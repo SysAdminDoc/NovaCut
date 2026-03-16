@@ -62,13 +62,18 @@ class ProjectAutoSave @Inject constructor(
 
     fun stop() {
         autoSaveJob?.cancel()
+        autoSaveJob = null
     }
 
     private fun saveState(projectId: String, state: AutoSaveState) {
         val file = getAutoSaveFile(projectId)
         val tempFile = File(autoSaveDir, "${projectId}.tmp")
         tempFile.writeText(state.serialize())
-        tempFile.renameTo(file)
+        // renameTo can fail on some filesystems — fallback to copy+delete
+        if (!tempFile.renameTo(file)) {
+            tempFile.copyTo(file, overwrite = true)
+            tempFile.delete()
+        }
     }
 
     private fun getAutoSaveFile(projectId: String): File {

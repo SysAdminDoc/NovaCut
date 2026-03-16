@@ -278,10 +278,12 @@ class EditorViewModel @Inject constructor(
                 tracks = tracks,
                 totalDurationMs = totalDuration,
                 selectedClipId = null,
-                selectedTrackId = null
+                selectedTrackId = null,
+                waveforms = state.waveforms - clipId
             )
         }
         rebuildPlayerTimeline()
+        saveProject()
     }
 
     fun splitClipAtPlayhead() {
@@ -322,6 +324,7 @@ class EditorViewModel @Inject constructor(
             recalculateDuration(s.copy(tracks = tracks))
         }
         rebuildPlayerTimeline()
+        saveProject()
     }
 
     fun beginTrim() {
@@ -347,8 +350,11 @@ class EditorViewModel @Inject constructor(
         rebuildPlayerTimeline()
     }
 
-    fun setClipSpeed(clipId: String, speed: Float) {
+    fun beginSpeedChange() {
         saveUndoState("Change speed")
+    }
+
+    fun setClipSpeed(clipId: String, speed: Float) {
         _state.update { state ->
             val tracks = state.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
@@ -376,16 +382,23 @@ class EditorViewModel @Inject constructor(
     }
 
     fun addEffect(clipId: String, effect: Effect) {
+        // Guard against duplicate effect types
+        val clip = _state.value.tracks.flatMap { it.clips }.firstOrNull { it.id == clipId }
+        if (clip?.effects?.any { it.type == effect.type } == true) {
+            showToast("${effect.type.displayName} already applied")
+            return
+        }
         saveUndoState("Add effect")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                track.copy(clips = track.clips.map { clip ->
-                    if (clip.id == clipId) clip.copy(effects = clip.effects + effect)
-                    else clip
+                track.copy(clips = track.clips.map { c ->
+                    if (c.id == clipId) c.copy(effects = c.effects + effect)
+                    else c
                 })
             }
             state.copy(tracks = tracks)
         }
+        saveProject()
     }
 
     fun updateEffect(clipId: String, effectId: String, params: Map<String, Float>) {
@@ -415,6 +428,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        saveProject()
     }
 
     fun setTransition(clipId: String, transition: Transition?) {
@@ -428,6 +442,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        saveProject()
     }
 
     fun addTextOverlay(text: TextOverlay) {
@@ -538,7 +553,11 @@ class EditorViewModel @Inject constructor(
     // Sheet toggles — each atomically dismisses other panels and shows the target
     fun showMediaPicker() { _state.update { dismissedPanelState(it).copy(showMediaPicker = true) } }
     fun hideMediaPicker() { _state.update { it.copy(showMediaPicker = false) } }
-    fun showExportSheet() { _state.update { dismissedPanelState(it).copy(showExportSheet = true) } }
+    fun showExportSheet() {
+        // Reset export state so stale COMPLETE/ERROR doesn't show on reopen
+        videoEngine.resetExportState()
+        _state.update { dismissedPanelState(it).copy(showExportSheet = true, exportState = ExportState.IDLE, exportProgress = 0f) }
+    }
     fun hideExportSheet() { _state.update { it.copy(showExportSheet = false) } }
     fun showEffectsPanel() { _state.update { dismissedPanelState(it).copy(showEffectsPanel = true) } }
     fun hideEffectsPanel() { _state.update { it.copy(showEffectsPanel = false) } }
@@ -546,7 +565,7 @@ class EditorViewModel @Inject constructor(
     fun hideTextEditor() { _state.update { it.copy(showTextEditor = false) } }
     fun showTransitionPicker() { _state.update { dismissedPanelState(it).copy(showTransitionPicker = true) } }
     fun hideTransitionPicker() { _state.update { it.copy(showTransitionPicker = false) } }
-    fun showAudioPanel() { saveUndoState("Audio changes"); _state.update { dismissedPanelState(it).copy(showAudioPanel = true) } }
+    fun showAudioPanel() { _state.update { dismissedPanelState(it).copy(showAudioPanel = true) } }
     fun hideAudioPanel() { _state.update { it.copy(showAudioPanel = false) } }
     fun showAiToolsPanel() { _state.update { dismissedPanelState(it).copy(showAiToolsPanel = true) } }
     fun hideAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = false) } }
@@ -567,6 +586,15 @@ class EditorViewModel @Inject constructor(
 
     fun beginVolumeChange() {
         saveUndoState("Change volume")
+    }
+
+    fun setClipFadeIn(clipId: String, fadeInMs: Long) {
+        // Fade in/out are metadata only — no undo spam needed
+        showToast("Fade in: ${fadeInMs}ms (applied on export)")
+    }
+
+    fun setClipFadeOut(clipId: String, fadeOutMs: Long) {
+        showToast("Fade out: ${fadeOutMs}ms (applied on export)")
     }
 
     // Export

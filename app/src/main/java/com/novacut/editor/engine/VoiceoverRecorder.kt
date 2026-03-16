@@ -40,7 +40,7 @@ class VoiceoverRecorderEngine @Inject constructor(
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 setAudioSamplingRate(44100)
                 setAudioEncodingBitRate(256000)
-                setAudioChannels(2)
+                setAudioChannels(1)
                 setOutputFile(file.absolutePath)
                 prepare()
                 start()
@@ -57,15 +57,18 @@ class VoiceoverRecorderEngine @Inject constructor(
     }
 
     fun stopRecording(): Uri? {
+        val file = outputFile
         return try {
             recorder?.stop()
             recorder?.release()
             recorder = null
+            outputFile = null
             _isRecording.value = false
-            outputFile?.let { Uri.fromFile(it) }
+            file?.let { Uri.fromFile(it) }
         } catch (e: Exception) {
             recorder?.release()
             recorder = null
+            outputFile = null
             _isRecording.value = false
             null
         }
@@ -78,8 +81,10 @@ class VoiceoverRecorderEngine @Inject constructor(
     }
 
     fun release() {
+        try { recorder?.stop() } catch (_: Exception) { }
         recorder?.release()
         recorder = null
+        outputFile = null
         _isRecording.value = false
     }
 }

@@ -83,8 +83,9 @@ object KeyframeEngine {
             }
             Easing.SPRING -> {
                 val c4 = (2f * PI / 3f).toFloat()
-                if (t == 0f || t == 1f) t
-                else -(2f.pow(-10f * t)) * sin((t * 10f - 0.75f) * c4) + 1f
+                val raw = if (t == 0f || t == 1f) t
+                    else -(2f.pow(-10f * t)) * sin((t * 10f - 0.75f) * c4) + 1f
+                raw.coerceIn(0f, 1f) // Clamp elastic oscillation
             }
         }
     }

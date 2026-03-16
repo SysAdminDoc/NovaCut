@@ -1,6 +1,5 @@
 package com.novacut.editor.ui.editor
 
-import android.os.Environment
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -151,6 +150,7 @@ fun EditorScreen(
                 SpeedPanel(
                     currentSpeed = clip.speed,
                     isReversed = clip.isReversed,
+                    onSpeedDragStarted = viewModel::beginSpeedChange,
                     onSpeedChanged = { viewModel.setClipSpeed(clip.id, it) },
                     onReversedChanged = { viewModel.setClipReversed(clip.id, it) },
                     onClose = { viewModel.setTool(EditorTool.NONE) }
@@ -210,10 +210,9 @@ fun EditorScreen(
                 exportProgress = state.exportProgress,
                 onConfigChanged = viewModel::updateExportConfig,
                 onStartExport = {
-                    val moviesDir = Environment.getExternalStoragePublicDirectory(
-                        Environment.DIRECTORY_MOVIES
-                    )
-                    val outputDir = File(moviesDir, "NovaCut").apply { mkdirs() }
+                    // Use app-private external dir — works on all Android versions including 11+
+                    val moviesDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
+                    val outputDir = File(moviesDir ?: context.filesDir, "NovaCut").apply { mkdirs() }
                     viewModel.startExport(outputDir)
                 },
                 onClose = viewModel::hideExportSheet
@@ -236,9 +235,15 @@ fun EditorScreen(
                     viewModel.setClipVolume(clipId, volume)
                 },
                 onVolumeDragStarted = viewModel::beginVolumeChange,
-                onFadeInChanged = { /* Future */ },
-                onFadeOutChanged = { /* Future */ },
-                onStartVoiceover = { /* Future */ },
+                onFadeInChanged = { fadeMs ->
+                    val clipId = state.selectedClipId ?: return@AudioPanel
+                    viewModel.setClipFadeIn(clipId, fadeMs)
+                },
+                onFadeOutChanged = { fadeMs ->
+                    val clipId = state.selectedClipId ?: return@AudioPanel
+                    viewModel.setClipFadeOut(clipId, fadeMs)
+                },
+                onStartVoiceover = { /* Future: voiceover recording */ },
                 onClose = viewModel::hideAudioPanel
             )
         }

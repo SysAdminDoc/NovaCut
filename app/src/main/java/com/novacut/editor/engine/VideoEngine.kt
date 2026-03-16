@@ -27,13 +27,10 @@ class VideoEngine @Inject constructor(
     private var player: ExoPlayer? = null
     private var playerListener: Player.Listener? = null
     // Thread-safe cache without accessOrder to avoid ConcurrentModificationException
+    // Don't recycle evicted bitmaps — they may still be referenced by Compose Image nodes
     private val thumbnailCache = object : LinkedHashMap<String, Bitmap>(100, 0.75f, false) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>): Boolean {
-            if (size > 200) {
-                eldest.value.recycle()
-                return true
-            }
-            return false
+            return size > 200
         }
     }
     private val cacheLock = Any()
@@ -133,8 +130,10 @@ class VideoEngine @Inject constructor(
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, uri)
+            // Try CAPTURE_FRAMERATE first (camera recordings), fall back to parsing bitrate
             val rate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)
-            rate?.toFloatOrNull()?.toInt() ?: 30
+                ?: retriever.extractMetadata(24) // METADATA_KEY_VIDEO_FRAME_COUNT not always available
+            rate?.toFloatOrNull()?.toInt()?.coerceIn(1, 120) ?: 30
         } catch (e: Exception) {
             30
         } finally {

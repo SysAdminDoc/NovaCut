@@ -52,16 +52,17 @@ fun Timeline(
     val pixelsPerMs = zoomLevel * 0.15f // base scale
     val coroutineScope = rememberCoroutineScope()
 
-    // Thumbnail cache
+    // Thumbnail cache — quantize zoom to prevent unbounded cache growth
     val thumbnails = remember { mutableStateMapOf<String, List<Bitmap>>() }
+    val quantizedZoom = (zoomLevel * 4).toInt() / 4f // quantize to 0.25 steps
 
     // Load thumbnails for visible clips
-    LaunchedEffect(tracks, zoomLevel) {
+    LaunchedEffect(tracks, quantizedZoom) {
         tracks.forEach { track ->
             track.clips.forEach { clip ->
-                val key = "${clip.id}_${zoomLevel}"
+                val key = "${clip.id}_${quantizedZoom}"
                 if (!thumbnails.containsKey(key)) {
-                    coroutineScope.launch {
+                    launch {
                         val count = ((clip.durationMs * pixelsPerMs) / 80f).toInt().coerceIn(1, 20)
                         val strip = engine.extractThumbnailStrip(clip.sourceUri, count)
                         thumbnails[key] = strip
@@ -127,17 +128,16 @@ fun Timeline(
                     .weight(1f)
                     .clipToBounds()
                     .onSizeChanged { timelineWidthPx = it.width.toFloat() }
-                    .pointerInput(Unit) {
+                    .pointerInput(zoomLevel, scrollOffsetMs) {
                         detectTransformGestures { _, pan, zoom, _ ->
+                            val currentPixelsPerMs = zoomLevel * 0.15f
                             val newZoom = (zoomLevel * zoom).coerceIn(0.1f, 10f)
                             onZoomChanged(newZoom)
-                            val panMs = (pan.x / pixelsPerMs).toLong()
+                            val panMs = (pan.x / currentPixelsPerMs).toLong()
                             onScrollChanged((scrollOffsetMs - panMs).coerceAtLeast(0L))
                         }
                     }
             ) {
-                val scrollState = rememberScrollState()
-
                 Column {
                     // Time ruler
                     Canvas(
@@ -166,10 +166,11 @@ fun Timeline(
                                     color = Mocha.Surface0.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(0.dp)
                                 )
-                                .pointerInput(Unit) {
+                                .pointerInput(scrollOffsetMs, zoomLevel) {
                                     detectTapGestures { offset ->
                                         // Convert tap to timeline position
-                                        val tappedMs = scrollOffsetMs + (offset.x / pixelsPerMs).toLong()
+                                        val currentPixelsPerMs = zoomLevel * 0.15f
+                                        val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
                                         // Find clip at this position
                                         val clip = track.clips.firstOrNull {
                                             tappedMs in it.timelineStartMs..it.timelineEndMs
@@ -216,7 +217,7 @@ fun Timeline(
                                     ) {
                                         // Thumbnail strip for video tracks
                                         if (track.type == TrackType.VIDEO) {
-                                            val key = "${clip.id}_${zoomLevel}"
+                                            val key = "${clip.id}_${quantizedZoom}"
                                             val thumbs = thumbnails[key]
                                             if (thumbs != null && thumbs.isNotEmpty()) {
                                                 Row(
@@ -263,13 +264,14 @@ fun Timeline(
                                                             bottomStart = 6.dp
                                                         )
                                                     )
-                                                    .pointerInput(clip.id) {
+                                                    .pointerInput(clip.id, clip.trimStartMs, clip.trimEndMs, zoomLevel) {
+                                                        val currentPixelsPerMs = zoomLevel * 0.15f
                                                         detectHorizontalDragGestures(
                                                             onDragStart = { onTrimDragStarted() },
                                                             onDragEnd = {},
                                                             onDragCancel = {},
                                                             onHorizontalDrag = { _, dragAmount ->
-                                                                val deltaMs = (dragAmount / pixelsPerMs).toLong()
+                                                                val deltaMs = (dragAmount / currentPixelsPerMs).toLong()
                                                                 val newStart = (clip.trimStartMs + deltaMs)
                                                                     .coerceAtLeast(0L)
                                                                     .coerceAtMost(clip.trimEndMs - 100L)
@@ -291,13 +293,14 @@ fun Timeline(
                                                             bottomEnd = 6.dp
                                                         )
                                                     )
-                                                    .pointerInput(clip.id) {
+                                                    .pointerInput(clip.id, clip.trimStartMs, clip.trimEndMs, zoomLevel) {
+                                                        val currentPixelsPerMs = zoomLevel * 0.15f
                                                         detectHorizontalDragGestures(
                                                             onDragStart = { onTrimDragStarted() },
                                                             onDragEnd = {},
                                                             onDragCancel = {},
                                                             onHorizontalDrag = { _, dragAmount ->
-                                                                val deltaMs = (dragAmount / pixelsPerMs).toLong()
+                                                                val deltaMs = (dragAmount / currentPixelsPerMs).toLong()
                                                                 val newEnd = (clip.trimEndMs + deltaMs)
                                                                     .coerceAtLeast(clip.trimStartMs + 100L)
                                                                 onTrimChanged(clip.id, null, newEnd)
@@ -423,15 +426,17 @@ private fun DrawScope.drawWaveform(samples: FloatArray, color: Color) {
 }
 
 private fun DrawScope.drawWaveformPlaceholder(color: Color) {
+    // Deterministic pattern to avoid 30fps flicker from Math.random()
     val steps = (size.width / 4f).toInt().coerceAtLeast(1)
+    val centerY = size.height / 2f
     for (i in 0 until steps) {
         val x = i * 4f
-        val h = (Math.random() * size.height * 0.6f + size.height * 0.1f).toFloat()
-        val top = (size.height - h) / 2f
+        val amplitude = (kotlin.math.sin(i * 0.7) * 0.3 + 0.4).toFloat()
+        val barH = (amplitude * size.height * 0.45f).coerceAtLeast(1f)
         drawLine(
-            color = color.copy(alpha = 0.6f),
-            start = Offset(x, top),
-            end = Offset(x, top + h),
+            color = color.copy(alpha = 0.4f),
+            start = Offset(x, centerY - barH),
+            end = Offset(x, centerY + barH),
             strokeWidth = 2f
         )
     }

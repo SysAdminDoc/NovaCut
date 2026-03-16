@@ -417,13 +417,71 @@ fun EffectAdjustmentPanel(
                     onUpdateParams(mapOf("width" to it))
                 }
             }
+            EffectType.TINT -> {
+                EffectSlider("Tint", effect.params["value"] ?: 0f, -1f, 1f) {
+                    onUpdateParams(mapOf("value" to it))
+                }
+            }
+            EffectType.GAMMA -> {
+                EffectSlider("Gamma", effect.params["value"] ?: 1f, 0.2f, 3f) {
+                    onUpdateParams(mapOf("value" to it))
+                }
+            }
+            EffectType.HIGHLIGHTS -> {
+                EffectSlider("Highlights", effect.params["value"] ?: 0f, -1f, 1f) {
+                    onUpdateParams(mapOf("value" to it))
+                }
+            }
+            EffectType.SHADOWS -> {
+                EffectSlider("Shadows", effect.params["value"] ?: 0f, -1f, 1f) {
+                    onUpdateParams(mapOf("value" to it))
+                }
+            }
+            EffectType.VIBRANCE -> {
+                EffectSlider("Vibrance", effect.params["value"] ?: 0f, -1f, 1f) {
+                    onUpdateParams(mapOf("value" to it))
+                }
+            }
+            EffectType.MOSAIC -> {
+                EffectSlider("Size", effect.params["size"] ?: 15f, 2f, 50f) {
+                    onUpdateParams(mapOf("size" to it))
+                }
+            }
+            EffectType.RADIAL_BLUR -> {
+                EffectSlider("Intensity", effect.params["intensity"] ?: 0.5f, 0f, 1f) {
+                    onUpdateParams(mapOf("intensity" to it))
+                }
+            }
+            EffectType.MOTION_BLUR -> {
+                EffectSlider("Intensity", effect.params["intensity"] ?: 0.5f, 0f, 1f) {
+                    onUpdateParams(mapOf("intensity" to it))
+                }
+            }
+            EffectType.FISHEYE -> {
+                EffectSlider("Intensity", effect.params["intensity"] ?: 0.5f, 0f, 1f) {
+                    onUpdateParams(mapOf("intensity" to it))
+                }
+            }
+            EffectType.WAVE -> {
+                EffectSlider("Amplitude", effect.params["amplitude"] ?: 0.02f, 0f, 0.1f) {
+                    onUpdateParams(mapOf("amplitude" to it))
+                }
+                EffectSlider("Frequency", effect.params["frequency"] ?: 10f, 1f, 30f) {
+                    onUpdateParams(mapOf("frequency" to it))
+                }
+            }
+            EffectType.POSTERIZE -> {
+                EffectSlider("Levels", effect.params["levels"] ?: 6f, 2f, 16f) {
+                    onUpdateParams(mapOf("levels" to it))
+                }
+            }
             EffectType.SPEED -> {
                 EffectSlider("Speed", effect.params["value"] ?: 1f, 0.1f, 16f) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             else -> {
-                Text("No adjustable parameters", color = Mocha.Subtext0, fontSize = 12.sp)
+                // Effects without adjustable parameters (GRAYSCALE, SEPIA, INVERT, MIRROR, REVERSE)
             }
         }
     }
@@ -459,9 +517,48 @@ fun EffectSlider(
 }
 
 @Composable
+fun SpeedSlider(
+    label: String,
+    value: Float,
+    min: Float,
+    max: Float,
+    onDragStarted: () -> Unit,
+    onValueChange: (Float) -> Unit
+) {
+    var isDragging by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, color = Mocha.Subtext1, fontSize = 12.sp)
+            Text("%.2f".format(value), color = Mocha.Subtext0, fontSize = 12.sp)
+        }
+        Slider(
+            value = value,
+            onValueChange = {
+                if (!isDragging) {
+                    isDragging = true
+                    onDragStarted()
+                }
+                onValueChange(it)
+            },
+            onValueChangeFinished = { isDragging = false },
+            valueRange = min..max,
+            colors = SliderDefaults.colors(
+                thumbColor = Mocha.Mauve,
+                activeTrackColor = Mocha.Mauve,
+                inactiveTrackColor = Mocha.Surface1
+            )
+        )
+    }
+}
+
+@Composable
 fun SpeedPanel(
     currentSpeed: Float,
     isReversed: Boolean,
+    onSpeedDragStarted: () -> Unit = {},
     onSpeedChanged: (Float) -> Unit,
     onReversedChanged: (Boolean) -> Unit,
     onClose: () -> Unit,
@@ -493,9 +590,9 @@ fun SpeedPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(presetSpeeds) { speed ->
-                val isActive = currentSpeed == speed
+                val isActive = kotlin.math.abs(currentSpeed - speed) < 0.01f
                 FilterChip(
-                    onClick = { onSpeedChanged(speed) },
+                    onClick = { onSpeedDragStarted(); onSpeedChanged(speed) },
                     label = { Text("${speed}x", fontSize = 12.sp) },
                     selected = isActive,
                     colors = FilterChipDefaults.filterChipColors(
@@ -510,8 +607,8 @@ fun SpeedPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Custom speed slider
-        EffectSlider("Custom Speed", currentSpeed, 0.1f, 16f) { onSpeedChanged(it) }
+        // Custom speed slider with drag start for undo debounce
+        SpeedSlider("Custom Speed", currentSpeed, 0.1f, 16f, onSpeedDragStarted) { onSpeedChanged(it) }
 
         // Reverse toggle
         Row(
