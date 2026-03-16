@@ -6,12 +6,37 @@
 # Room
 -keep class * extends androidx.room.RoomDatabase
 -keep class * implements androidx.room.DatabaseConfiguration
+-keep @androidx.room.Database class * { *; }
+-keep @androidx.room.Dao class * { *; }
 
 # Hilt / Dagger
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
+-keep,allowobfuscation,allowshrinking class dagger.hilt.android.internal.** { *; }
 -dontwarn dagger.hilt.internal.**
+
+# Compose — keep runtime + reflection needs
+-keep class androidx.compose.runtime.** { *; }
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
+-keepclassmembers class * {
+    @androidx.compose.ui.tooling.preview.Preview <methods>;
+}
+-dontwarn androidx.compose.**
+
+# Compose Material 3
+-keep class androidx.compose.material3.** { *; }
+-dontwarn androidx.compose.material3.**
+
+# Navigation Compose
+-keep class androidx.navigation.** { *; }
+-dontwarn androidx.navigation.**
+
+# Lifecycle
+-keep class androidx.lifecycle.** { *; }
+-dontwarn androidx.lifecycle.**
 
 # Media3 (ExoPlayer, Transformer, Effect)
 -keep class androidx.media3.** { *; }
@@ -23,9 +48,18 @@
 -keepclassmembers class kotlinx.coroutines.** { volatile <fields>; }
 
 # Coil
+-keep class coil.** { *; }
 -dontwarn coil.**
+
+# Kotlin serialization / reflection
+-keepclassmembers class * extends java.lang.Enum {
+    <fields>;
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
 
 # Suppress common warnings
 -dontwarn org.bouncycastle.**
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
+-dontwarn java.lang.invoke.StringConcatFactory

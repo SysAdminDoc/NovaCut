@@ -73,21 +73,19 @@ fun EditorScreen(
                         EditorTool.TRANSITION -> viewModel.showTransitionPicker()
                         EditorTool.EXPORT -> viewModel.showExportSheet()
                         EditorTool.AUDIO -> viewModel.showAudioPanel()
+                        EditorTool.TRANSFORM -> viewModel.showTransformPanel()
+                        EditorTool.CROP -> viewModel.showCropPanel()
+                        EditorTool.SPEED -> viewModel.dismissAllPanels()
                         EditorTool.SPLIT -> {
                             viewModel.splitClipAtPlayhead()
                             viewModel.setTool(EditorTool.NONE)
                         }
-                        EditorTool.TRIM -> { /* Trim handles activate in Timeline */ }
-                        EditorTool.TRANSFORM -> {
-                            viewModel.showToast("Transform: coming soon")
-                            viewModel.setTool(EditorTool.NONE)
-                        }
-                        EditorTool.CROP -> {
-                            viewModel.showToast("Crop: coming soon")
-                            viewModel.setTool(EditorTool.NONE)
-                        }
+                        EditorTool.TRIM -> { /* Trim handles activate in Timeline when clip selected */ }
                         else -> {}
                     }
+                },
+                onDisabledToolTap = { label ->
+                    viewModel.showToast("Select a clip to use $label")
                 },
                 onAddMedia = viewModel::showMediaPicker,
                 onUndo = viewModel::undo,
@@ -245,6 +243,45 @@ fun EditorScreen(
                 },
                 onStartVoiceover = { /* Future: voiceover recording */ },
                 onClose = viewModel::hideAudioPanel
+            )
+        }
+
+        // Transform panel
+        AnimatedVisibility(
+            visible = state.showTransformPanel,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = viewModel.getSelectedClip()
+            if (clip != null) {
+                TransformPanel(
+                    clip = clip,
+                    onTransformDragStarted = viewModel::beginTransformChange,
+                    onTransformChanged = { px, py, sx, sy, rot ->
+                        viewModel.setClipTransform(clip.id, px, py, sx, sy, rot)
+                    },
+                    onOpacityChanged = { viewModel.setClipOpacity(clip.id, it) },
+                    onReset = { viewModel.resetClipTransform(clip.id) },
+                    onClose = viewModel::hideTransformPanel
+                )
+            }
+        }
+
+        // Crop panel
+        AnimatedVisibility(
+            visible = state.showCropPanel,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            CropPanel(
+                currentAspect = state.project.aspectRatio,
+                onCropSelected = { ratio ->
+                    viewModel.renameProject(state.project.name) // trigger save
+                    viewModel.updateProjectAspect(ratio)
+                },
+                onClose = viewModel::hideCropPanel
             )
         }
 

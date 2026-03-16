@@ -54,6 +54,8 @@ data class EditorState(
     val waveforms: Map<String, FloatArray> = emptyMap(),
     val showAudioPanel: Boolean = false,
     val showAiToolsPanel: Boolean = false,
+    val showTransformPanel: Boolean = false,
+    val showCropPanel: Boolean = false,
     val selectedEffectId: String? = null,
     val undoStack: List<UndoAction> = emptyList(),
     val redoStack: List<UndoAction> = emptyList(),
@@ -545,6 +547,8 @@ class EditorViewModel @Inject constructor(
         showTransitionPicker = false,
         showAudioPanel = false,
         showAiToolsPanel = false,
+        showTransformPanel = false,
+        showCropPanel = false,
         selectedEffectId = null
     )
 
@@ -569,6 +573,10 @@ class EditorViewModel @Inject constructor(
     fun hideAudioPanel() { _state.update { it.copy(showAudioPanel = false) } }
     fun showAiToolsPanel() { _state.update { dismissedPanelState(it).copy(showAiToolsPanel = true) } }
     fun hideAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = false) } }
+    fun showTransformPanel() { _state.update { dismissedPanelState(it).copy(showTransformPanel = true) } }
+    fun hideTransformPanel() { _state.update { it.copy(showTransformPanel = false) } }
+    fun showCropPanel() { _state.update { dismissedPanelState(it).copy(showCropPanel = true) } }
+    fun hideCropPanel() { _state.update { it.copy(showCropPanel = false) } }
     fun selectEffect(effectId: String?) { _state.update { it.copy(selectedEffectId = effectId) } }
     fun clearSelectedEffect() { _state.update { it.copy(selectedEffectId = null) } }
 
@@ -586,6 +594,56 @@ class EditorViewModel @Inject constructor(
 
     fun beginVolumeChange() {
         saveUndoState("Change volume")
+    }
+
+    fun beginTransformChange() {
+        saveUndoState("Transform clip")
+    }
+
+    fun setClipTransform(clipId: String, positionX: Float? = null, positionY: Float? = null,
+                         scaleX: Float? = null, scaleY: Float? = null, rotation: Float? = null) {
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(
+                        positionX = positionX ?: clip.positionX,
+                        positionY = positionY ?: clip.positionY,
+                        scaleX = (scaleX ?: clip.scaleX).coerceIn(0.1f, 5f),
+                        scaleY = (scaleY ?: clip.scaleY).coerceIn(0.1f, 5f),
+                        rotation = rotation ?: clip.rotation
+                    ) else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
+    }
+
+    fun resetClipTransform(clipId: String) {
+        saveUndoState("Reset transform")
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(
+                        positionX = 0f, positionY = 0f,
+                        scaleX = 1f, scaleY = 1f, rotation = 0f
+                    ) else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
+        saveProject()
+    }
+
+    fun setClipOpacity(clipId: String, opacity: Float) {
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(opacity = opacity.coerceIn(0f, 1f))
+                    else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
     }
 
     fun setClipFadeIn(clipId: String, fadeInMs: Long) {
@@ -724,6 +782,12 @@ class EditorViewModel @Inject constructor(
     fun renameProject(name: String) {
         _state.update { it.copy(project = it.project.copy(name = name)) }
         saveProject()
+    }
+
+    fun updateProjectAspect(aspect: AspectRatio) {
+        _state.update { it.copy(project = it.project.copy(aspectRatio = aspect)) }
+        saveProject()
+        showToast("Aspect ratio: ${aspect.label}")
     }
 
     private fun saveUndoState(description: String) {

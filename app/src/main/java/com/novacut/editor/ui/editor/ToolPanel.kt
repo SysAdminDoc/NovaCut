@@ -36,7 +36,7 @@ val mainTools = listOf(
     ToolItem(EditorTool.SPEED, Icons.Default.Speed, "Speed", true),
     ToolItem(EditorTool.EFFECTS, Icons.Default.AutoFixHigh, "Effects", true),
     ToolItem(EditorTool.TEXT, Icons.Default.Title, "Text"),
-    ToolItem(EditorTool.AUDIO, Icons.Default.MusicNote, "Audio"),
+    ToolItem(EditorTool.AUDIO, Icons.Default.MusicNote, "Audio", true),
     ToolItem(EditorTool.TRANSITION, Icons.Default.SwapHoriz, "Transition", true),
     ToolItem(EditorTool.TRANSFORM, Icons.Default.Transform, "Transform", true),
     ToolItem(EditorTool.CROP, Icons.Default.Crop, "Crop", true),
@@ -48,6 +48,7 @@ fun ToolPanel(
     currentTool: EditorTool,
     selectedClipId: String?,
     onToolSelected: (EditorTool) -> Unit,
+    onDisabledToolTap: (String) -> Unit,
     onAddMedia: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
@@ -146,7 +147,10 @@ fun ToolPanel(
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable(enabled = isEnabled) { onToolSelected(tool.tool) }
+                        .clickable {
+                            if (isEnabled) onToolSelected(tool.tool)
+                            else onDisabledToolTap(tool.label)
+                        }
                         .background(
                             if (isActive) Mocha.Mauve.copy(alpha = 0.2f)
                             else Color.Transparent
@@ -625,6 +629,137 @@ fun SpeedPanel(
                     checkedTrackColor = Mocha.Mauve.copy(alpha = 0.3f)
                 )
             )
+        }
+    }
+}
+
+@Composable
+fun TransformPanel(
+    clip: Clip,
+    onTransformDragStarted: () -> Unit,
+    onTransformChanged: (positionX: Float?, positionY: Float?, scaleX: Float?, scaleY: Float?, rotation: Float?) -> Unit,
+    onOpacityChanged: (Float) -> Unit,
+    onReset: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Mocha.Mantle, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Transform", color = Mocha.Text, fontSize = 16.sp)
+            Row {
+                TextButton(onClick = onReset) {
+                    Text("Reset", color = Mocha.Peach, fontSize = 12.sp)
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SpeedSlider("Position X", clip.positionX, -1f, 1f, onTransformDragStarted) {
+            onTransformChanged(it, null, null, null, null)
+        }
+        SpeedSlider("Position Y", clip.positionY, -1f, 1f, onTransformDragStarted) {
+            onTransformChanged(null, it, null, null, null)
+        }
+        SpeedSlider("Scale X", clip.scaleX, 0.1f, 5f, onTransformDragStarted) {
+            onTransformChanged(null, null, it, null, null)
+        }
+        SpeedSlider("Scale Y", clip.scaleY, 0.1f, 5f, onTransformDragStarted) {
+            onTransformChanged(null, null, null, it, null)
+        }
+        SpeedSlider("Rotation", clip.rotation, -360f, 360f, onTransformDragStarted) {
+            onTransformChanged(null, null, null, null, it)
+        }
+        SpeedSlider("Opacity", clip.opacity, 0f, 1f, onTransformDragStarted) {
+            onOpacityChanged(it)
+        }
+    }
+}
+
+@Composable
+fun CropPanel(
+    onCropSelected: (AspectRatio) -> Unit,
+    currentAspect: AspectRatio,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Mocha.Mantle, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Crop / Aspect Ratio", color = Mocha.Text, fontSize = 16.sp)
+            IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(AspectRatio.entries.toList()) { ratio ->
+                val isActive = currentAspect == ratio
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onCropSelected(ratio) }
+                        .background(
+                            if (isActive) Mocha.Mauve.copy(alpha = 0.2f) else Mocha.Surface0
+                        )
+                        .padding(12.dp)
+                        .width(70.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Aspect ratio preview box
+                    val previewW: Float
+                    val previewH: Float
+                    val maxDim = 32f
+                    if (ratio.toFloat() >= 1f) {
+                        previewW = maxDim
+                        previewH = maxDim / ratio.toFloat()
+                    } else {
+                        previewH = maxDim
+                        previewW = maxDim * ratio.toFloat()
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(width = previewW.dp, height = previewH.dp)
+                            .border(
+                                width = 2.dp,
+                                color = if (isActive) Mocha.Mauve else Mocha.Subtext0,
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        ratio.label,
+                        fontSize = 11.sp,
+                        color = if (isActive) Mocha.Mauve else Mocha.Text,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }

@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.4.0
+v0.5.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -77,10 +77,14 @@ v0.4.0
 - Speed control (0.1x-16x) + reverse
 - Keyframe opacity applied during export via RgbMatrix
 - Text overlays with 10 animation styles
-- Audio panel with volume controls + real waveform visualization
+- Audio panel with volume controls + real waveform visualization (requires clip selection)
 - Effects panel with add -> adjust flow (EffectsPanel -> EffectAdjustmentPanel)
+- Transform panel: position X/Y, scale X/Y, rotation, opacity sliders with reset
+- Crop panel: aspect ratio selector (16:9, 9:16, 1:1, 4:3, 3:4, 21:9) with visual previews
+- Disabled tool feedback: "Select a clip to use X" toast when tapping tools without selection
 - AI tools panel (UI stub)
 - Export: resolution, codec, bitrate from config; foreground service with MEDIA_PROCESSING type
+- R8 minification enabled with comprehensive ProGuard keep rules (~5MB APK)
 - Undo/redo (50 levels, immutable state snapshots)
 - Project auto-save every 30s with full state recovery
 - Project persistence to Room DB
