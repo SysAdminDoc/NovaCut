@@ -22,7 +22,7 @@ object AppModule {
             context,
             ProjectDatabase::class.java,
             "novacut.db"
-        ).fallbackToDestructiveMigration(dropAllTables = true).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

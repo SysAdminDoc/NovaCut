@@ -23,6 +23,7 @@ import java.io.File
 
 @Composable
 fun EditorScreen(
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: EditorViewModel = hiltViewModel()
 ) {
@@ -50,10 +51,12 @@ fun EditorScreen(
                 zoomLevel = state.zoomLevel,
                 scrollOffsetMs = state.scrollOffsetMs,
                 selectedClipId = state.selectedClipId,
+                waveforms = state.waveforms,
                 onClipSelected = viewModel::selectClip,
                 onPlayheadMoved = viewModel::seekTo,
                 onZoomChanged = viewModel::setZoomLevel,
                 onScrollChanged = viewModel::setScrollOffset,
+                onTrimChanged = viewModel::trimClip,
                 engine = viewModel.engine,
                 modifier = Modifier.weight(0.35f)
             )
@@ -69,10 +72,13 @@ fun EditorScreen(
                         EditorTool.TEXT -> viewModel.showTextEditor()
                         EditorTool.TRANSITION -> viewModel.showTransitionPicker()
                         EditorTool.EXPORT -> viewModel.showExportSheet()
+                        EditorTool.AUDIO -> viewModel.showAudioPanel()
                         EditorTool.SPLIT -> {
                             viewModel.splitClipAtPlayhead()
                             viewModel.setTool(EditorTool.NONE)
                         }
+                        EditorTool.TRIM -> { /* Trim handles activate in Timeline */ }
+                        EditorTool.TRANSFORM, EditorTool.CROP -> { /* Tool mode activates in Preview */ }
                         else -> {}
                     }
                 },
@@ -112,6 +118,8 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@EffectsPanel
                     val effect = Effect(type = effectType, params = getDefaultParams(effectType))
                     viewModel.addEffect(clipId, effect)
+                    viewModel.selectEffect(effect.id)
+                    viewModel.hideEffectsPanel()
                 },
                 onClose = viewModel::hideEffectsPanel
             )
@@ -198,6 +206,70 @@ fun EditorScreen(
             )
         }
 
+        // Audio panel
+        AnimatedVisibility(
+            visible = state.showAudioPanel,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = viewModel.getSelectedClip()
+            AudioPanel(
+                clip = clip,
+                waveform = clip?.let { state.waveforms[it.id] },
+                onVolumeChanged = { volume ->
+                    val clipId = state.selectedClipId ?: return@AudioPanel
+                    viewModel.setClipVolume(clipId, volume)
+                },
+                onFadeInChanged = { /* Wire in Phase 5 */ },
+                onFadeOutChanged = { /* Wire in Phase 5 */ },
+                onStartVoiceover = { /* Future */ },
+                onClose = viewModel::hideAudioPanel
+            )
+        }
+
+        // AI tools panel
+        AnimatedVisibility(
+            visible = state.showAiToolsPanel,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            AiToolsPanel(
+                hasSelectedClip = state.selectedClipId != null,
+                onToolSelected = { toolId ->
+                    viewModel.showToast("AI tool: $toolId (processing...)")
+                },
+                onClose = viewModel::hideAiToolsPanel
+            )
+        }
+
+        // Effect adjustment panel
+        AnimatedVisibility(
+            visible = state.selectedEffectId != null,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = viewModel.getSelectedClip()
+            val effect = clip?.effects?.firstOrNull { it.id == state.selectedEffectId }
+            if (effect != null) {
+                EffectAdjustmentPanel(
+                    effect = effect,
+                    onUpdateParams = { params ->
+                        val clipId = state.selectedClipId ?: return@EffectAdjustmentPanel
+                        viewModel.updateEffect(clipId, effect.id, params)
+                    },
+                    onRemove = {
+                        val clipId = state.selectedClipId ?: return@EffectAdjustmentPanel
+                        viewModel.removeEffect(clipId, effect.id)
+                        viewModel.clearSelectedEffect()
+                    },
+                    onClose = viewModel::clearSelectedEffect
+                )
+            }
+        }
+
         // Toast messages
         state.toastMessage?.let { message ->
             Snackbar(
@@ -214,40 +286,40 @@ fun EditorScreen(
     }
 }
 
-private fun getDefaultParams(type: EffectType): MutableMap<String, Float> {
+private fun getDefaultParams(type: EffectType): Map<String, Float> {
     return when (type) {
-        EffectType.BRIGHTNESS -> mutableMapOf("value" to 0f)
-        EffectType.CONTRAST -> mutableMapOf("value" to 1f)
-        EffectType.SATURATION -> mutableMapOf("value" to 1f)
-        EffectType.TEMPERATURE -> mutableMapOf("value" to 0f)
-        EffectType.TINT -> mutableMapOf("value" to 0f)
-        EffectType.EXPOSURE -> mutableMapOf("value" to 0f)
-        EffectType.GAMMA -> mutableMapOf("value" to 1f)
-        EffectType.HIGHLIGHTS -> mutableMapOf("value" to 0f)
-        EffectType.SHADOWS -> mutableMapOf("value" to 0f)
-        EffectType.VIBRANCE -> mutableMapOf("value" to 0f)
-        EffectType.VIGNETTE -> mutableMapOf("intensity" to 0.5f, "radius" to 0.7f)
-        EffectType.GAUSSIAN_BLUR -> mutableMapOf("radius" to 5f)
-        EffectType.SHARPEN -> mutableMapOf("strength" to 0.5f)
-        EffectType.FILM_GRAIN -> mutableMapOf("intensity" to 0.1f)
-        EffectType.GLITCH -> mutableMapOf("intensity" to 0.5f)
-        EffectType.PIXELATE -> mutableMapOf("size" to 10f)
-        EffectType.CHROMATIC_ABERRATION -> mutableMapOf("intensity" to 0.5f)
-        EffectType.CHROMA_KEY -> mutableMapOf("similarity" to 0.4f, "smoothness" to 0.1f, "spill" to 0.1f)
-        EffectType.TILT_SHIFT -> mutableMapOf("blur" to 0.01f, "focusY" to 0.5f, "width" to 0.1f)
-        EffectType.CYBERPUNK -> mutableMapOf("intensity" to 0.7f)
-        EffectType.NOIR -> mutableMapOf("intensity" to 0.7f)
-        EffectType.VINTAGE -> mutableMapOf("intensity" to 0.7f)
-        EffectType.COOL_TONE -> mutableMapOf("intensity" to 0.5f)
-        EffectType.WARM_TONE -> mutableMapOf("intensity" to 0.5f)
-        EffectType.SPEED -> mutableMapOf("value" to 1f)
-        EffectType.MOSAIC -> mutableMapOf("size" to 15f)
-        EffectType.RADIAL_BLUR -> mutableMapOf("intensity" to 0.5f)
-        EffectType.MOTION_BLUR -> mutableMapOf("intensity" to 0.5f)
-        EffectType.FISHEYE -> mutableMapOf("intensity" to 0.5f)
-        EffectType.MIRROR -> mutableMapOf()
-        EffectType.WAVE -> mutableMapOf("amplitude" to 0.02f, "frequency" to 10f)
-        EffectType.POSTERIZE -> mutableMapOf("levels" to 6f)
-        else -> mutableMapOf()
+        EffectType.BRIGHTNESS -> mapOf("value" to 0f)
+        EffectType.CONTRAST -> mapOf("value" to 1f)
+        EffectType.SATURATION -> mapOf("value" to 1f)
+        EffectType.TEMPERATURE -> mapOf("value" to 0f)
+        EffectType.TINT -> mapOf("value" to 0f)
+        EffectType.EXPOSURE -> mapOf("value" to 0f)
+        EffectType.GAMMA -> mapOf("value" to 1f)
+        EffectType.HIGHLIGHTS -> mapOf("value" to 0f)
+        EffectType.SHADOWS -> mapOf("value" to 0f)
+        EffectType.VIBRANCE -> mapOf("value" to 0f)
+        EffectType.VIGNETTE -> mapOf("intensity" to 0.5f, "radius" to 0.7f)
+        EffectType.GAUSSIAN_BLUR -> mapOf("radius" to 5f)
+        EffectType.SHARPEN -> mapOf("strength" to 0.5f)
+        EffectType.FILM_GRAIN -> mapOf("intensity" to 0.1f)
+        EffectType.GLITCH -> mapOf("intensity" to 0.5f)
+        EffectType.PIXELATE -> mapOf("size" to 10f)
+        EffectType.CHROMATIC_ABERRATION -> mapOf("intensity" to 0.5f)
+        EffectType.CHROMA_KEY -> mapOf("similarity" to 0.4f, "smoothness" to 0.1f, "spill" to 0.1f)
+        EffectType.TILT_SHIFT -> mapOf("blur" to 0.01f, "focusY" to 0.5f, "width" to 0.1f)
+        EffectType.CYBERPUNK -> mapOf("intensity" to 0.7f)
+        EffectType.NOIR -> mapOf("intensity" to 0.7f)
+        EffectType.VINTAGE -> mapOf("intensity" to 0.7f)
+        EffectType.COOL_TONE -> mapOf("intensity" to 0.5f)
+        EffectType.WARM_TONE -> mapOf("intensity" to 0.5f)
+        EffectType.SPEED -> mapOf("value" to 1f)
+        EffectType.MOSAIC -> mapOf("size" to 15f)
+        EffectType.RADIAL_BLUR -> mapOf("intensity" to 0.5f)
+        EffectType.MOTION_BLUR -> mapOf("intensity" to 0.5f)
+        EffectType.FISHEYE -> mapOf("intensity" to 0.5f)
+        EffectType.MIRROR -> emptyMap()
+        EffectType.WAVE -> mapOf("amplitude" to 0.02f, "frequency" to 10f)
+        EffectType.POSTERIZE -> mapOf("levels" to 6f)
+        else -> emptyMap()
     }
 }

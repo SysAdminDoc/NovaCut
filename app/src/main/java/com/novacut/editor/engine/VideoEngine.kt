@@ -46,6 +46,29 @@ class VideoEngine @Inject constructor(
         p.prepare()
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
+    fun prepareTimeline(tracks: List<Track>) {
+        val p = getPlayer()
+        val videoClips = tracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
+        if (videoClips.isEmpty()) {
+            p.clearMediaItems()
+            return
+        }
+        val mediaItems = videoClips.map { clip ->
+            MediaItem.Builder()
+                .setUri(clip.sourceUri)
+                .setClippingConfiguration(
+                    MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(clip.trimStartMs)
+                        .setEndPositionMs(clip.trimEndMs)
+                        .build()
+                )
+                .build()
+        }
+        p.setMediaItems(mediaItems)
+        p.prepare()
+    }
+
     fun seekTo(positionMs: Long) {
         player?.seekTo(positionMs)
     }
@@ -144,7 +167,7 @@ class VideoEngine @Inject constructor(
         onProgress: (Float) -> Unit = {},
         onComplete: () -> Unit = {},
         onError: (Exception) -> Unit = {}
-    ) = withContext(Dispatchers.IO) {
+    ) {
         _exportState.value = ExportState.EXPORTING
         _exportProgress.value = 0f
 
@@ -153,6 +176,8 @@ class VideoEngine @Inject constructor(
             if (videoTrack == null || videoTrack.clips.isEmpty()) {
                 throw IllegalStateException("No video clips to export")
             }
+
+            val (targetW, targetH) = config.resolution.forAspect(AspectRatio.RATIO_16_9)
 
             val editedItems = videoTrack.clips.map { clip ->
                 val mediaItem = MediaItem.Builder()
@@ -165,20 +190,36 @@ class VideoEngine @Inject constructor(
                     )
                     .build()
 
-                val videoEffects = mutableListOf<androidx.media3.common.Effect>()
-                val audioProcessors = mutableListOf<androidx.media3.common.audio.AudioProcessor>()
-
-                for (effect in clip.effects) {
-                    if (!effect.enabled) continue
-                    buildVideoEffect(effect)?.let { videoEffects.add(it) }
-                }
-
-                if (clip.speed != 1.0f) {
-                    videoEffects.add(SpeedChangeEffect(clip.speed))
+                val videoEffects = buildList<androidx.media3.common.Effect> {
+                    for (effect in clip.effects) {
+                        if (!effect.enabled) continue
+                        buildVideoEffect(effect)?.let { add(it) }
+                    }
+                    // Apply keyframe opacity if defined
+                    if (clip.keyframes.any { it.property == KeyframeProperty.OPACITY }) {
+                        add(RgbMatrix { presentationTimeUs, _ ->
+                            val timeMs = presentationTimeUs / 1000L
+                            val opacity = KeyframeEngine.getValueAt(
+                                clip.keyframes, KeyframeProperty.OPACITY, timeMs
+                            ) ?: 1f
+                            floatArrayOf(
+                                opacity, 0f, 0f, 0f,
+                                0f, opacity, 0f, 0f,
+                                0f, 0f, opacity, 0f,
+                                0f, 0f, 0f, 1f
+                            )
+                        })
+                    }
+                    if (clip.speed != 1.0f) {
+                        add(SpeedChangeEffect(clip.speed))
+                    }
+                    add(Presentation.createForWidthAndHeight(
+                        targetW, targetH, Presentation.LAYOUT_SCALE_TO_FIT
+                    ))
                 }
 
                 EditedMediaItem.Builder(mediaItem)
-                    .setEffects(Effects(audioProcessors, videoEffects))
+                    .setEffects(Effects(emptyList(), videoEffects))
                     .build()
             }
 
@@ -190,39 +231,51 @@ class VideoEngine @Inject constructor(
                 VideoCodec.H264 -> MimeTypes.VIDEO_H264
             }
 
-            val transformer = Transformer.Builder(context)
-                .setVideoMimeType(mimeType)
-                .build()
+            // Transformer.start() requires a Looper — must run on Main thread
+            withContext(Dispatchers.Main) {
+                val transformer = Transformer.Builder(context)
+                    .setVideoMimeType(mimeType)
+                    .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                    .setEncoderFactory(
+                        DefaultEncoderFactory.Builder(context)
+                            .setRequestedVideoEncoderSettings(
+                                VideoEncoderSettings.Builder()
+                                    .setBitrate(config.videoBitrate)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
 
-            val listener = object : Transformer.Listener {
-                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                    _exportState.value = ExportState.COMPLETE
-                    _exportProgress.value = 1f
-                    onComplete()
+                val listener = object : Transformer.Listener {
+                    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                        _exportState.value = ExportState.COMPLETE
+                        _exportProgress.value = 1f
+                        onComplete()
+                    }
+
+                    override fun onError(
+                        composition: Composition,
+                        exportResult: ExportResult,
+                        exportException: ExportException
+                    ) {
+                        _exportState.value = ExportState.ERROR
+                        onError(exportException)
+                    }
                 }
 
-                override fun onError(
-                    composition: Composition,
-                    exportResult: ExportResult,
-                    exportException: ExportException
-                ) {
-                    _exportState.value = ExportState.ERROR
-                    onError(exportException)
-                }
-            }
+                transformer.addListener(listener)
+                transformer.start(composition, outputFile.absolutePath)
 
-            transformer.addListener(listener)
-            transformer.start(composition, outputFile.absolutePath)
-
-            while (_exportState.value == ExportState.EXPORTING) {
-                val progress = transformer.getProgress(ProgressHolder())
-                if (progress != Transformer.PROGRESS_STATE_NOT_STARTED) {
-                    val holder = ProgressHolder()
-                    transformer.getProgress(holder)
-                    _exportProgress.value = holder.progress / 100f
-                    onProgress(holder.progress / 100f)
+                val holder = ProgressHolder()
+                while (_exportState.value == ExportState.EXPORTING) {
+                    val state = transformer.getProgress(holder)
+                    if (state == Transformer.PROGRESS_STATE_AVAILABLE) {
+                        _exportProgress.value = holder.progress / 100f
+                        onProgress(holder.progress / 100f)
+                    }
+                    delay(250)
                 }
-                delay(100)
             }
         } catch (e: Exception) {
             _exportState.value = ExportState.ERROR
@@ -317,7 +370,6 @@ class VideoEngine @Inject constructor(
     }
 
     fun release() {
-        scope.cancel()
         player?.release()
         player = null
         clearThumbnailCache()

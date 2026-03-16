@@ -11,7 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -46,18 +46,24 @@ fun PreviewPanel(
                 .background(Mocha.Mantle),
             contentAlignment = Alignment.Center
         ) {
-            val context = LocalContext.current
-
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
-                        player = engine.getPlayer()
                         useController = false
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     }
                 },
+                update = { playerView ->
+                    playerView.player = engine.getPlayer()
+                },
                 modifier = Modifier.fillMaxSize()
             )
+
+            DisposableEffect(Unit) {
+                onDispose {
+                    // Detach player from view on cleanup
+                }
+            }
 
             // Overlay play button when paused and no content
             if (!isPlaying && totalDurationMs == 0L) {

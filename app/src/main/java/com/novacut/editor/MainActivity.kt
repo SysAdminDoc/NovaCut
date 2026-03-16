@@ -12,7 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.novacut.editor.ui.editor.EditorScreen
+import com.novacut.editor.ui.projects.ProjectListScreen
 import com.novacut.editor.ui.theme.NovaCutTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -30,11 +34,29 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             NovaCutTheme {
-                EditorScreen(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .systemBarsPadding()
-                )
+                val navController = rememberNavController()
+                val rootModifier = Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding()
+
+                NavHost(
+                    navController = navController,
+                    startDestination = "projects",
+                    modifier = rootModifier
+                ) {
+                    composable("projects") {
+                        ProjectListScreen(
+                            onProjectSelected = { projectId ->
+                                navController.navigate("editor/$projectId")
+                            }
+                        )
+                    }
+                    composable("editor/{projectId}") {
+                        EditorScreen(
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                }
             }
         }
     }

@@ -36,10 +36,12 @@ fun Timeline(
     zoomLevel: Float,
     scrollOffsetMs: Long,
     selectedClipId: String?,
+    waveforms: Map<String, FloatArray> = emptyMap(),
     onClipSelected: (String, String) -> Unit,
     onPlayheadMoved: (Long) -> Unit,
     onZoomChanged: (Float) -> Unit,
     onScrollChanged: (Long) -> Unit,
+    onTrimChanged: (clipId: String, newTrimStartMs: Long?, newTrimEndMs: Long?) -> Unit = { _, _, _ -> },
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -233,20 +235,25 @@ fun Timeline(
                                             }
                                         }
 
-                                        // Audio waveform placeholder
+                                        // Audio waveform
                                         if (track.type == TrackType.AUDIO) {
+                                            val waveform = waveforms[clip.id]
                                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                                drawWaveformPlaceholder(clipColor)
+                                                if (waveform != null && waveform.isNotEmpty()) {
+                                                    drawWaveform(waveform, clipColor)
+                                                } else {
+                                                    drawWaveformPlaceholder(clipColor)
+                                                }
                                             }
                                         }
 
                                         // Trim handles
                                         if (isSelected) {
-                                            // Left handle
+                                            // Left trim handle
                                             Box(
                                                 modifier = Modifier
                                                     .align(Alignment.CenterStart)
-                                                    .width(6.dp)
+                                                    .width(12.dp)
                                                     .fillMaxHeight()
                                                     .background(
                                                         clipColor,
@@ -255,12 +262,21 @@ fun Timeline(
                                                             bottomStart = 6.dp
                                                         )
                                                     )
+                                                    .pointerInput(clip.id) {
+                                                        detectHorizontalDragGestures { _, dragAmount ->
+                                                            val deltaMs = (dragAmount / pixelsPerMs).toLong()
+                                                            val newStart = (clip.trimStartMs + deltaMs)
+                                                                .coerceAtLeast(0L)
+                                                                .coerceAtMost(clip.trimEndMs - 100L)
+                                                            onTrimChanged(clip.id, newStart, null)
+                                                        }
+                                                    }
                                             )
-                                            // Right handle
+                                            // Right trim handle
                                             Box(
                                                 modifier = Modifier
                                                     .align(Alignment.CenterEnd)
-                                                    .width(6.dp)
+                                                    .width(12.dp)
                                                     .fillMaxHeight()
                                                     .background(
                                                         clipColor,
@@ -269,6 +285,14 @@ fun Timeline(
                                                             bottomEnd = 6.dp
                                                         )
                                                     )
+                                                    .pointerInput(clip.id) {
+                                                        detectHorizontalDragGestures { _, dragAmount ->
+                                                            val deltaMs = (dragAmount / pixelsPerMs).toLong()
+                                                            val newEnd = (clip.trimEndMs + deltaMs)
+                                                                .coerceAtLeast(clip.trimStartMs + 100L)
+                                                            onTrimChanged(clip.id, null, newEnd)
+                                                        }
+                                                    }
                                             )
                                         }
 
@@ -363,6 +387,27 @@ private fun DrawScope.drawTimeRuler(
             )
         }
         currentMs += intervalMs
+    }
+}
+
+private fun DrawScope.drawWaveform(samples: FloatArray, color: Color) {
+    val steps = (size.width / 3f).toInt().coerceAtLeast(1)
+    val samplesPerStep = samples.size.toFloat() / steps
+    val centerY = size.height / 2f
+    val maxAmp = size.height * 0.45f
+
+    for (i in 0 until steps) {
+        val sampleIndex = (i * samplesPerStep).toInt().coerceIn(0, samples.size - 1)
+        val amplitude = samples[sampleIndex].coerceIn(0f, 1f)
+        val barH = (amplitude * maxAmp).coerceAtLeast(1f)
+        val x = i * 3f
+
+        drawLine(
+            color = color.copy(alpha = 0.7f),
+            start = Offset(x, centerY - barH),
+            end = Offset(x, centerY + barH),
+            strokeWidth = 2f
+        )
     }
 }
 

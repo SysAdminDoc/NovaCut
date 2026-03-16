@@ -1,15 +1,26 @@
 package com.novacut.editor.ui.editor
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.Player
+import com.novacut.editor.engine.AudioEngine
+import com.novacut.editor.engine.AutoSaveState
+import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
+import com.novacut.editor.engine.ProjectAutoSave
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,6 +49,10 @@ data class EditorState(
     val exportProgress: Float = 0f,
     val exportState: ExportState = ExportState.IDLE,
     val textOverlays: List<TextOverlay> = emptyList(),
+    val waveforms: Map<String, FloatArray> = emptyMap(),
+    val showAudioPanel: Boolean = false,
+    val showAiToolsPanel: Boolean = false,
+    val selectedEffectId: String? = null,
     val undoStack: List<UndoAction> = emptyList(),
     val redoStack: List<UndoAction> = emptyList(),
     val toastMessage: String? = null
@@ -66,8 +81,14 @@ data class UndoAction(
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val videoEngine: VideoEngine,
-    private val projectDao: ProjectDao
+    private val projectDao: ProjectDao,
+    private val audioEngine: AudioEngine,
+    private val autoSave: ProjectAutoSave,
+    @ApplicationContext private val appContext: Context,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    private val projectId: String? = savedStateHandle["projectId"]
 
     private val _state = MutableStateFlow(EditorState())
     val state: StateFlow<EditorState> = _state.asStateFlow()
@@ -75,6 +96,20 @@ class EditorViewModel @Inject constructor(
     val engine get() = videoEngine
 
     init {
+        // Load existing project if projectId provided
+        if (projectId != null) {
+            viewModelScope.launch {
+                val project = projectDao.getProject(projectId)
+                if (project != null) {
+                    _state.update { it.copy(project = project) }
+                } else {
+                    // New project — save it to Room
+                    val newProject = _state.value.project.copy(id = projectId)
+                    _state.update { it.copy(project = newProject) }
+                    projectDao.insertProject(newProject)
+                }
+            }
+        }
         viewModelScope.launch {
             videoEngine.exportProgress.collect { progress ->
                 _state.update { it.copy(exportProgress = progress) }
@@ -84,6 +119,60 @@ class EditorViewModel @Inject constructor(
             videoEngine.exportState.collect { exportState ->
                 _state.update { it.copy(exportState = exportState) }
             }
+        }
+
+        // Player.Listener for play state sync
+        videoEngine.getPlayer().addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                _state.update { it.copy(isPlaying = playing) }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    _state.update { it.copy(isPlaying = false, playheadMs = it.totalDurationMs) }
+                }
+            }
+        })
+
+        // Periodic playhead sync (~30fps)
+        viewModelScope.launch {
+            while (isActive) {
+                delay(33)
+                val player = videoEngine.getPlayer()
+                if (player.isPlaying) {
+                    _state.update { it.copy(playheadMs = player.currentPosition) }
+                }
+            }
+        }
+
+        // Restore from auto-save if available
+        val autoSaveId = projectId ?: _state.value.project.id
+        val recovery = autoSave.loadRecoveryData(autoSaveId)
+        if (recovery != null) {
+            _state.update {
+                it.copy(
+                    tracks = recovery.tracks.ifEmpty { it.tracks },
+                    textOverlays = recovery.textOverlays,
+                    playheadMs = recovery.playheadMs,
+                    totalDurationMs = recovery.tracks.maxOfOrNull { t ->
+                        t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L
+                    } ?: 0L
+                )
+            }
+            if (recovery.tracks.flatMap { it.clips }.isNotEmpty()) {
+                videoEngine.prepareTimeline(_state.value.tracks)
+            }
+        }
+
+        // Start auto-save
+        autoSave.startAutoSave(autoSaveId) {
+            val s = _state.value
+            AutoSaveState(
+                projectId = s.project.id,
+                tracks = s.tracks,
+                textOverlays = s.textOverlays,
+                playheadMs = s.playheadMs
+            )
         }
     }
 
@@ -100,11 +189,10 @@ class EditorViewModel @Inject constructor(
             saveUndoState("Add clip")
 
             _state.update { state ->
-                val tracks = state.tracks.toMutableList()
-                val trackIndex = tracks.indexOfFirst { it.type == trackType }
+                val trackIndex = state.tracks.indexOfFirst { it.type == trackType }
                 if (trackIndex < 0) return@update state
 
-                val track = tracks[trackIndex]
+                val track = state.tracks[trackIndex]
                 val timelineStart = track.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
 
                 val clip = Clip(
@@ -115,8 +203,9 @@ class EditorViewModel @Inject constructor(
                     trimEndMs = duration
                 )
 
-                val updatedClips = track.clips.toMutableList().apply { add(clip) }
-                tracks[trackIndex] = track.copy(clips = updatedClips)
+                val tracks = state.tracks.mapIndexed { i, t ->
+                    if (i == trackIndex) t.copy(clips = t.clips + clip) else t
+                }
 
                 val totalDuration = tracks.maxOfOrNull { t ->
                     t.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
@@ -131,10 +220,17 @@ class EditorViewModel @Inject constructor(
                 )
             }
 
-            // Prepare the player with the first clip if this is the first one
-            val clips = _state.value.tracks.flatMap { it.clips }
-            if (clips.size == 1) {
-                videoEngine.prepareClip(uri)
+            // Rebuild player timeline with all clips
+            videoEngine.prepareTimeline(_state.value.tracks)
+            saveProject()
+
+            // Extract waveform for audio visualization
+            val newClip = _state.value.tracks.flatMap { it.clips }.lastOrNull()
+            if (newClip != null) {
+                viewModelScope.launch {
+                    val waveform = audioEngine.extractWaveform(uri)
+                    _state.update { it.copy(waveforms = it.waveforms + (newClip.id to waveform)) }
+                }
             }
         }
     }
@@ -149,7 +245,7 @@ class EditorViewModel @Inject constructor(
 
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                track.copy(clips = track.clips.filterNot { it.id == clipId }.toMutableList())
+                track.copy(clips = track.clips.filterNot { it.id == clipId })
             }
             val totalDuration = tracks.maxOfOrNull { t ->
                 t.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
@@ -191,10 +287,11 @@ class EditorViewModel @Inject constructor(
                     trimStartMs = splitPointInSource
                 )
 
-                val updatedClips = track.clips.toMutableList().apply {
-                    removeAt(clipIndex)
-                    add(clipIndex, firstHalf)
-                    add(clipIndex + 1, secondHalf)
+                val updatedClips = buildList {
+                    addAll(track.clips.subList(0, clipIndex))
+                    add(firstHalf)
+                    add(secondHalf)
+                    addAll(track.clips.subList(clipIndex + 1, track.clips.size))
                 }
                 track.copy(clips = updatedClips)
             }
@@ -206,15 +303,14 @@ class EditorViewModel @Inject constructor(
         saveUndoState("Trim clip")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
+                track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) {
                         clip.copy(
                             trimStartMs = newTrimStartMs ?: clip.trimStartMs,
                             trimEndMs = newTrimEndMs ?: clip.trimEndMs
                         )
                     } else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                })
             }
             val totalDuration = tracks.maxOfOrNull { t ->
                 t.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
@@ -227,11 +323,10 @@ class EditorViewModel @Inject constructor(
         saveUndoState("Change speed")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
+                track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) clip.copy(speed = speed.coerceIn(0.1f, 16f))
                     else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                })
             }
             recalculateDuration(state.copy(tracks = tracks))
         }
@@ -241,11 +336,10 @@ class EditorViewModel @Inject constructor(
         saveUndoState("Reverse clip")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
+                track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) clip.copy(isReversed = reversed)
                     else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                })
             }
             state.copy(tracks = tracks)
         }
@@ -255,12 +349,10 @@ class EditorViewModel @Inject constructor(
         saveUndoState("Add effect")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
-                    if (clip.id == clipId) {
-                        clip.copy(effects = (clip.effects + effect).toMutableList())
-                    } else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(effects = clip.effects + effect)
+                    else clip
+                })
             }
             state.copy(tracks = tracks)
         }
@@ -269,16 +361,14 @@ class EditorViewModel @Inject constructor(
     fun updateEffect(clipId: String, effectId: String, params: Map<String, Float>) {
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
+                track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) {
-                        val effects = clip.effects.map { e ->
-                            if (e.id == effectId) e.copy(params = (e.params + params).toMutableMap())
+                        clip.copy(effects = clip.effects.map { e ->
+                            if (e.id == effectId) e.copy(params = e.params + params)
                             else e
-                        }.toMutableList()
-                        clip.copy(effects = effects)
+                        })
                     } else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                })
             }
             state.copy(tracks = tracks)
         }
@@ -288,12 +378,10 @@ class EditorViewModel @Inject constructor(
         saveUndoState("Remove effect")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
-                    if (clip.id == clipId) {
-                        clip.copy(effects = clip.effects.filterNot { it.id == effectId }.toMutableList())
-                    } else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(effects = clip.effects.filterNot { it.id == effectId })
+                    else clip
+                })
             }
             state.copy(tracks = tracks)
         }
@@ -303,11 +391,10 @@ class EditorViewModel @Inject constructor(
         saveUndoState("Set transition")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                val updatedClips = track.clips.map { clip ->
+                track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) clip.copy(transition = transition)
                     else clip
-                }.toMutableList()
-                track.copy(clips = updatedClips)
+                })
             }
             state.copy(tracks = tracks)
         }
@@ -415,6 +502,24 @@ class EditorViewModel @Inject constructor(
     fun hideTextEditor() { _state.update { it.copy(showTextEditor = false) } }
     fun showTransitionPicker() { _state.update { it.copy(showTransitionPicker = true) } }
     fun hideTransitionPicker() { _state.update { it.copy(showTransitionPicker = false) } }
+    fun showAudioPanel() { _state.update { it.copy(showAudioPanel = true) } }
+    fun hideAudioPanel() { _state.update { it.copy(showAudioPanel = false) } }
+    fun showAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = true) } }
+    fun hideAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = false) } }
+    fun selectEffect(effectId: String?) { _state.update { it.copy(selectedEffectId = effectId) } }
+    fun clearSelectedEffect() { _state.update { it.copy(selectedEffectId = null) } }
+
+    fun setClipVolume(clipId: String, volume: Float) {
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(volume = volume.coerceIn(0f, 2f))
+                    else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
+    }
 
     // Export
     fun updateExportConfig(config: ExportConfig) {
@@ -426,6 +531,10 @@ class EditorViewModel @Inject constructor(
             val config = _state.value.exportConfig
             val outputFile = File(outputDir, "NovaCut_${System.currentTimeMillis()}.mp4")
 
+            // Start foreground service for export notification
+            val serviceIntent = Intent(appContext, ExportService::class.java)
+            appContext.startService(serviceIntent)
+
             videoEngine.export(
                 tracks = _state.value.tracks,
                 config = config,
@@ -435,9 +544,11 @@ class EditorViewModel @Inject constructor(
                 },
                 onComplete = {
                     showToast("Export complete: ${outputFile.name}")
+                    appContext.stopService(serviceIntent)
                 },
                 onError = { e ->
                     showToast("Export failed: ${e.message}")
+                    appContext.stopService(serviceIntent)
                 }
             )
         }
@@ -516,6 +627,11 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun renameProject(name: String) {
+        _state.update { it.copy(project = it.project.copy(name = name)) }
+        saveProject()
+    }
+
     private fun saveUndoState(description: String) {
         _state.update { state ->
             val action = UndoAction(
@@ -539,6 +655,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        autoSave.stop()
         videoEngine.release()
     }
 }

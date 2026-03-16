@@ -47,7 +47,7 @@ data class Track(
     val id: String = UUID.randomUUID().toString(),
     val type: TrackType,
     val index: Int,
-    val clips: MutableList<Clip> = mutableListOf(),
+    val clips: List<Clip> = emptyList(),
     val isLocked: Boolean = false,
     val isVisible: Boolean = true,
     val isMuted: Boolean = false
@@ -60,7 +60,7 @@ data class Clip(
     val timelineStartMs: Long,
     val trimStartMs: Long = 0L,
     val trimEndMs: Long = sourceDurationMs,
-    val effects: MutableList<Effect> = mutableListOf(),
+    val effects: List<Effect> = emptyList(),
     val transition: Transition? = null,
     val volume: Float = 1.0f,
     val speed: Float = 1.0f,
@@ -71,7 +71,7 @@ data class Clip(
     val scaleY: Float = 1f,
     val positionX: Float = 0f,
     val positionY: Float = 0f,
-    val keyframes: MutableList<Keyframe> = mutableListOf()
+    val keyframes: List<Keyframe> = emptyList()
 ) {
     val durationMs: Long get() = ((trimEndMs - trimStartMs) / speed).toLong()
     val timelineEndMs: Long get() = timelineStartMs + durationMs
@@ -80,7 +80,7 @@ data class Clip(
 data class Effect(
     val id: String = UUID.randomUUID().toString(),
     val type: EffectType,
-    val params: MutableMap<String, Float> = mutableMapOf(),
+    val params: Map<String, Float> = emptyMap(),
     val enabled: Boolean = true
 )
 
