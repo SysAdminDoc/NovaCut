@@ -26,6 +26,7 @@ fun AudioPanel(
     clip: Clip?,
     waveform: FloatArray?,
     onVolumeChanged: (Float) -> Unit,
+    onVolumeDragStarted: () -> Unit = {},
     onFadeInChanged: (Long) -> Unit,
     onFadeOutChanged: (Long) -> Unit,
     onStartVoiceover: () -> Unit,
@@ -69,8 +70,32 @@ fun AudioPanel(
         }
 
         // Volume
-        EffectSlider("Volume", clip?.volume ?: 1f, 0f, 2f) {
-            onVolumeChanged(it)
+        var volumeDragStarted by remember { mutableStateOf(false) }
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Volume", color = Mocha.Subtext1, fontSize = 12.sp)
+                Text("%.2f".format(clip?.volume ?: 1f), color = Mocha.Subtext0, fontSize = 12.sp)
+            }
+            Slider(
+                value = clip?.volume ?: 1f,
+                onValueChange = {
+                    if (!volumeDragStarted) {
+                        volumeDragStarted = true
+                        onVolumeDragStarted()
+                    }
+                    onVolumeChanged(it)
+                },
+                onValueChangeFinished = { volumeDragStarted = false },
+                valueRange = 0f..2f,
+                colors = SliderDefaults.colors(
+                    thumbColor = Mocha.Mauve,
+                    activeTrackColor = Mocha.Mauve,
+                    inactiveTrackColor = Mocha.Surface1
+                )
+            )
         }
 
         // Fade In

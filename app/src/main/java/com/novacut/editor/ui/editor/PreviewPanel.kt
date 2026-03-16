@@ -59,11 +59,7 @@ fun PreviewPanel(
                 modifier = Modifier.fillMaxSize()
             )
 
-            DisposableEffect(Unit) {
-                onDispose {
-                    // Detach player from view on cleanup
-                }
-            }
+            // No-op: PlayerView lifecycle is managed by AndroidView factory/update
 
             // Overlay play button when paused and no content
             if (!isPlaying && totalDurationMs == 0L) {
@@ -192,11 +188,11 @@ fun formatTimestamp(ms: Long): String {
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    val frames = (ms % 1000) / 33
+    val millis = (ms % 1000) / 10 // Show centiseconds (00-99)
 
     return if (hours > 0) {
-        "%d:%02d:%02d.%02d".format(hours, minutes, seconds, frames)
+        "%d:%02d:%02d.%02d".format(hours, minutes, seconds, millis)
     } else {
-        "%02d:%02d.%02d".format(minutes, seconds, frames)
+        "%02d:%02d.%02d".format(minutes, seconds, millis)
     }
 }

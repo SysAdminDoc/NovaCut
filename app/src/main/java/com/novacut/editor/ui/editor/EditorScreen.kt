@@ -57,6 +57,7 @@ fun EditorScreen(
                 onZoomChanged = viewModel::setZoomLevel,
                 onScrollChanged = viewModel::setScrollOffset,
                 onTrimChanged = viewModel::trimClip,
+                onTrimDragStarted = viewModel::beginTrim,
                 engine = viewModel.engine,
                 modifier = Modifier.weight(0.35f)
             )
@@ -78,7 +79,14 @@ fun EditorScreen(
                             viewModel.setTool(EditorTool.NONE)
                         }
                         EditorTool.TRIM -> { /* Trim handles activate in Timeline */ }
-                        EditorTool.TRANSFORM, EditorTool.CROP -> { /* Tool mode activates in Preview */ }
+                        EditorTool.TRANSFORM -> {
+                            viewModel.showToast("Transform: coming soon")
+                            viewModel.setTool(EditorTool.NONE)
+                        }
+                        EditorTool.CROP -> {
+                            viewModel.showToast("Crop: coming soon")
+                            viewModel.setTool(EditorTool.NONE)
+                        }
                         else -> {}
                     }
                 },
@@ -100,7 +108,13 @@ fun EditorScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             MediaPickerSheet(
-                onMediaSelected = { uri -> viewModel.addClipToTrack(uri) },
+                onMediaSelected = { uri, mediaType ->
+                    val trackType = when (mediaType) {
+                        "audio" -> TrackType.AUDIO
+                        else -> TrackType.VIDEO
+                    }
+                    viewModel.addClipToTrack(uri, trackType)
+                },
                 onClose = viewModel::hideMediaPicker
             )
         }
@@ -221,8 +235,9 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@AudioPanel
                     viewModel.setClipVolume(clipId, volume)
                 },
-                onFadeInChanged = { /* Wire in Phase 5 */ },
-                onFadeOutChanged = { /* Wire in Phase 5 */ },
+                onVolumeDragStarted = viewModel::beginVolumeChange,
+                onFadeInChanged = { /* Future */ },
+                onFadeOutChanged = { /* Future */ },
                 onStartVoiceover = { /* Future */ },
                 onClose = viewModel::hideAudioPanel
             )

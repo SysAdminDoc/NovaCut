@@ -39,8 +39,10 @@ fun ExportSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Export", color = Mocha.Text, fontSize = 18.sp)
-            IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+            if (exportState != ExportState.EXPORTING) {
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                }
             }
         }
 
@@ -95,6 +97,30 @@ fun ExportSheet(
                     colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
                 ) {
                     Text("Done", color = Mocha.Crust)
+                }
+            }
+            return
+        }
+
+        if (exportState == ExportState.ERROR) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Error,
+                    contentDescription = "Error",
+                    tint = Mocha.Red,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Export Failed", color = Mocha.Red, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onClose,
+                    colors = ButtonDefaults.buttonColors(containerColor = Mocha.Surface1)
+                ) {
+                    Text("Close", color = Mocha.Text)
                 }
             }
             return

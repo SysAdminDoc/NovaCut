@@ -95,14 +95,19 @@ data class AutoSaveState(
     }
 
     companion object {
+        // Safe enum valueOf with fallback — prevents crashes from stale/unknown enum values
+        private inline fun <reified T : Enum<T>> safeValueOf(name: String, default: T): T {
+            return try { enumValueOf<T>(name) } catch (_: IllegalArgumentException) { default }
+        }
+
         fun deserialize(raw: String): AutoSaveState {
             val json = JSONObject(raw)
             return AutoSaveState(
-                projectId = json.getString("projectId"),
-                timestamp = json.getLong("timestamp"),
-                playheadMs = json.getLong("playheadMs"),
-                tracks = deserializeTracks(json.getJSONArray("tracks")),
-                textOverlays = deserializeTextOverlays(json.getJSONArray("textOverlays"))
+                projectId = json.optString("projectId", ""),
+                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
+                playheadMs = json.optLong("playheadMs", 0L),
+                tracks = deserializeTracks(json.optJSONArray("tracks") ?: JSONArray()),
+                textOverlays = deserializeTextOverlays(json.optJSONArray("textOverlays") ?: JSONArray())
             )
         }
 
@@ -219,21 +224,23 @@ data class AutoSaveState(
         }
 
         private fun deserializeTrack(json: JSONObject): Track {
-            val clipsArr = json.getJSONArray("clips")
+            val clipsArr = json.optJSONArray("clips") ?: JSONArray()
             return Track(
-                id = json.getString("id"),
-                type = TrackType.valueOf(json.getString("type")),
-                index = json.getInt("index"),
+                id = json.optString("id", java.util.UUID.randomUUID().toString()),
+                type = safeValueOf(json.optString("type", "VIDEO"), TrackType.VIDEO),
+                index = json.optInt("index", 0),
                 isLocked = json.optBoolean("isLocked", false),
                 isVisible = json.optBoolean("isVisible", true),
                 isMuted = json.optBoolean("isMuted", false),
-                clips = (0 until clipsArr.length()).map { deserializeClip(clipsArr.getJSONObject(it)) }
+                clips = (0 until clipsArr.length()).mapNotNull {
+                    try { deserializeClip(clipsArr.getJSONObject(it)) } catch (_: Exception) { null }
+                }
             )
         }
 
         private fun deserializeClip(json: JSONObject): Clip {
-            val effectsArr = json.getJSONArray("effects")
-            val keyframesArr = json.getJSONArray("keyframes")
+            val effectsArr = json.optJSONArray("effects") ?: JSONArray()
+            val keyframesArr = json.optJSONArray("keyframes") ?: JSONArray()
             return Clip(
                 id = json.getString("id"),
                 sourceUri = Uri.parse(json.getString("sourceUri")),
@@ -250,21 +257,26 @@ data class AutoSaveState(
                 scaleY = json.optDouble("scaleY", 1.0).toFloat(),
                 positionX = json.optDouble("positionX", 0.0).toFloat(),
                 positionY = json.optDouble("positionY", 0.0).toFloat(),
-                effects = (0 until effectsArr.length()).map { deserializeEffect(effectsArr.getJSONObject(it)) },
-                keyframes = (0 until keyframesArr.length()).map { deserializeKeyframe(keyframesArr.getJSONObject(it)) },
+                effects = (0 until effectsArr.length()).mapNotNull {
+                    try { deserializeEffect(effectsArr.getJSONObject(it)) } catch (_: Exception) { null }
+                },
+                keyframes = (0 until keyframesArr.length()).mapNotNull {
+                    try { deserializeKeyframe(keyframesArr.getJSONObject(it)) } catch (_: Exception) { null }
+                },
                 transition = if (json.has("transition")) deserializeTransition(json.getJSONObject("transition")) else null
             )
         }
 
         private fun deserializeEffect(json: JSONObject): Effect {
-            val paramsJson = json.getJSONObject("params")
-            val params = mutableMapOf<String, Float>()
-            paramsJson.keys().forEach { key ->
-                params[key] = paramsJson.getDouble(key).toFloat()
+            val paramsJson = json.optJSONObject("params")
+            val params = buildMap {
+                paramsJson?.keys()?.forEach { key ->
+                    put(key, paramsJson.optDouble(key, 0.0).toFloat())
+                }
             }
             return Effect(
-                id = json.getString("id"),
-                type = EffectType.valueOf(json.getString("type")),
+                id = json.optString("id", java.util.UUID.randomUUID().toString()),
+                type = safeValueOf(json.optString("type", "BRIGHTNESS"), EffectType.BRIGHTNESS),
                 enabled = json.optBoolean("enabled", true),
                 params = params
             )
@@ -272,28 +284,30 @@ data class AutoSaveState(
 
         private fun deserializeKeyframe(json: JSONObject): Keyframe {
             return Keyframe(
-                timeOffsetMs = json.getLong("timeOffsetMs"),
-                property = KeyframeProperty.valueOf(json.getString("property")),
-                value = json.getDouble("value").toFloat(),
-                easing = Easing.valueOf(json.optString("easing", "LINEAR"))
+                timeOffsetMs = json.optLong("timeOffsetMs", 0L),
+                property = safeValueOf(json.optString("property", "OPACITY"), KeyframeProperty.OPACITY),
+                value = json.optDouble("value", 1.0).toFloat(),
+                easing = safeValueOf(json.optString("easing", "LINEAR"), Easing.LINEAR)
             )
         }
 
         private fun deserializeTransition(json: JSONObject): Transition {
             return Transition(
-                type = TransitionType.valueOf(json.getString("type")),
+                type = safeValueOf(json.optString("type", "DISSOLVE"), TransitionType.DISSOLVE),
                 durationMs = json.optLong("durationMs", 500L)
             )
         }
 
         private fun deserializeTextOverlays(arr: JSONArray): List<TextOverlay> {
-            return (0 until arr.length()).map { deserializeTextOverlay(arr.getJSONObject(it)) }
+            return (0 until arr.length()).mapNotNull {
+                try { deserializeTextOverlay(arr.getJSONObject(it)) } catch (_: Exception) { null }
+            }
         }
 
         private fun deserializeTextOverlay(json: JSONObject): TextOverlay {
             return TextOverlay(
-                id = json.getString("id"),
-                text = json.getString("text"),
+                id = json.optString("id", java.util.UUID.randomUUID().toString()),
+                text = json.optString("text", ""),
                 fontFamily = json.optString("fontFamily", "sans-serif"),
                 fontSize = json.optDouble("fontSize", 48.0).toFloat(),
                 color = json.optLong("color", 0xFFFFFFFF),
@@ -302,13 +316,13 @@ data class AutoSaveState(
                 strokeWidth = json.optDouble("strokeWidth", 0.0).toFloat(),
                 bold = json.optBoolean("bold", false),
                 italic = json.optBoolean("italic", false),
-                alignment = TextAlignment.valueOf(json.optString("alignment", "CENTER")),
+                alignment = safeValueOf(json.optString("alignment", "CENTER"), TextAlignment.CENTER),
                 positionX = json.optDouble("positionX", 0.5).toFloat(),
                 positionY = json.optDouble("positionY", 0.5).toFloat(),
                 startTimeMs = json.optLong("startTimeMs", 0L),
                 endTimeMs = json.optLong("endTimeMs", 3000L),
-                animationIn = TextAnimation.valueOf(json.optString("animationIn", "NONE")),
-                animationOut = TextAnimation.valueOf(json.optString("animationOut", "NONE"))
+                animationIn = safeValueOf(json.optString("animationIn", "NONE"), TextAnimation.NONE),
+                animationOut = safeValueOf(json.optString("animationOut", "NONE"), TextAnimation.NONE)
             )
         }
     }

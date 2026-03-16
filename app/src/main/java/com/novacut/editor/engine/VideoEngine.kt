@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.*
 import androidx.media3.exoplayer.ExoPlayer
@@ -24,8 +25,18 @@ class VideoEngine @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private var player: ExoPlayer? = null
-    private val thumbnailCache = LinkedHashMap<String, Bitmap>(100, 0.75f, true)
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var playerListener: Player.Listener? = null
+    // Thread-safe cache without accessOrder to avoid ConcurrentModificationException
+    private val thumbnailCache = object : LinkedHashMap<String, Bitmap>(100, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>): Boolean {
+            if (size > 200) {
+                eldest.value.recycle()
+                return true
+            }
+            return false
+        }
+    }
+    private val cacheLock = Any()
 
     private val _exportProgress = MutableStateFlow(0f)
     val exportProgress: StateFlow<Float> = _exportProgress
@@ -33,11 +44,26 @@ class VideoEngine @Inject constructor(
     private val _exportState = MutableStateFlow(ExportState.IDLE)
     val exportState: StateFlow<ExportState> = _exportState
 
+    /**
+     * Get or create ExoPlayer. Must be called from main thread.
+     * ExoPlayer requires a Looper for creation and all API calls.
+     */
     fun getPlayer(): ExoPlayer {
         if (player == null) {
             player = ExoPlayer.Builder(context).build()
         }
         return player!!
+    }
+
+    fun setPlayerListener(listener: Player.Listener) {
+        playerListener?.let { player?.removeListener(it) }
+        playerListener = listener
+        player?.addListener(listener)
+    }
+
+    fun removePlayerListener() {
+        playerListener?.let { player?.removeListener(it) }
+        playerListener = null
     }
 
     fun prepareClip(uri: Uri) {
@@ -118,7 +144,9 @@ class VideoEngine @Inject constructor(
 
     fun extractThumbnail(uri: Uri, timeUs: Long, width: Int = 160, height: Int = 90): Bitmap? {
         val key = "${uri}_${timeUs}_${width}x${height}"
-        thumbnailCache[key]?.let { return it }
+        synchronized(cacheLock) {
+            thumbnailCache[key]?.let { return it }
+        }
 
         val retriever = MediaMetadataRetriever()
         return try {
@@ -127,12 +155,8 @@ class VideoEngine @Inject constructor(
             frame?.let {
                 val scaled = Bitmap.createScaledBitmap(it, width, height, true)
                 if (scaled !== it) it.recycle()
-                synchronized(thumbnailCache) {
-                    if (thumbnailCache.size > 500) {
-                        val oldest = thumbnailCache.entries.first()
-                        oldest.value.recycle()
-                        thumbnailCache.remove(oldest.key)
-                    }
+                synchronized(cacheLock) {
+                    // removeEldestEntry handles eviction automatically
                     thumbnailCache[key] = scaled
                 }
                 scaled
@@ -168,6 +192,7 @@ class VideoEngine @Inject constructor(
         onComplete: () -> Unit = {},
         onError: (Exception) -> Unit = {}
     ) {
+        // Reset from any previous export state
         _exportState.value = ExportState.EXPORTING
         _exportProgress.value = 0f
 
@@ -338,12 +363,14 @@ class VideoEngine @Inject constructor(
                 }
             }
             EffectType.INVERT -> {
+                // Row-major 4x4: out.R = row0 dot [R,G,B,A]
+                // Invert: out.rgb = 1 - in.rgb, using alpha (=1) as offset
                 RgbMatrix { _, _ ->
                     floatArrayOf(
-                        -1f, 0f, 0f, 0f,
-                        0f, -1f, 0f, 0f,
-                        0f, 0f, -1f, 0f,
-                        1f, 1f, 1f, 1f
+                        -1f, 0f, 0f, 1f,
+                        0f, -1f, 0f, 1f,
+                        0f, 0f, -1f, 1f,
+                        0f, 0f, 0f, 1f
                     )
                 }
             }
@@ -363,13 +390,19 @@ class VideoEngine @Inject constructor(
     }
 
     fun clearThumbnailCache() {
-        synchronized(thumbnailCache) {
+        synchronized(cacheLock) {
             thumbnailCache.values.forEach { it.recycle() }
             thumbnailCache.clear()
         }
     }
 
+    fun resetExportState() {
+        _exportState.value = ExportState.IDLE
+        _exportProgress.value = 0f
+    }
+
     fun release() {
+        removePlayerListener()
         player?.release()
         player = null
         clearThumbnailCache()

@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.2.0
+v0.3.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -53,9 +53,17 @@ v0.2.0
 - **Immutable collections** in all models (List/Map, not MutableList/MutableMap) for safe undo/redo copy-on-write
 - **Transformer.start() on Main thread** - Media3 Transformer requires a Looper, export runs withContext(Dispatchers.Main)
 - **Multi-clip playback** via ExoPlayer setMediaItems() with ClippingConfiguration per clip
-- **Player.Listener** syncs play/pause/end state; periodic coroutine syncs playhead at ~30fps
-- **Auto-save** uses org.json serialization of full Track/Clip/Effect/Keyframe/TextOverlay model tree
+- **Player.Listener** syncs play/pause/end state; periodic coroutine syncs playhead at ~30fps. Tracked via `setPlayerListener()`/`removePlayerListener()` for proper lifecycle cleanup.
+- **Auto-save** uses org.json serialization of full Track/Clip/Effect/Keyframe/TextOverlay model tree with safe deserialization (optString/optLong/safeValueOf — never crashes on missing or unknown values)
 - **SavedStateHandle** for projectId in EditorViewModel, loaded from NavHost route arg
+- **Panel mutual exclusion** — atomic `dismissedPanelState()` + show in single `_state.update` to prevent intermediate states
+- **Trim debounce** — `beginTrim()` saves undo once on drag start; `trimClip()` updates live without undo spam
+- **Ripple delete** — clip deletion shifts subsequent clips back to close timeline gaps
+- **Media type routing** — MediaPickerSheet passes media type string; audio routed to AUDIO track
+- **rebuildPlayerTimeline()** — called after every clip mutation (add, delete, split, trim, speed, reverse, undo, redo) to keep ExoPlayer in sync with visual timeline
+- **VideoEngine is @Singleton** — ViewModel calls `removePlayerListener()` + `resetExportState()` in onCleared(), never `release()`. The engine outlives any individual ViewModel.
+- **Thumbnail cache** — thread-safe LinkedHashMap with `cacheLock` synchronization and `removeEldestEntry` auto-eviction at 200 entries. `accessOrder=false` prevents ConcurrentModificationException.
+- **AudioEngine PCM decode** — ShortArray chunks collected then concatenated via `System.arraycopy` to avoid boxing millions of Shorts through `MutableList<Short>`
 
 ## Features Wired & Working
 - Project gallery (create, open, delete, swipe-to-delete with confirm)
@@ -86,8 +94,13 @@ v0.2.0
 - Room `fallbackToDestructiveMigration()` - no `dropAllTables` parameter in Room 2.6.1
 - Room DB stores project metadata only - track/clip state serialized separately via ProjectAutoSave
 - FFmpeg not yet integrated - using pure Media3 pipeline
-- VideoEngine is @Singleton - don't cancel its coroutine scope (outlives ViewModel)
+- VideoEngine is @Singleton - don't call `release()` from ViewModel onCleared (use `removePlayerListener()` + `resetExportState()`)
 - `local.properties` not in git - must be created with sdk.dir path
+- RgbMatrix color matrices are row-major 4x4: `[R_out = row0 dot [R,G,B,A]]`. Alpha channel (=1) serves as offset for translation effects (brightness, invert).
+- OES shader extension for GLES 3.0 is `GL_OES_EGL_image_external_essl3` (not `GL_OES_EGL_image_external`)
+- Room TypeConverters must handle unknown enum values gracefully (try/catch around valueOf)
+- `startForegroundService()` required on API 26+ (minSdk), with SDK version check for compatibility
+- Auto-save deserialization uses `opt*` methods throughout to survive missing/corrupt fields
 
 ## Next Steps
 - Integrate Whisper ONNX for real auto captions

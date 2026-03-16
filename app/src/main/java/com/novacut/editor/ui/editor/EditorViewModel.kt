@@ -18,11 +18,13 @@ import com.novacut.editor.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.os.Build
 import java.io.File
 import javax.inject.Inject
 
@@ -96,20 +98,40 @@ class EditorViewModel @Inject constructor(
     val engine get() = videoEngine
 
     init {
-        // Load existing project if projectId provided
-        if (projectId != null) {
-            viewModelScope.launch {
+        val autoSaveId = projectId ?: _state.value.project.id
+
+        // Load existing project if projectId provided, then restore auto-save
+        viewModelScope.launch {
+            if (projectId != null) {
                 val project = projectDao.getProject(projectId)
                 if (project != null) {
                     _state.update { it.copy(project = project) }
                 } else {
-                    // New project — save it to Room
                     val newProject = _state.value.project.copy(id = projectId)
                     _state.update { it.copy(project = newProject) }
                     projectDao.insertProject(newProject)
                 }
             }
+
+            // Restore auto-save AFTER Room load to avoid race condition
+            val recovery = autoSave.loadRecoveryData(autoSaveId)
+            if (recovery != null) {
+                _state.update {
+                    it.copy(
+                        tracks = recovery.tracks.ifEmpty { it.tracks },
+                        textOverlays = recovery.textOverlays,
+                        playheadMs = recovery.playheadMs,
+                        totalDurationMs = recovery.tracks.maxOfOrNull { t ->
+                            t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L
+                        } ?: 0L
+                    )
+                }
+                if (recovery.tracks.flatMap { it.clips }.isNotEmpty()) {
+                    rebuildPlayerTimeline()
+                }
+            }
         }
+
         viewModelScope.launch {
             videoEngine.exportProgress.collect { progress ->
                 _state.update { it.copy(exportProgress = progress) }
@@ -121,8 +143,8 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        // Player.Listener for play state sync
-        videoEngine.getPlayer().addListener(object : Player.Listener {
+        // Player.Listener for play state sync — tracked for cleanup
+        videoEngine.setPlayerListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 _state.update { it.copy(isPlaying = playing) }
             }
@@ -145,25 +167,6 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        // Restore from auto-save if available
-        val autoSaveId = projectId ?: _state.value.project.id
-        val recovery = autoSave.loadRecoveryData(autoSaveId)
-        if (recovery != null) {
-            _state.update {
-                it.copy(
-                    tracks = recovery.tracks.ifEmpty { it.tracks },
-                    textOverlays = recovery.textOverlays,
-                    playheadMs = recovery.playheadMs,
-                    totalDurationMs = recovery.tracks.maxOfOrNull { t ->
-                        t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L
-                    } ?: 0L
-                )
-            }
-            if (recovery.tracks.flatMap { it.clips }.isNotEmpty()) {
-                videoEngine.prepareTimeline(_state.value.tracks)
-            }
-        }
-
         // Start auto-save
         autoSave.startAutoSave(autoSaveId) {
             val s = _state.value
@@ -176,17 +179,25 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /** Rebuild ExoPlayer timeline from current tracks. Call after any clip mutation. */
+    private fun rebuildPlayerTimeline() {
+        videoEngine.prepareTimeline(_state.value.tracks)
+    }
+
     fun addClipToTrack(uri: Uri, trackType: TrackType = TrackType.VIDEO) {
         viewModelScope.launch {
             val duration = withContext(Dispatchers.IO) {
                 videoEngine.getVideoDuration(uri)
             }
             if (duration <= 0) {
-                showToast("Could not read video file")
+                showToast("Could not read media file")
                 return@launch
             }
 
             saveUndoState("Add clip")
+
+            // Create clip ID outside state update so we can reference it for waveform
+            val clipId = java.util.UUID.randomUUID().toString()
 
             _state.update { state ->
                 val trackIndex = state.tracks.indexOfFirst { it.type == trackType }
@@ -196,6 +207,7 @@ class EditorViewModel @Inject constructor(
                 val timelineStart = track.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
 
                 val clip = Clip(
+                    id = clipId,
                     sourceUri = uri,
                     sourceDurationMs = duration,
                     timelineStartMs = timelineStart,
@@ -224,13 +236,10 @@ class EditorViewModel @Inject constructor(
             videoEngine.prepareTimeline(_state.value.tracks)
             saveProject()
 
-            // Extract waveform for audio visualization
-            val newClip = _state.value.tracks.flatMap { it.clips }.lastOrNull()
-            if (newClip != null) {
-                viewModelScope.launch {
-                    val waveform = audioEngine.extractWaveform(uri)
-                    _state.update { it.copy(waveforms = it.waveforms + (newClip.id to waveform)) }
-                }
+            // Extract waveform for audio visualization using the known clip ID
+            viewModelScope.launch {
+                val waveform = audioEngine.extractWaveform(uri)
+                _state.update { it.copy(waveforms = it.waveforms + (clipId to waveform)) }
             }
         }
     }
@@ -245,7 +254,21 @@ class EditorViewModel @Inject constructor(
 
         _state.update { state ->
             val tracks = state.tracks.map { track ->
-                track.copy(clips = track.clips.filterNot { it.id == clipId })
+                val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+                if (clipIndex < 0) return@map track
+
+                val deletedClip = track.clips[clipIndex]
+                val gapMs = deletedClip.durationMs
+
+                // Ripple delete: shift subsequent clips back to close the gap
+                val updatedClips = track.clips
+                    .filterNot { it.id == clipId }
+                    .map { clip ->
+                        if (clip.timelineStartMs > deletedClip.timelineStartMs) {
+                            clip.copy(timelineStartMs = clip.timelineStartMs - gapMs)
+                        } else clip
+                    }
+                track.copy(clips = updatedClips)
             }
             val totalDuration = tracks.maxOfOrNull { t ->
                 t.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
@@ -258,6 +281,7 @@ class EditorViewModel @Inject constructor(
                 selectedTrackId = null
             )
         }
+        rebuildPlayerTimeline()
     }
 
     fun splitClipAtPlayhead() {
@@ -295,20 +319,23 @@ class EditorViewModel @Inject constructor(
                 }
                 track.copy(clips = updatedClips)
             }
-            s.copy(tracks = tracks)
+            recalculateDuration(s.copy(tracks = tracks))
         }
+        rebuildPlayerTimeline()
+    }
+
+    fun beginTrim() {
+        saveUndoState("Trim clip")
     }
 
     fun trimClip(clipId: String, newTrimStartMs: Long? = null, newTrimEndMs: Long? = null) {
-        saveUndoState("Trim clip")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) {
-                        clip.copy(
-                            trimStartMs = newTrimStartMs ?: clip.trimStartMs,
-                            trimEndMs = newTrimEndMs ?: clip.trimEndMs
-                        )
+                        val start = (newTrimStartMs ?: clip.trimStartMs).coerceAtLeast(0L)
+                        val end = (newTrimEndMs ?: clip.trimEndMs).coerceAtLeast(start + 100L)
+                        clip.copy(trimStartMs = start, trimEndMs = end)
                     } else clip
                 })
             }
@@ -317,6 +344,7 @@ class EditorViewModel @Inject constructor(
             } ?: 0L
             state.copy(tracks = tracks, totalDurationMs = totalDuration)
         }
+        rebuildPlayerTimeline()
     }
 
     fun setClipSpeed(clipId: String, speed: Float) {
@@ -330,6 +358,7 @@ class EditorViewModel @Inject constructor(
             }
             recalculateDuration(state.copy(tracks = tracks))
         }
+        rebuildPlayerTimeline()
     }
 
     fun setClipReversed(clipId: String, reversed: Boolean) {
@@ -343,6 +372,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        rebuildPlayerTimeline()
     }
 
     fun addEffect(clipId: String, effect: Effect) {
@@ -491,20 +521,34 @@ class EditorViewModel @Inject constructor(
         _state.update { it.copy(currentTool = tool) }
     }
 
-    // Sheet toggles
-    fun showMediaPicker() { _state.update { it.copy(showMediaPicker = true) } }
+    // Panel mutual exclusion — atomic dismiss-and-show in single state update
+    private fun dismissedPanelState(state: EditorState) = state.copy(
+        showMediaPicker = false,
+        showExportSheet = false,
+        showEffectsPanel = false,
+        showTextEditor = false,
+        showTransitionPicker = false,
+        showAudioPanel = false,
+        showAiToolsPanel = false,
+        selectedEffectId = null
+    )
+
+    fun dismissAllPanels() { _state.update { dismissedPanelState(it) } }
+
+    // Sheet toggles — each atomically dismisses other panels and shows the target
+    fun showMediaPicker() { _state.update { dismissedPanelState(it).copy(showMediaPicker = true) } }
     fun hideMediaPicker() { _state.update { it.copy(showMediaPicker = false) } }
-    fun showExportSheet() { _state.update { it.copy(showExportSheet = true) } }
+    fun showExportSheet() { _state.update { dismissedPanelState(it).copy(showExportSheet = true) } }
     fun hideExportSheet() { _state.update { it.copy(showExportSheet = false) } }
-    fun showEffectsPanel() { _state.update { it.copy(showEffectsPanel = true) } }
+    fun showEffectsPanel() { _state.update { dismissedPanelState(it).copy(showEffectsPanel = true) } }
     fun hideEffectsPanel() { _state.update { it.copy(showEffectsPanel = false) } }
-    fun showTextEditor() { _state.update { it.copy(showTextEditor = true) } }
+    fun showTextEditor() { _state.update { dismissedPanelState(it).copy(showTextEditor = true) } }
     fun hideTextEditor() { _state.update { it.copy(showTextEditor = false) } }
-    fun showTransitionPicker() { _state.update { it.copy(showTransitionPicker = true) } }
+    fun showTransitionPicker() { _state.update { dismissedPanelState(it).copy(showTransitionPicker = true) } }
     fun hideTransitionPicker() { _state.update { it.copy(showTransitionPicker = false) } }
-    fun showAudioPanel() { _state.update { it.copy(showAudioPanel = true) } }
+    fun showAudioPanel() { saveUndoState("Audio changes"); _state.update { dismissedPanelState(it).copy(showAudioPanel = true) } }
     fun hideAudioPanel() { _state.update { it.copy(showAudioPanel = false) } }
-    fun showAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = true) } }
+    fun showAiToolsPanel() { _state.update { dismissedPanelState(it).copy(showAiToolsPanel = true) } }
     fun hideAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = false) } }
     fun selectEffect(effectId: String?) { _state.update { it.copy(selectedEffectId = effectId) } }
     fun clearSelectedEffect() { _state.update { it.copy(selectedEffectId = null) } }
@@ -521,19 +565,36 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun beginVolumeChange() {
+        saveUndoState("Change volume")
+    }
+
     // Export
     fun updateExportConfig(config: ExportConfig) {
         _state.update { it.copy(exportConfig = config) }
     }
 
     fun startExport(outputDir: File) {
+        val currentTracks = _state.value.tracks
+        if (currentTracks.flatMap { it.clips }.isEmpty()) {
+            showToast("No clips to export")
+            return
+        }
+
         viewModelScope.launch {
             val config = _state.value.exportConfig
             val outputFile = File(outputDir, "NovaCut_${System.currentTimeMillis()}.mp4")
 
+            // Ensure output directory exists (off main thread)
+            withContext(Dispatchers.IO) { outputDir.mkdirs() }
+
             // Start foreground service for export notification
             val serviceIntent = Intent(appContext, ExportService::class.java)
-            appContext.startService(serviceIntent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                appContext.startForegroundService(serviceIntent)
+            } else {
+                appContext.startService(serviceIntent)
+            }
 
             videoEngine.export(
                 tracks = _state.value.tracks,
@@ -574,6 +635,7 @@ class EditorViewModel @Inject constructor(
                 redoStack = it.redoStack + currentAction
             )
         }
+        rebuildPlayerTimeline()
     }
 
     fun redo() {
@@ -595,12 +657,16 @@ class EditorViewModel @Inject constructor(
                 undoStack = it.undoStack + currentAction
             )
         }
+        rebuildPlayerTimeline()
     }
 
+    private var toastJob: Job? = null
+
     fun showToast(message: String) {
+        toastJob?.cancel()
         _state.update { it.copy(toastMessage = message) }
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(3000)
+        toastJob = viewModelScope.launch {
+            delay(3000)
             _state.update { it.copy(toastMessage = null) }
         }
     }
@@ -656,6 +722,8 @@ class EditorViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         autoSave.stop()
-        videoEngine.release()
+        videoEngine.removePlayerListener()
+        videoEngine.resetExportState()
+        // DON'T call videoEngine.release() — it's a @Singleton that outlives this ViewModel
     }
 }

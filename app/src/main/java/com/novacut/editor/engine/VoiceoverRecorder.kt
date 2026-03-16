@@ -26,26 +26,34 @@ class VoiceoverRecorderEngine @Inject constructor(
         val file = File(context.cacheDir, "voiceover_${System.currentTimeMillis()}.m4a")
         outputFile = file
 
-        recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val rec = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
         } else {
             @Suppress("DEPRECATION")
             MediaRecorder()
-        }.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioSamplingRate(44100)
-            setAudioEncodingBitRate(256000)
-            setAudioChannels(2)
-            setOutputFile(file.absolutePath)
-            prepare()
-            start()
         }
 
-        startTime = System.currentTimeMillis()
-        _isRecording.value = true
-        return file
+        return try {
+            rec.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(44100)
+                setAudioEncodingBitRate(256000)
+                setAudioChannels(2)
+                setOutputFile(file.absolutePath)
+                prepare()
+                start()
+            }
+            recorder = rec
+            startTime = System.currentTimeMillis()
+            _isRecording.value = true
+            file
+        } catch (e: Exception) {
+            rec.release()
+            outputFile = null
+            null
+        }
     }
 
     fun stopRecording(): Uri? {

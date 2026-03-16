@@ -38,11 +38,19 @@ class Converters {
     fun fromAspectRatio(value: AspectRatio): String = value.name
 
     @TypeConverter
-    fun toAspectRatio(value: String): AspectRatio = AspectRatio.valueOf(value)
+    fun toAspectRatio(value: String): AspectRatio = try {
+        AspectRatio.valueOf(value)
+    } catch (_: IllegalArgumentException) {
+        AspectRatio.RATIO_16_9
+    }
 
     @TypeConverter
     fun fromResolution(value: Resolution): String = value.name
 
     @TypeConverter
-    fun toResolution(value: String): Resolution = Resolution.valueOf(value)
+    fun toResolution(value: String): Resolution = try {
+        Resolution.valueOf(value)
+    } catch (_: IllegalArgumentException) {
+        Resolution.FHD_1080P
+    }
 }

@@ -42,6 +42,7 @@ fun Timeline(
     onZoomChanged: (Float) -> Unit,
     onScrollChanged: (Long) -> Unit,
     onTrimChanged: (clipId: String, newTrimStartMs: Long?, newTrimEndMs: Long?) -> Unit = { _, _, _ -> },
+    onTrimDragStarted: () -> Unit = {},
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -263,13 +264,18 @@ fun Timeline(
                                                         )
                                                     )
                                                     .pointerInput(clip.id) {
-                                                        detectHorizontalDragGestures { _, dragAmount ->
-                                                            val deltaMs = (dragAmount / pixelsPerMs).toLong()
-                                                            val newStart = (clip.trimStartMs + deltaMs)
-                                                                .coerceAtLeast(0L)
-                                                                .coerceAtMost(clip.trimEndMs - 100L)
-                                                            onTrimChanged(clip.id, newStart, null)
-                                                        }
+                                                        detectHorizontalDragGestures(
+                                                            onDragStart = { onTrimDragStarted() },
+                                                            onDragEnd = {},
+                                                            onDragCancel = {},
+                                                            onHorizontalDrag = { _, dragAmount ->
+                                                                val deltaMs = (dragAmount / pixelsPerMs).toLong()
+                                                                val newStart = (clip.trimStartMs + deltaMs)
+                                                                    .coerceAtLeast(0L)
+                                                                    .coerceAtMost(clip.trimEndMs - 100L)
+                                                                onTrimChanged(clip.id, newStart, null)
+                                                            }
+                                                        )
                                                     }
                                             )
                                             // Right trim handle
@@ -286,12 +292,17 @@ fun Timeline(
                                                         )
                                                     )
                                                     .pointerInput(clip.id) {
-                                                        detectHorizontalDragGestures { _, dragAmount ->
-                                                            val deltaMs = (dragAmount / pixelsPerMs).toLong()
-                                                            val newEnd = (clip.trimEndMs + deltaMs)
-                                                                .coerceAtLeast(clip.trimStartMs + 100L)
-                                                            onTrimChanged(clip.id, null, newEnd)
-                                                        }
+                                                        detectHorizontalDragGestures(
+                                                            onDragStart = { onTrimDragStarted() },
+                                                            onDragEnd = {},
+                                                            onDragCancel = {},
+                                                            onHorizontalDrag = { _, dragAmount ->
+                                                                val deltaMs = (dragAmount / pixelsPerMs).toLong()
+                                                                val newEnd = (clip.trimEndMs + deltaMs)
+                                                                    .coerceAtLeast(clip.trimStartMs + 100L)
+                                                                onTrimChanged(clip.id, null, newEnd)
+                                                            }
+                                                        )
                                                     }
                                             )
                                         }

@@ -207,12 +207,13 @@ class AiFeatures @Inject constructor(
         targetAspectRatio: Float
     ): CropSuggestion = withContext(Dispatchers.IO) {
         // TODO: Use face/object detection to find the subject
-        // Placeholder: center crop
+        // Placeholder: center crop — guard against zero/negative aspect ratio
+        val safeRatio = targetAspectRatio.coerceAtLeast(0.01f)
         CropSuggestion(
             centerX = 0.5f,
             centerY = 0.5f,
             width = 1f,
-            height = 1f / targetAspectRatio,
+            height = (1f / safeRatio).coerceAtMost(1f),
             confidence = 0.8f
         )
     }

@@ -22,7 +22,7 @@ object ShaderEffects {
 
     // OES vertex shader for external textures (camera/video)
     const val VERTEX_SHADER_OES = """
-        #extension GL_OES_EGL_image_external : require
+        #extension GL_OES_EGL_image_external_essl3 : require
         attribute vec4 aPosition;
         attribute vec2 aTexCoord;
         uniform mat4 uTexMatrix;
@@ -272,10 +272,10 @@ object ShaderEffects {
 
             vec4 sum = vec4(0.0);
             float total = 0.0;
-            for (int i = -4; i <= 4; i++) {
-                for (int j = -4; j <= 4; j++) {
+            for (int i = -2; i <= 2; i++) {
+                for (int j = -2; j <= 2; j++) {
                     vec2 offset = vec2(float(i), float(j)) * blur;
-                    float weight = 1.0 - length(vec2(float(i), float(j))) / 5.6;
+                    float weight = 1.0 - length(vec2(float(i), float(j))) / 3.0;
                     weight = max(weight, 0.0);
                     sum += texture2D(uTexture, vTexCoord + offset) * weight;
                     total += weight;

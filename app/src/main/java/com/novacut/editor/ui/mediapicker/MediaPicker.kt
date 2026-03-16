@@ -25,12 +25,13 @@ import com.novacut.editor.ui.theme.Mocha
 
 @Composable
 fun MediaPickerSheet(
-    onMediaSelected: (Uri) -> Unit,
+    onMediaSelected: (Uri, String) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var selectedUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var pendingMediaType by remember { mutableStateOf("video") }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -43,7 +44,7 @@ fun MediaPickerSheet(
                     android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) { }
-            onMediaSelected(uri)
+            onMediaSelected(uri, "video")
         }
     }
 
@@ -57,7 +58,7 @@ fun MediaPickerSheet(
                     android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) { }
-            onMediaSelected(uri)
+            onMediaSelected(uri, pendingMediaType)
         }
     }
 
@@ -93,6 +94,7 @@ fun MediaPickerSheet(
                 color = Mocha.Blue,
                 modifier = Modifier.weight(1f)
             ) {
+                pendingMediaType = "video"
                 singlePickerLauncher.launch(arrayOf("video/*"))
             }
 
@@ -102,6 +104,7 @@ fun MediaPickerSheet(
                 color = Mocha.Green,
                 modifier = Modifier.weight(1f)
             ) {
+                pendingMediaType = "image"
                 singlePickerLauncher.launch(arrayOf("image/*"))
             }
 
@@ -111,6 +114,7 @@ fun MediaPickerSheet(
                 color = Mocha.Peach,
                 modifier = Modifier.weight(1f)
             ) {
+                pendingMediaType = "audio"
                 singlePickerLauncher.launch(arrayOf("audio/*"))
             }
         }
