@@ -1,0 +1,6 @@
+-keepattributes *Annotation*
+-keep class com.novacut.editor.model.** { *; }
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
