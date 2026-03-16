@@ -183,7 +183,7 @@ class VideoEngine @Inject constructor(
             }
 
             val sequence = EditedMediaItemSequence(editedItems)
-            val composition = Composition.Builder(sequence).build()
+            val composition = Composition.Builder(listOf(sequence)).build()
 
             val mimeType = when (config.codec) {
                 VideoCodec.HEVC -> MimeTypes.VIDEO_H265
@@ -235,7 +235,15 @@ class VideoEngine @Inject constructor(
         return when (effect.type) {
             EffectType.BRIGHTNESS -> {
                 val value = effect.params["value"] ?: 0f
-                Brightness(value)
+                RgbMatrix { _, _ ->
+                    val b = value
+                    floatArrayOf(
+                        1f, 0f, 0f, b,
+                        0f, 1f, 0f, b,
+                        0f, 0f, 1f, b,
+                        0f, 0f, 0f, 1f
+                    )
+                }
             }
             EffectType.CONTRAST -> {
                 val value = effect.params["value"] ?: 1f

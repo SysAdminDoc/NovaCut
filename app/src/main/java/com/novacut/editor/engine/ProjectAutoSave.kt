@@ -5,7 +5,6 @@ import com.novacut.editor.model.Track
 import com.novacut.editor.model.TextOverlay
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
-import kotlinx.serialization.json.Json
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton

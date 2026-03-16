@@ -22,15 +22,9 @@ object AppModule {
             context,
             ProjectDatabase::class.java,
             "novacut.db"
-        ).fallbackToDestructiveMigration().build()
+        ).fallbackToDestructiveMigration(dropAllTables = true).build()
     }
 
     @Provides
     fun provideProjectDao(db: ProjectDatabase): ProjectDao = db.projectDao()
-
-    @Provides
-    @Singleton
-    fun provideVideoEngine(@ApplicationContext context: Context): VideoEngine {
-        return VideoEngine(context)
-    }
 }

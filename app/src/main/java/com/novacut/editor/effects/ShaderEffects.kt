@@ -1,8 +1,6 @@
 package com.novacut.editor.effects
 
-import android.content.Context
 import android.opengl.GLES30
-import androidx.media3.common.util.UnstableApi
 
 /**
  * GLSL shader source code for video effects.

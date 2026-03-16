@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
 import androidx.compose.ui.unit.dp
@@ -27,7 +28,6 @@ import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalTextApi::class)
 @Composable
 fun Timeline(
     tracks: List<Track>,
@@ -118,10 +118,12 @@ fun Timeline(
             }
 
             // Scrollable timeline area
+            var timelineWidthPx by remember { mutableFloatStateOf(0f) }
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .clipToBounds()
+                    .onSizeChanged { timelineWidthPx = it.width.toFloat() }
                     .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             val newZoom = (zoomLevel * zoom).coerceIn(0.1f, 10f)
@@ -181,7 +183,7 @@ fun Timeline(
                                 val clipStartPx = ((clip.timelineStartMs - scrollOffsetMs) * pixelsPerMs)
                                 val clipWidthPx = (clip.durationMs * pixelsPerMs)
 
-                                if (clipStartPx + clipWidthPx > 0 && clipStartPx < with(density) { this@Box.maxWidth.toPx() }) {
+                                if (clipStartPx + clipWidthPx > 0 && clipStartPx < timelineWidthPx) {
                                     val isSelected = clip.id == selectedClipId
                                     val clipColor = when (track.type) {
                                         TrackType.VIDEO -> Mocha.Blue
@@ -289,7 +291,7 @@ fun Timeline(
 
                             // Playhead line
                             val playheadPx = ((playheadMs - scrollOffsetMs) * pixelsPerMs)
-                            if (playheadPx in 0f..with(density) { this@Box.maxWidth.toPx() }) {
+                            if (playheadPx in 0f..timelineWidthPx) {
                                 Canvas(
                                     modifier = Modifier
                                         .offset(x = with(density) { playheadPx.toDp() })
