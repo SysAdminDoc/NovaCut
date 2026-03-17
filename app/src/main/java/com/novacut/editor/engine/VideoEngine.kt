@@ -7,6 +7,8 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.*
 import androidx.media3.exoplayer.ExoPlayer
@@ -18,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import android.util.Log
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,6 +44,9 @@ class VideoEngine @Inject constructor(
 
     // Clip durations for multi-clip seek/playhead calculations
     private var clipDurationsMs: List<Long> = emptyList()
+
+    // Active Transformer for export cancellation
+    @Volatile private var activeTransformer: Transformer? = null
 
     private val _exportProgress = MutableStateFlow(0f)
     val exportProgress: StateFlow<Float> = _exportProgress
@@ -268,8 +275,21 @@ class VideoEngine @Inject constructor(
                     ))
                 }
 
+                val audioProcessors = buildList<AudioProcessor> {
+                    val needsVolume = clip.volume != 1.0f
+                    val needsFade = clip.fadeInMs > 0L || clip.fadeOutMs > 0L
+                    if (needsVolume || needsFade) {
+                        add(VolumeAudioProcessor(
+                            volume = clip.volume,
+                            fadeInMs = clip.fadeInMs,
+                            fadeOutMs = clip.fadeOutMs,
+                            clipDurationMs = clip.durationMs
+                        ))
+                    }
+                }
+
                 EditedMediaItem.Builder(mediaItem)
-                    .setEffects(Effects(emptyList(), videoEffects))
+                    .setEffects(Effects(audioProcessors, videoEffects))
                     .build()
             }
 
@@ -317,6 +337,7 @@ class VideoEngine @Inject constructor(
                 }
 
                 transformer.addListener(listener)
+                activeTransformer = transformer
                 transformer.start(composition, outputFile.absolutePath)
 
                 val holder = ProgressHolder()
@@ -328,13 +349,25 @@ class VideoEngine @Inject constructor(
                     }
                     delay(250)
                 }
+                activeTransformer = null
             }
         } catch (e: Exception) {
             Log.e(TAG, "Export setup failed", e)
             _exportState.value = ExportState.ERROR
             _exportProgress.value = 0f
+            activeTransformer = null
             onError(e)
         }
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    fun cancelExport() {
+        if (_exportState.value != ExportState.EXPORTING) return
+        Log.d(TAG, "Cancelling export")
+        _exportState.value = ExportState.CANCELLED
+        _exportProgress.value = 0f
+        activeTransformer?.cancel()
+        activeTransformer = null
     }
 
     @androidx.annotation.OptIn(UnstableApi::class)
@@ -459,4 +492,71 @@ class VideoEngine @Inject constructor(
     }
 }
 
-enum class ExportState { IDLE, EXPORTING, COMPLETE, ERROR }
+enum class ExportState { IDLE, EXPORTING, COMPLETE, ERROR, CANCELLED }
+
+/**
+ * Audio processor that applies volume scaling and fade in/out envelope.
+ * Operates on 16-bit PCM audio samples.
+ */
+@UnstableApi
+private class VolumeAudioProcessor(
+    private val volume: Float,
+    private val fadeInMs: Long,
+    private val fadeOutMs: Long,
+    private val clipDurationMs: Long
+) : BaseAudioProcessor() {
+
+    private var processedFrames: Long = 0L
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        if (inputAudioFormat.sampleRate == 0) {
+            throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+        }
+        return inputAudioFormat
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val remaining = inputBuffer.remaining()
+        if (remaining == 0) return
+
+        val outputBuffer = replaceOutputBuffer(remaining)
+        val sampleRate = inputAudioFormat.sampleRate
+        val channelCount = inputAudioFormat.channelCount
+        val bytesPerFrame = channelCount * 2 // 16-bit = 2 bytes per sample
+
+        while (inputBuffer.hasRemaining()) {
+            val sample = inputBuffer.short
+            val frameIndex = processedFrames / channelCount
+            val timeMs = frameIndex * 1000L / sampleRate
+
+            var gain = volume
+
+            // Fade in envelope
+            if (fadeInMs > 0 && timeMs < fadeInMs) {
+                gain *= timeMs.toFloat() / fadeInMs
+            }
+
+            // Fade out envelope
+            if (fadeOutMs > 0 && timeMs > clipDurationMs - fadeOutMs) {
+                val remaining = (clipDurationMs - timeMs).coerceAtLeast(0L)
+                gain *= remaining.toFloat() / fadeOutMs
+            }
+
+            val scaled = (sample * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+            outputBuffer.putShort(scaled.toShort())
+            processedFrames++
+        }
+
+        outputBuffer.flip()
+    }
+
+    override fun onFlush() {
+        super.onFlush()
+        processedFrames = 0L
+    }
+
+    override fun onReset() {
+        super.onReset()
+        processedFrames = 0L
+    }
+}

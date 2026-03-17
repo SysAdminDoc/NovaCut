@@ -171,6 +171,9 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch {
             videoEngine.exportState.collect { exportState ->
                 _state.update { it.copy(exportState = exportState) }
+                if (exportState == ExportState.CANCELLED) {
+                    showToast("Export cancelled")
+                }
             }
         }
 
@@ -981,16 +984,13 @@ class EditorViewModel @Inject constructor(
                     onComplete = {
                         _state.update { it.copy(lastExportedFilePath = outputFile.absolutePath) }
                         showToast("Export complete: ${outputFile.name}")
-                        appContext.stopService(serviceIntent)
                     },
                     onError = { e ->
                         _state.update { it.copy(exportErrorMessage = e.message ?: "Unknown error") }
-                        appContext.stopService(serviceIntent)
                     }
                 )
             } catch (e: Exception) {
                 _state.update { it.copy(exportErrorMessage = e.message ?: "Unknown error") }
-                appContext.stopService(serviceIntent)
             }
         }
     }

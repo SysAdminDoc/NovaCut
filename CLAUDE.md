@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.19.0
+v0.20.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -127,7 +127,10 @@ v0.19.0
 - Camera capture via system camera app (CaptureVideo intent)
 - Photo Picker for Android 13+ (PickVisualMedia) with OpenDocument fallback
 - Project thumbnails on gallery cards (Coil VideoFrameDecoder)
-- Export: resolution, codec, bitrate from config; aspect-ratio-aware output dimensions; foreground service with MEDIA_PROCESSING type; error display with retry button
+- Export: resolution, codec, bitrate from config; aspect-ratio-aware output dimensions; foreground service with MEDIA_PROCESSING type; error display with retry button; cancel via notification action
+- Export notification live progress (ExportService observes VideoEngine StateFlows, updates notification in real-time)
+- Export cancellation (notification Cancel button triggers Transformer.cancel(), CANCELLED state propagated)
+- Export audio volume + fades (VolumeAudioProcessor applies clip volume/fadeIn/fadeOut to exported audio)
 - R8 minification enabled with comprehensive ProGuard keep rules (~5MB APK)
 - Undo/redo (50 levels, immutable state snapshots)
 - Project auto-save every 30s with full state recovery (errors logged to logcat)
@@ -258,6 +261,10 @@ v0.19.0
 - **Voiceover permanent storage** — Voiceover recordings now saved to `filesDir/voiceovers/` instead of `cacheDir`. Freeze frames saved to `filesDir/freeze_frames/`. Both survive cache cleanup and device reboot.
 - **Project-mode AI tab removed** — AI tools only available in clip mode (when a clip is selected). Removed dead `projectAiSubMenu` and its tab entry from `projectTabs`.
 - **Snackbar z-ordering** — Toast Snackbar now uses `zIndex(10f)` and `bottom = 120.dp` padding to render above bottom sheets and tool panels.
+- **ExportService @AndroidEntryPoint** — Service now uses Hilt DI to inject VideoEngine @Singleton. Collects `exportProgress`/`exportState` StateFlows via `combine()` to update notification in real-time. Self-manages lifecycle (stopSelf on COMPLETE/ERROR/CANCELLED). ViewModel no longer calls `stopService()`.
+- **Export cancellation** — `VideoEngine.cancelExport()` sets `CANCELLED` state and calls `transformer.cancel()`. `activeTransformer` stored as `@Volatile` field, cleared after export completes or fails. ExportService `ACTION_CANCEL` now calls `videoEngine.cancelExport()` instead of just `stopSelf()`. CANCELLED state added to `ExportState` enum.
+- **VolumeAudioProcessor** — Custom `BaseAudioProcessor` that applies volume scaling and fade in/out envelope to 16-bit PCM audio during export. Tracks sample position to compute time offset for fade calculations. Only created when `volume != 1.0f` or `fadeInMs > 0` or `fadeOutMs > 0`.
+- **Export audio effects wired** — `Effects(audioProcessors, videoEffects)` now passes `VolumeAudioProcessor` list instead of `emptyList()` for audio. Each clip gets its own processor with its specific volume/fade settings.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
