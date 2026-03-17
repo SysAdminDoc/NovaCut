@@ -2,8 +2,14 @@ package com.novacut.editor.engine
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Typeface
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.AbsoluteSizeSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
@@ -221,6 +227,7 @@ class VideoEngine @Inject constructor(
         tracks: List<Track>,
         config: ExportConfig,
         outputFile: File,
+        textOverlays: List<com.novacut.editor.model.TextOverlay> = emptyList(),
         onProgress: (Float) -> Unit = {},
         onComplete: () -> Unit = {},
         onError: (Exception) -> Unit = {}
@@ -253,8 +260,9 @@ class VideoEngine @Inject constructor(
                         if (!effect.enabled) continue
                         buildVideoEffect(effect)?.let { add(it) }
                     }
-                    // Apply keyframe opacity if defined
-                    if (clip.keyframes.any { it.property == KeyframeProperty.OPACITY }) {
+                    // Apply static opacity (if no keyframe opacity overrides)
+                    val hasKeyframeOpacity = clip.keyframes.any { it.property == KeyframeProperty.OPACITY }
+                    if (hasKeyframeOpacity) {
                         add(RgbMatrix { presentationTimeUs, _ ->
                             val timeMs = presentationTimeUs / 1000L
                             val opacity = KeyframeEngine.getValueAt(
@@ -267,9 +275,42 @@ class VideoEngine @Inject constructor(
                                 0f, 0f, 0f, 1f
                             )
                         })
+                    } else if (clip.opacity != 1f) {
+                        val o = clip.opacity.coerceIn(0f, 1f)
+                        add(RgbMatrix { _, _ ->
+                            floatArrayOf(
+                                o, 0f, 0f, 0f,
+                                0f, o, 0f, 0f,
+                                0f, 0f, o, 0f,
+                                0f, 0f, 0f, 1f
+                            )
+                        })
+                    }
+                    // Apply clip transform (rotation, scale)
+                    if (clip.rotation != 0f || clip.scaleX != 1f || clip.scaleY != 1f) {
+                        add(ScaleAndRotateTransformation.Builder()
+                            .setScale(clip.scaleX, clip.scaleY)
+                            .setRotationDegrees(clip.rotation)
+                            .build())
                     }
                     if (clip.speed != 1.0f) {
                         add(SpeedChangeEffect(clip.speed))
+                    }
+                    // Text overlays that overlap this clip's timeline range
+                    val clipStart = clip.timelineStartMs
+                    val clipEnd = clip.timelineEndMs
+                    val overlapping = textOverlays.filter { overlay ->
+                        overlay.startTimeMs < clipEnd && overlay.endTimeMs > clipStart
+                    }
+                    if (overlapping.isNotEmpty()) {
+                        val overlayList = overlapping.map { overlay ->
+                            val relStart = (overlay.startTimeMs - clipStart).coerceAtLeast(0L)
+                            val relEnd = (overlay.endTimeMs - clipStart).coerceAtMost(clip.durationMs)
+                            ExportTextOverlay(overlay, relStart, relEnd)
+                        }
+                        @Suppress("UNCHECKED_CAST")
+                        val typed = overlayList as List<TextureOverlay>
+                        add(OverlayEffect(com.google.common.collect.ImmutableList.copyOf(typed)))
                     }
                     add(Presentation.createForWidthAndHeight(
                         targetW, targetH, Presentation.LAYOUT_SCALE_TO_FIT
@@ -294,8 +335,47 @@ class VideoEngine @Inject constructor(
                     .build()
             }
 
-            val sequence = EditedMediaItemSequence(editedItems)
-            val composition = Composition.Builder(listOf(sequence)).build()
+            val videoSequence = EditedMediaItemSequence.Builder(editedItems).build()
+
+            // Build audio track sequence (background music, voiceovers, etc.)
+            val audioTrack = tracks.firstOrNull { it.type == TrackType.AUDIO }
+            val sequences = buildList {
+                add(videoSequence)
+                if (audioTrack != null && audioTrack.clips.isNotEmpty()) {
+                    val audioItems = audioTrack.clips.map { clip ->
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(clip.sourceUri)
+                            .setClippingConfiguration(
+                                MediaItem.ClippingConfiguration.Builder()
+                                    .setStartPositionMs(clip.trimStartMs)
+                                    .setEndPositionMs(clip.trimEndMs)
+                                    .build()
+                            )
+                            .build()
+                        val processors = buildList<AudioProcessor> {
+                            val needsVolume = clip.volume != 1.0f
+                            val needsFade = clip.fadeInMs > 0L || clip.fadeOutMs > 0L
+                            if (needsVolume || needsFade) {
+                                add(VolumeAudioProcessor(
+                                    volume = clip.volume,
+                                    fadeInMs = clip.fadeInMs,
+                                    fadeOutMs = clip.fadeOutMs,
+                                    clipDurationMs = clip.durationMs
+                                ))
+                            }
+                        }
+                        EditedMediaItem.Builder(mediaItem)
+                            .setEffects(Effects(processors, emptyList()))
+                            .setRemoveVideo(true)
+                            .build()
+                    }
+                    add(EditedMediaItemSequence.Builder(audioItems).build())
+                }
+            }
+
+            val composition = Composition.Builder(sequences)
+                .setTransmuxAudio(audioTrack == null || audioTrack.clips.isEmpty())
+                .build()
 
             val mimeType = when (config.codec) {
                 VideoCodec.HEVC -> MimeTypes.VIDEO_H265
@@ -448,7 +528,175 @@ class VideoEngine @Inject constructor(
                     )
                 }
             }
-            else -> null
+            EffectType.TINT -> {
+                val value = (effect.params["value"] ?: 0f).coerceIn(-1f, 1f)
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        1f, 0f, 0f, 0f,
+                        0f, 1f + value * 0.1f, 0f, 0f,
+                        0f, 0f, 1f, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.EXPOSURE -> {
+                // Approximate exposure: multiply all channels by 2^value
+                val value = (effect.params["value"] ?: 0f).coerceIn(-2f, 2f)
+                val mul = Math.pow(2.0, value.toDouble()).toFloat()
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        mul, 0f, 0f, 0f,
+                        0f, mul, 0f, 0f,
+                        0f, 0f, mul, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.GAMMA -> {
+                // Gamma approximation: use linear scale (true gamma needs pow per-pixel)
+                val value = (effect.params["value"] ?: 1f).coerceIn(0.2f, 5f)
+                val inv = 1f / value
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        inv, 0f, 0f, 0f,
+                        0f, inv, 0f, 0f,
+                        0f, 0f, inv, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.HIGHLIGHTS -> {
+                // Boost/reduce bright areas: scale toward white
+                val value = (effect.params["value"] ?: 0f).coerceIn(-1f, 1f)
+                val scale = 1f + value * 0.3f
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        scale, 0f, 0f, 0f,
+                        0f, scale, 0f, 0f,
+                        0f, 0f, scale, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.SHADOWS -> {
+                // Lift/crush shadow areas: offset toward black
+                val value = (effect.params["value"] ?: 0f).coerceIn(-1f, 1f)
+                val offset = value * 0.15f
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        1f, 0f, 0f, offset,
+                        0f, 1f, 0f, offset,
+                        0f, 0f, 1f, offset,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.VIBRANCE -> {
+                // Selective saturation: boost less-saturated colors more
+                val value = (effect.params["value"] ?: 0f).coerceIn(-1f, 1f)
+                val s = 1f + value * 0.5f
+                val sr = (1 - s) * 0.2126f
+                val sg = (1 - s) * 0.7152f
+                val sb = (1 - s) * 0.0722f
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        sr + s, sg, sb, 0f,
+                        sr, sg + s, sb, 0f,
+                        sr, sg, sb + s, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.POSTERIZE -> {
+                // Approximate posterize by reducing contrast then boosting
+                val levels = (effect.params["levels"] ?: 6f).coerceIn(2f, 16f)
+                val scale = levels / 8f
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        scale, 0f, 0f, (1f - scale) * 0.5f,
+                        0f, scale, 0f, (1f - scale) * 0.5f,
+                        0f, 0f, scale, (1f - scale) * 0.5f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.COOL_TONE -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        1f - intensity * 0.1f, 0f, 0f, 0f,
+                        0f, 1f, 0f, 0f,
+                        0f, 0f, 1f + intensity * 0.15f, intensity * 0.02f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.WARM_TONE -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        1f + intensity * 0.15f, 0f, 0f, intensity * 0.02f,
+                        0f, 1f + intensity * 0.05f, 0f, 0f,
+                        0f, 0f, 1f - intensity * 0.1f, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.CYBERPUNK -> {
+                // Teal shadows + magenta highlights
+                val intensity = (effect.params["intensity"] ?: 0.7f).coerceIn(0f, 1f)
+                val s = 1f + intensity * 0.3f
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        s, 0f, 0f, intensity * 0.05f,
+                        0f, 1f - intensity * 0.1f, 0f, -intensity * 0.02f,
+                        0f, 0f, s, intensity * 0.08f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.NOIR -> {
+                // High contrast desaturated with slight warm tint
+                val intensity = (effect.params["intensity"] ?: 0.7f).coerceIn(0f, 1f)
+                val gray = intensity
+                val tint = intensity * 0.03f
+                val lr = 0.2126f * gray + (1f - gray)
+                val lg = 0.7152f * gray
+                val lb = 0.0722f * gray
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        lr, lg, lb, tint,
+                        0.2126f * gray, 0.7152f * gray + (1f - gray), 0.0722f * gray, 0f,
+                        0.2126f * gray, 0.7152f * gray, 0.0722f * gray + (1f - gray), -tint,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.VINTAGE -> {
+                // Faded warm look: reduced contrast + sepia blend
+                val intensity = (effect.params["intensity"] ?: 0.7f).coerceIn(0f, 1f)
+                val i = intensity
+                RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        1f - i * 0.3f + i * 0.393f * 0.5f, i * 0.769f * 0.5f, i * 0.189f * 0.5f, i * 0.03f,
+                        i * 0.349f * 0.5f, 1f - i * 0.2f + i * 0.686f * 0.5f, i * 0.168f * 0.5f, i * 0.01f,
+                        i * 0.272f * 0.5f, i * 0.534f * 0.5f, 1f - i * 0.4f + i * 0.131f * 0.5f, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                }
+            }
+            EffectType.MIRROR -> {
+                ScaleAndRotateTransformation.Builder()
+                    .setScale(-1f, 1f)
+                    .build()
+            }
+            // Effects requiring custom GL shaders — not yet implementable with RgbMatrix
+            EffectType.VIGNETTE, EffectType.SHARPEN, EffectType.FILM_GRAIN,
+            EffectType.GAUSSIAN_BLUR, EffectType.RADIAL_BLUR, EffectType.MOTION_BLUR,
+            EffectType.TILT_SHIFT, EffectType.MOSAIC, EffectType.FISHEYE,
+            EffectType.GLITCH, EffectType.PIXELATE, EffectType.WAVE,
+            EffectType.CHROMATIC_ABERRATION, EffectType.CHROMA_KEY,
+            EffectType.SPEED, EffectType.REVERSE -> null
         }
     }
 
@@ -559,5 +807,56 @@ private class VolumeAudioProcessor(
     override fun onReset() {
         super.onReset()
         processedFrames = 0L
+    }
+}
+
+/**
+ * Text overlay that renders within a specific time range during export.
+ * Converts model TextOverlay properties to Media3 SpannableString styling.
+ */
+@UnstableApi
+private class ExportTextOverlay(
+    private val overlay: com.novacut.editor.model.TextOverlay,
+    private val relStartMs: Long,
+    private val relEndMs: Long
+) : androidx.media3.effect.TextOverlay() {
+
+    override fun getText(presentationTimeUs: Long): SpannableString {
+        val timeMs = presentationTimeUs / 1000L
+        if (timeMs < relStartMs || timeMs > relEndMs) {
+            return SpannableString("")
+        }
+        val text = SpannableString(overlay.text)
+        text.setSpan(
+            ForegroundColorSpan(overlay.color.toInt()),
+            0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        text.setSpan(
+            AbsoluteSizeSpan(overlay.fontSize.toInt(), true),
+            0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        val style = when {
+            overlay.bold && overlay.italic -> Typeface.BOLD_ITALIC
+            overlay.bold -> Typeface.BOLD
+            overlay.italic -> Typeface.ITALIC
+            else -> Typeface.NORMAL
+        }
+        if (style != Typeface.NORMAL) {
+            text.setSpan(StyleSpan(style), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return text
+    }
+
+    override fun getOverlaySettings(presentationTimeUs: Long): OverlaySettings {
+        val timeMs = presentationTimeUs / 1000L
+        val alpha = if (timeMs < relStartMs || timeMs > relEndMs) 0f else 1f
+        // Convert 0..1 position to -1..1 anchor (Y inverted: 0=top -> 1, 1=bottom -> -1)
+        val anchorX = overlay.positionX * 2f - 1f
+        val anchorY = -(overlay.positionY * 2f - 1f)
+        return OverlaySettings.Builder()
+            .setOverlayFrameAnchor(anchorX, anchorY)
+            .setBackgroundFrameAnchor(anchorX, anchorY)
+            .setAlphaScale(alpha)
+            .build()
     }
 }

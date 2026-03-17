@@ -981,6 +981,7 @@ class EditorViewModel @Inject constructor(
                     tracks = _state.value.tracks,
                     config = config,
                     outputFile = outputFile,
+                    textOverlays = _state.value.textOverlays,
                     onProgress = { progress ->
                         _state.update { it.copy(exportProgress = progress) }
                     },

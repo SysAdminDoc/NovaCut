@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.21.0
+v0.22.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -135,6 +135,11 @@ v0.21.0
 - Text overlay list/edit/delete UI (BottomToolArea text tab shows existing overlays with edit/delete buttons)
 - Text overlay editing (TextEditorSheet opens with existing overlay data, save updates instead of creating new)
 - Camera temp file cleanup (stale files older than 1 hour deleted on MediaPicker open)
+- Export 20+ color/filter effects via RgbMatrix (tint, exposure, gamma, highlights, shadows, vibrance, posterize, cool/warm tone, cyberpunk, noir, vintage, mirror)
+- Export clip transforms (rotation, scale via ScaleAndRotateTransformation)
+- Export static clip opacity (RgbMatrix when no keyframe opacity override)
+- Export audio track (background music, voiceovers mixed into output via second EditedMediaItemSequence)
+- Export text overlays (timed OverlayEffect with styled SpannableString, position anchoring, per-frame alpha gating)
 - R8 minification enabled with comprehensive ProGuard keep rules (~5MB APK)
 - Undo/redo (50 levels, immutable state snapshots)
 - Project auto-save every 30s with full state recovery (errors logged to logcat)
@@ -275,6 +280,12 @@ v0.21.0
 - **Text overlay list UI** — `TextOverlayList` composable in ToolPanel. Shows when text tab active and overlays exist. Each item: colored icon, text preview (1 line), time range, edit + delete buttons. Scrollable with 150dp max height.
 - **Camera temp cleanup** — `LaunchedEffect(Unit)` in MediaPickerSheet deletes files in `cacheDir/camera/` older than 1 hour. Safe because camera launcher completes before user opens picker again.
 - **dismissedPanelState includes editingTextOverlayId** — Reset to null alongside all panel booleans to prevent stale overlay editing state.
+- **Export color effects expanded** — `buildVideoEffect()` now handles 20+ effect types via RgbMatrix: TINT, EXPOSURE, GAMMA, HIGHLIGHTS, SHADOWS, VIBRANCE, POSTERIZE, COOL_TONE, WARM_TONE, CYBERPUNK, NOIR, VINTAGE, MIRROR (via ScaleAndRotateTransformation). Effects requiring custom GL shaders (blur, distortion, vignette, etc.) still return null.
+- **Export clip transforms** — Clip rotation, scaleX, scaleY applied via `ScaleAndRotateTransformation.Builder()` in export. Position X/Y not yet supported (requires MatrixTransformation with translation matrix). Static opacity applied via RgbMatrix when no keyframe opacity overrides exist.
+- **Export audio track** — Audio track clips (background music, voiceovers) exported as second `EditedMediaItemSequence` with `setRemoveVideo(true)`. Each audio clip gets its own `VolumeAudioProcessor`. `Composition.Builder` uses `setTransmuxAudio(true)` when no audio track to avoid re-encoding video audio.
+- **Export text overlays** — `ExportTextOverlay` class extends `androidx.media3.effect.TextOverlay` (not to be confused with model `TextOverlay`). Renders styled SpannableString with ForegroundColorSpan, AbsoluteSizeSpan, StyleSpan. Time-gated: returns empty string + alpha 0 outside `relStartMs..relEndMs`. Position converted from 0..1 model space to -1..1 anchor space (Y inverted). Added via `OverlayEffect(ImmutableList.copyOf(typed))` after effects but before Presentation.
+- **TextOverlay name collision** — `com.novacut.editor.model.TextOverlay` and `androidx.media3.effect.TextOverlay` both imported via wildcards. Export function parameter uses fully qualified `com.novacut.editor.model.TextOverlay`. `ExportTextOverlay` extends fully qualified `androidx.media3.effect.TextOverlay()`.
+- **EditedMediaItemSequence.Builder** — Migrated from deprecated `EditedMediaItemSequence(list)` constructor to `EditedMediaItemSequence.Builder(list).build()` pattern (Media3 1.5.x).
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
