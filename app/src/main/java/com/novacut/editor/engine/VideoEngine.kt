@@ -38,6 +38,9 @@ class VideoEngine @Inject constructor(
     }
     private val cacheLock = Any()
 
+    // Clip durations for multi-clip seek/playhead calculations
+    private var clipDurationsMs: List<Long> = emptyList()
+
     private val _exportProgress = MutableStateFlow(0f)
     val exportProgress: StateFlow<Float> = _exportProgress
 
@@ -78,8 +81,10 @@ class VideoEngine @Inject constructor(
         val videoClips = tracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }
         if (videoClips.isEmpty()) {
             p.clearMediaItems()
+            clipDurationsMs = emptyList()
             return
         }
+        clipDurationsMs = videoClips.map { it.durationMs }
         val mediaItems = videoClips.map { clip ->
             MediaItem.Builder()
                 .setUri(clip.sourceUri)
@@ -96,7 +101,26 @@ class VideoEngine @Inject constructor(
     }
 
     fun seekTo(positionMs: Long) {
-        player?.seekTo(positionMs)
+        val p = player ?: return
+        if (clipDurationsMs.size <= 1) {
+            p.seekTo(positionMs)
+            return
+        }
+        var remaining = positionMs
+        for (i in clipDurationsMs.indices) {
+            if (remaining < clipDurationsMs[i] || i == clipDurationsMs.lastIndex) {
+                p.seekTo(i, remaining.coerceAtLeast(0L))
+                return
+            }
+            remaining -= clipDurationsMs[i]
+        }
+    }
+
+    fun getAbsolutePositionMs(): Long {
+        val p = player ?: return 0L
+        val index = p.currentMediaItemIndex
+        val offset = clipDurationsMs.take(index).sum()
+        return offset + p.currentPosition
     }
 
     fun play() { player?.play() }
@@ -402,7 +426,8 @@ class VideoEngine @Inject constructor(
                 timeMs * 1000L,
                 MediaMetadataRetriever.OPTION_CLOSEST_SYNC
             ) ?: return null
-            val file = File(context.cacheDir, "freeze_${System.currentTimeMillis()}.jpg")
+            val dir = File(context.filesDir, "freeze_frames").also { it.mkdirs() }
+            val file = File(dir, "freeze_${System.currentTimeMillis()}.jpg")
             file.outputStream().use { out ->
                 frame.compress(Bitmap.CompressFormat.JPEG, 95, out)
             }

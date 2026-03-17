@@ -193,7 +193,7 @@ class EditorViewModel @Inject constructor(
                 delay(33)
                 val player = videoEngine.getPlayer()
                 if (player.isPlaying) {
-                    val currentMs = player.currentPosition
+                    val currentMs = videoEngine.getAbsolutePositionMs()
                     _state.update { s ->
                         var newScroll = s.scrollOffsetMs
                         // Auto-scroll when playhead approaches right edge (>80% of visible area)
@@ -391,6 +391,10 @@ class EditorViewModel @Inject constructor(
         val vNextClip = vTrack.clips[vClipIndex + 1]
         if (vClip.sourceUri != vNextClip.sourceUri) {
             showToast("Can only merge clips from the same source")
+            return
+        }
+        if (vClip.trimEndMs != vNextClip.trimStartMs) {
+            showToast("Clips must have adjacent trim ranges to merge")
             return
         }
 
@@ -609,18 +613,25 @@ class EditorViewModel @Inject constructor(
             showToast("No effects copied")
             return
         }
+        val targetClip = _state.value.tracks.flatMap { it.clips }.firstOrNull { it.id == clipId } ?: return
+        val existingTypes = targetClip.effects.map { it.type }.toSet()
+        val filtered = toPaste.filter { it.type !in existingTypes }
+        if (filtered.isEmpty()) {
+            showToast("Effects already present on clip")
+            return
+        }
         saveUndoState("Paste effects")
         _state.update { state ->
             val tracks = state.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) {
-                        clip.copy(effects = clip.effects + toPaste.map { it.copy(id = UUID.randomUUID().toString()) })
+                        clip.copy(effects = clip.effects + filtered.map { it.copy(id = UUID.randomUUID().toString()) })
                     } else clip
                 })
             }
             state.copy(tracks = tracks)
         }
-        showToast("Pasted ${toPaste.size} effects")
+        showToast("Pasted ${filtered.size} effects")
         saveProject()
     }
 

@@ -23,7 +23,8 @@ class VoiceoverRecorderEngine @Inject constructor(
     val isRecording: StateFlow<Boolean> = _isRecording
 
     fun startRecording(): File? {
-        val file = File(context.cacheDir, "voiceover_${System.currentTimeMillis()}.m4a")
+        val dir = File(context.filesDir, "voiceovers").also { it.mkdirs() }
+        val file = File(dir, "voiceover_${System.currentTimeMillis()}.m4a")
         outputFile = file
 
         val rec = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

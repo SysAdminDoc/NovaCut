@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.18.0
+v0.19.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -170,6 +170,12 @@ v0.18.0
 - Safe bitmap cache clearing (no recycle() on potentially in-use Compose Bitmaps)
 - ExportService stopped on setup-phase failures (try/catch around videoEngine.export)
 - Deserialization safe getters throughout (optString/optLong, nullable deserializeClip)
+- Multi-clip seek/playhead (absolute timeline position across concatenated ExoPlayer media items)
+- Paste effects duplicate type filtering (skips already-present effect types)
+- Merge contiguous trim validation (requires adjacent trim ranges from same source)
+- Voiceover/freeze frame permanent storage (filesDir instead of cacheDir)
+- Project-mode AI tab removed (all AI tools require clip selection)
+- Snackbar toast z-ordering above bottom sheets
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -246,6 +252,12 @@ v0.18.0
 - **ExportService setup-phase safety** — `startExport()` wraps `videoEngine.export()` in try/catch to stop the foreground service even if export setup throws before Transformer listener is registered.
 - **Deserialization safe getters** — `deserializeClip()` now uses `optString`/`optLong` for all fields (id, sourceUri, sourceDurationMs, timelineStartMs, trimStartMs, trimEndMs). Returns null for missing sourceUri. Transition uses `optJSONObject` instead of throwing `getJSONObject`. Consistent with `deserializeEffect`/`deserializeKeyframe` patterns.
 - **Dead metadata key removed** — `getVideoFrameRate()` no longer calls `extractMetadata(24)` (undocumented constant, always returned null). Falls back directly to 30fps default.
+- **Multi-clip seek** — `VideoEngine.seekTo()` now computes which media item index the target position falls into and calls `player.seekTo(index, positionWithinItem)`. `clipDurationsMs` list stored on `prepareTimeline()`. `getAbsolutePositionMs()` returns sum of preceding clip durations + `currentPosition` for accurate playhead sync.
+- **Paste effects dedup** — `pasteEffects()` now filters out effect types already present on the target clip before pasting. Shows "Effects already present on clip" if all pasted types are duplicates.
+- **Merge contiguous validation** — `mergeWithNextClip()` now validates `clip.trimEndMs == nextClip.trimStartMs` to prevent including trimmed-out footage when merging non-adjacent trim ranges.
+- **Voiceover permanent storage** — Voiceover recordings now saved to `filesDir/voiceovers/` instead of `cacheDir`. Freeze frames saved to `filesDir/freeze_frames/`. Both survive cache cleanup and device reboot.
+- **Project-mode AI tab removed** — AI tools only available in clip mode (when a clip is selected). Removed dead `projectAiSubMenu` and its tab entry from `projectTabs`.
+- **Snackbar z-ordering** — Toast Snackbar now uses `zIndex(10f)` and `bottom = 120.dp` padding to render above bottom sheets and tool panels.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

@@ -37,7 +37,6 @@ val projectTabs = listOf(
     TabItem("audio", Icons.Default.MusicNote, "Audio"),
     TabItem("text", Icons.Default.Title, "Text"),
     TabItem("effects", Icons.Default.AutoFixHigh, "Effects"),
-    TabItem("ai", Icons.Default.AutoAwesome, "AI Magic"),
     TabItem("aspect", Icons.Default.AspectRatio, "Aspect\nRatio")
 )
 
@@ -57,16 +56,6 @@ val clipTabs = listOf(
 private val textSubMenu = listOf(
     SubMenuItem("add_text", Icons.Default.Title, "Add Text"),
     SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions")
-)
-
-// Project mode — AI Magic tab sub-menu
-private val projectAiSubMenu = listOf(
-    SubMenuItem("scene_detect", Icons.Default.ContentCut, "Scene\nDetect"),
-    SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions"),
-    SubMenuItem("smart_crop", Icons.Default.Crop, "Smart\nCrop"),
-    SubMenuItem("auto_color", Icons.Default.Palette, "Auto\nColor"),
-    SubMenuItem("stabilize", Icons.Default.Straighten, "Stabilize"),
-    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise\nAudio")
 )
 
 // Clip mode — Edit tab sub-menu
@@ -111,7 +100,6 @@ fun BottomToolArea(
     // Resolve sub-menu for the currently active tab
     val subMenuItems: List<SubMenuItem>? = when {
         !isClipMode && activeTabId == "text" -> textSubMenu
-        !isClipMode && activeTabId == "ai" -> projectAiSubMenu
         isClipMode && activeTabId == "edit" -> clipEditSubMenu
         isClipMode && activeTabId == "ai" -> clipAiSubMenu
         else -> null

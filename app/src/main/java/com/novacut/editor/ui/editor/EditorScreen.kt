@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -389,7 +390,8 @@ fun EditorScreen(
             Snackbar(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(16.dp),
+                    .padding(bottom = 120.dp, start = 16.dp, end = 16.dp)
+                    .zIndex(10f),
                 containerColor = Mocha.Surface0,
                 contentColor = Mocha.Text,
                 shape = RoundedCornerShape(8.dp)
