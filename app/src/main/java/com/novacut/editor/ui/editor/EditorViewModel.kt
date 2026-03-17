@@ -14,6 +14,7 @@ import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.ProjectAutoSave
 import com.novacut.editor.engine.VideoEngine
+import com.novacut.editor.engine.VoiceoverRecorderEngine
 import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -68,7 +69,11 @@ data class EditorState(
     val toastMessage: String? = null,
     val aiProcessingTool: String? = null,
     val lastExportedFilePath: String? = null,
-    val copiedEffects: List<Effect> = emptyList()
+    val copiedEffects: List<Effect> = emptyList(),
+    val showVoiceoverRecorder: Boolean = false,
+    val isRecordingVoiceover: Boolean = false,
+    val voiceoverDurationMs: Long = 0L,
+    val isLooping: Boolean = false
 )
 
 enum class EditorTool(val displayName: String) {
@@ -100,6 +105,7 @@ class EditorViewModel @Inject constructor(
     private val audioEngine: AudioEngine,
     private val autoSave: ProjectAutoSave,
     private val aiFeatures: AiFeatures,
+    private val voiceoverEngine: VoiceoverRecorderEngine,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -333,6 +339,54 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
+    fun mergeWithNextClip() {
+        val clipId = _state.value.selectedClipId ?: return
+
+        _state.update { s ->
+            val trackAndClip = s.tracks.flatMapIndexed { idx, track ->
+                track.clips.filter { it.id == clipId }.map { idx to it }
+            }.firstOrNull() ?: return@update s
+
+            val (trackIdx, clip) = trackAndClip
+            val track = s.tracks[trackIdx]
+            val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+
+            if (clipIndex >= track.clips.size - 1) {
+                // No next clip to merge with
+                return@update s.copy(toastMessage = "No next clip to merge")
+            }
+
+            saveUndoState("Merge clips")
+            val nextClip = track.clips[clipIndex + 1]
+
+            // Only merge clips from the same source
+            if (clip.sourceUri != nextClip.sourceUri) {
+                return@update s.copy(toastMessage = "Can only merge clips from the same source")
+            }
+
+            val merged = clip.copy(
+                trimEndMs = nextClip.trimEndMs,
+                effects = clip.effects + nextClip.effects.map { it.copy(id = UUID.randomUUID().toString()) }
+            )
+
+            val updatedClips = track.clips.toMutableList().apply {
+                removeAt(clipIndex + 1)
+                set(clipIndex, merged)
+            }
+
+            // Shift subsequent clips back
+            val nextDuration = nextClip.durationMs
+            val shifted = updatedClips.mapIndexed { i, c ->
+                if (i > clipIndex) c.copy(timelineStartMs = c.timelineStartMs - nextDuration) else c
+            }
+
+            val tracks = s.tracks.mapIndexed { i, t -> if (i == trackIdx) t.copy(clips = shifted) else t }
+            recalculateDuration(s.copy(tracks = tracks))
+        }
+        rebuildPlayerTimeline()
+        saveProject()
+    }
+
     fun splitClipAtPlayhead() {
         val state = _state.value
         val clipId = state.selectedClipId ?: return
@@ -524,6 +578,20 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
+    fun setTransitionDuration(clipId: String, durationMs: Long) {
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId && clip.transition != null)
+                        clip.copy(transition = clip.transition.copy(durationMs = durationMs))
+                    else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
+        saveProject()
+    }
+
     fun addTextOverlay(text: TextOverlay) {
         saveUndoState("Add text")
         _state.update { it.copy(textOverlays = it.textOverlays + text) }
@@ -592,6 +660,13 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun toggleLoop() {
+        val newLooping = !_state.value.isLooping
+        videoEngine.getPlayer()?.repeatMode = if (newLooping)
+            Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+        _state.update { it.copy(isLooping = newLooping) }
+    }
+
     fun seekTo(positionMs: Long) {
         videoEngine.seekTo(positionMs)
         _state.update { it.copy(playheadMs = positionMs) }
@@ -626,6 +701,7 @@ class EditorViewModel @Inject constructor(
         showAiToolsPanel = false,
         showTransformPanel = false,
         showCropPanel = false,
+        showVoiceoverRecorder = false,
         selectedEffectId = null
     )
 
@@ -656,6 +732,42 @@ class EditorViewModel @Inject constructor(
     fun hideCropPanel() { _state.update { it.copy(showCropPanel = false) } }
     fun selectEffect(effectId: String?) { _state.update { it.copy(selectedEffectId = effectId) } }
     fun clearSelectedEffect() { _state.update { it.copy(selectedEffectId = null) } }
+    fun showVoiceoverPanel() { _state.update { dismissedPanelState(it).copy(showVoiceoverRecorder = true) } }
+    fun hideVoiceoverPanel() {
+        if (_state.value.isRecordingVoiceover) stopVoiceover()
+        voiceoverDurationJob?.cancel()
+        _state.update { it.copy(showVoiceoverRecorder = false) }
+    }
+
+    // Voiceover recording
+    private var voiceoverDurationJob: Job? = null
+
+    fun startVoiceover() {
+        val file = voiceoverEngine.startRecording()
+        if (file == null) {
+            showToast("Microphone access failed")
+            return
+        }
+        _state.update { it.copy(isRecordingVoiceover = true, voiceoverDurationMs = 0L) }
+        voiceoverDurationJob = viewModelScope.launch {
+            while (isActive) {
+                delay(100)
+                _state.update { it.copy(voiceoverDurationMs = voiceoverEngine.getRecordingDurationMs()) }
+            }
+        }
+    }
+
+    fun stopVoiceover() {
+        voiceoverDurationJob?.cancel()
+        val uri = voiceoverEngine.stopRecording()
+        _state.update { it.copy(isRecordingVoiceover = false, showVoiceoverRecorder = false) }
+        if (uri != null) {
+            addClipToTrack(uri, TrackType.AUDIO)
+            showToast("Voiceover added to audio track")
+        } else {
+            showToast("Voiceover recording failed")
+        }
+    }
 
     fun setClipVolume(clipId: String, volume: Float) {
         _state.update { state ->
@@ -798,7 +910,7 @@ class EditorViewModel @Inject constructor(
         val filePath = _state.value.lastExportedFilePath ?: return null
         val file = File(filePath)
         if (!file.exists()) return null
-        val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.provider", file)
+        val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", file)
         return Intent(Intent.ACTION_SEND).apply {
             type = "video/*"
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -1248,6 +1360,9 @@ class EditorViewModel @Inject constructor(
                             showToast("Tracked ${results.size} motion points across clip")
                         }
                     }
+                    else -> {
+                        showToast("Unknown AI tool: $toolId")
+                    }
                 }
             } catch (e: Exception) {
                 showToast("AI tool failed: ${e.message}")
@@ -1338,6 +1453,8 @@ class EditorViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         autoSave.stop()
+        voiceoverDurationJob?.cancel()
+        voiceoverEngine.release()
         videoEngine.removePlayerListener()
         videoEngine.resetExportState()
         // DON'T call videoEngine.release() — it's a @Singleton that outlives this ViewModel

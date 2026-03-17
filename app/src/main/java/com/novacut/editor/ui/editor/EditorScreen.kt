@@ -55,7 +55,9 @@ fun EditorScreen(
                 playheadMs = state.playheadMs,
                 totalDurationMs = state.totalDurationMs,
                 isPlaying = state.isPlaying,
+                isLooping = state.isLooping,
                 onTogglePlayback = viewModel::togglePlayback,
+                onToggleLoop = viewModel::toggleLoop,
                 onSeek = viewModel::seekTo,
                 modifier = Modifier.weight(0.45f)
             )
@@ -98,6 +100,7 @@ fun EditorScreen(
                         "add_text" -> viewModel.showTextEditor()
                         "split" -> { viewModel.splitClipAtPlayhead(); viewModel.setTool(EditorTool.NONE) }
                         "trim" -> { viewModel.setTool(EditorTool.TRIM); viewModel.dismissAllPanels() }
+                        "merge" -> viewModel.mergeWithNextClip()
                         "duplicate" -> viewModel.duplicateSelectedClip()
                         "freeze" -> { viewModel.insertFreezeFrame(); viewModel.setTool(EditorTool.NONE) }
                         "copy_fx" -> viewModel.copyEffects()
@@ -191,6 +194,10 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@TransitionPicker
                     viewModel.setTransition(clipId, null)
                 },
+                onDurationChanged = { durationMs ->
+                    val clipId = state.selectedClipId ?: return@TransitionPicker
+                    viewModel.setTransitionDuration(clipId, durationMs)
+                },
                 onClose = viewModel::hideTransitionPicker,
                 currentTransition = clip?.transition
             )
@@ -266,8 +273,24 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@AudioPanel
                     viewModel.setClipFadeOut(clipId, fadeMs)
                 },
-                onStartVoiceover = { viewModel.showToast("Voiceover recording: Coming soon") },
+                onStartVoiceover = viewModel::showVoiceoverPanel,
                 onClose = viewModel::hideAudioPanel
+            )
+        }
+
+        // Voiceover recorder
+        AnimatedVisibility(
+            visible = state.showVoiceoverRecorder,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            VoiceoverRecorder(
+                isRecording = state.isRecordingVoiceover,
+                recordingDurationMs = state.voiceoverDurationMs,
+                onStartRecording = viewModel::startVoiceover,
+                onStopRecording = viewModel::stopVoiceover,
+                onClose = viewModel::hideVoiceoverPanel
             )
         }
 

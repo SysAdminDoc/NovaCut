@@ -1,7 +1,9 @@
 package com.novacut.editor.ui.mediapicker
 
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -65,6 +67,50 @@ fun MediaPickerSheet(
         }
     }
 
+    // Photo Picker (Android 13+)
+    val usePhotoPicker = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    val photoPickerVideoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+            onMediaSelected(uri, "video")
+        }
+    }
+
+    val photoPickerImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+            onMediaSelected(uri, "image")
+        }
+    }
+
+    val photoPickerMultiLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        uris.forEach { uri ->
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+            val mimeType = context.contentResolver.getType(uri) ?: ""
+            val type = if (mimeType.startsWith("image")) "image" else "video"
+            onMediaSelected(uri, type)
+        }
+    }
+
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CaptureVideo()
     ) { success ->
@@ -105,8 +151,14 @@ fun MediaPickerSheet(
                 color = Mocha.Blue,
                 modifier = Modifier.weight(1f)
             ) {
-                pendingMediaType = "video"
-                singlePickerLauncher.launch(arrayOf("video/*"))
+                if (usePhotoPicker) {
+                    photoPickerVideoLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                    )
+                } else {
+                    pendingMediaType = "video"
+                    singlePickerLauncher.launch(arrayOf("video/*"))
+                }
             }
 
             MediaTypeButton(
@@ -115,8 +167,14 @@ fun MediaPickerSheet(
                 color = Mocha.Green,
                 modifier = Modifier.weight(1f)
             ) {
-                pendingMediaType = "image"
-                singlePickerLauncher.launch(arrayOf("image/*"))
+                if (usePhotoPicker) {
+                    photoPickerImageLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                } else {
+                    pendingMediaType = "image"
+                    singlePickerLauncher.launch(arrayOf("image/*"))
+                }
             }
 
             MediaTypeButton(
@@ -135,7 +193,13 @@ fun MediaPickerSheet(
         // Multi-select button
         OutlinedButton(
             onClick = {
-                videoPickerLauncher.launch(arrayOf("video/*", "image/*"))
+                if (usePhotoPicker) {
+                    photoPickerMultiLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                    )
+                } else {
+                    videoPickerLauncher.launch(arrayOf("video/*", "image/*"))
+                }
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(

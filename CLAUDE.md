@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.9.0
+v0.10.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -29,21 +29,21 @@ v0.9.0
   - `ui/projects/ProjectListScreen.kt` - Project gallery with search, sort, create/delete/duplicate/open
   - `ui/projects/ProjectListViewModel.kt` - Project list state management (search, sort, duplicate)
   - `ui/editor/EditorScreen.kt` - Main editor composable (EditorTopBar + preview + timeline + BottomToolArea) with onAction dispatch
-  - `ui/editor/EditorViewModel.kt` - Editor state management (tracks, clips, effects, undo/redo)
+  - `ui/editor/EditorViewModel.kt` - Editor state management (tracks, clips, effects, undo/redo, voiceover, loop)
   - `ui/editor/Timeline.kt` - Custom multi-track timeline with thumbnail strips + waveforms + trim handles
-  - `ui/editor/PreviewPanel.kt` - ExoPlayer-based video preview with playback controls
+  - `ui/editor/PreviewPanel.kt` - ExoPlayer-based video preview with playback controls + loop toggle
   - `ui/editor/ToolPanel.kt` - PowerDirector-style BottomToolArea (two-mode tab bar + sub-menu grids) + effects/speed/transform/crop/transition panels
-  - `ui/editor/TextEditorSheet.kt` - Text overlay editor with animations
-  - `ui/editor/AudioPanel.kt` - Audio controls, waveform visualization, voiceover
-  - `ui/editor/AiToolsPanel.kt` - AI tools UI (captions, bg removal, scene detect, smart crop)
-  - `ui/mediapicker/MediaPicker.kt` - Media picker sheet with camera capture (CaptureVideo + FileProvider)
+  - `ui/editor/TextEditorSheet.kt` - Text overlay editor with font selector, animations
+  - `ui/editor/AudioPanel.kt` - Audio controls, waveform visualization, voiceover recorder
+  - `ui/editor/AiToolsPanel.kt` - AI tools UI (captions, bg removal, scene detect, smart crop, etc.)
+  - `ui/mediapicker/MediaPicker.kt` - Media picker with Photo Picker (API 33+) + OpenDocument fallback + camera capture
   - `res/xml/file_paths.xml` - FileProvider paths config for camera capture + export sharing
   - `ui/export/ExportSheet.kt` - Export settings (resolution, codec, quality, progress, share, save to gallery)
   - `engine/VideoEngine.kt` - Media3 Transformer export + ExoPlayer + thumbnail extraction
   - `engine/AudioEngine.kt` - Audio waveform extraction + PCM mixing
   - `engine/KeyframeEngine.kt` - Keyframe interpolation with 5 easing curves
   - `engine/ExportService.kt` - Foreground service for export notifications (MEDIA_PROCESSING type)
-  - `engine/VoiceoverRecorder.kt` - MediaRecorder wrapper for voiceover
+  - `engine/VoiceoverRecorder.kt` - MediaRecorder wrapper for voiceover recording
   - `engine/ProjectAutoSave.kt` - Periodic auto-save with full JSON serialization/deserialization
   - `engine/AppModule.kt` - Hilt DI module (Room DB + DAO)
   - `engine/db/ProjectDatabase.kt` - Room database (v3) + ProjectDao + converters
@@ -58,27 +58,33 @@ v0.9.0
 - **Player.Listener** syncs play/pause/end state; periodic coroutine syncs playhead at ~30fps. Tracked via `setPlayerListener()`/`removePlayerListener()` for proper lifecycle cleanup.
 - **Auto-save** uses org.json serialization of full Track/Clip/Effect/Keyframe/TextOverlay model tree with safe deserialization (optString/optLong/safeValueOf — never crashes on missing or unknown values)
 - **SavedStateHandle** for projectId in EditorViewModel, loaded from NavHost route arg
-- **Panel mutual exclusion** — atomic `dismissedPanelState()` + show in single `_state.update` to prevent intermediate states
+- **Panel mutual exclusion** — atomic `dismissedPanelState()` + show in single `_state.update` to prevent intermediate states. Voiceover panel included in dismissal.
 - **Trim debounce** — `beginTrim()` saves undo once on drag start; `trimClip()` updates live without undo spam
 - **Ripple delete** — clip deletion shifts subsequent clips back to close timeline gaps
 - **Media type routing** — MediaPickerSheet passes media type string; audio routed to AUDIO track
-- **rebuildPlayerTimeline()** — called after every clip mutation (add, delete, split, trim, speed, reverse, undo, redo) to keep ExoPlayer in sync with visual timeline
+- **rebuildPlayerTimeline()** — called after every clip mutation (add, delete, split, merge, trim, speed, reverse, undo, redo) to keep ExoPlayer in sync with visual timeline
 - **VideoEngine is @Singleton** — ViewModel calls `removePlayerListener()` + `resetExportState()` in onCleared(), never `release()`. The engine outlives any individual ViewModel.
 - **Thumbnail cache** — thread-safe LinkedHashMap with `cacheLock` synchronization and `removeEldestEntry` auto-eviction at 200 entries. `accessOrder=false` prevents ConcurrentModificationException.
 - **AudioEngine PCM decode** — ShortArray chunks collected then concatenated via `System.arraycopy` to avoid boxing millions of Shorts through `MutableList<Short>`
 - **Project thumbnails** — Stores first video clip's source URI in `Project.thumbnailUri`; Coil `VideoFrameDecoder` renders frame at display time (no file management needed)
 - **Camera capture** — `ActivityResultContracts.CaptureVideo()` + FileProvider URI from cache dir. No CAMERA permission needed — delegated to system camera app via intent.
-- **AI tools wiring** — `runAiTool(toolId)` dispatches to `AiFeatures` methods in viewModelScope. All 8 tools fully wired: scene detect auto-splits clips at boundaries (reverse-order). Auto captions detect speech via audio energy analysis and create TextOverlay entries. Smart crop uses saliency-weighted region analysis. Auto color analyzes frame histograms and applies brightness/contrast/saturation/temperature effects. Stabilize estimates motion vectors via block matching and applies counter-motion zoom + position keyframes. Denoise analyzes audio noise floor and adjusts volume/fade. Remove BG detects background color from edge pixels and applies chroma key. Track motion uses template matching across frames to generate position keyframes.
+- **AI tools wiring** — `runAiTool(toolId)` dispatches to `AiFeatures` methods in viewModelScope. All 8 tools fully wired with else branch for unknown tool IDs. Scene detect auto-splits clips at boundaries (reverse-order). Auto captions detect speech via audio energy analysis and create TextOverlay entries. Smart crop uses saliency-weighted region analysis. Auto color analyzes frame histograms and applies brightness/contrast/saturation/temperature effects. Stabilize estimates motion vectors via block matching and applies counter-motion zoom + position keyframes. Denoise analyzes audio noise floor and adjusts volume/fade. Remove BG detects background color from edge pixels and applies chroma key. Track motion uses template matching across frames to generate position keyframes.
 - **Audio fade persistence** — `fadeInMs`/`fadeOutMs` stored on Clip model (not local UI state). AudioPanel reads from clip data so values survive panel close/reopen. Serialized in ProjectAutoSave.
 - **Duplicate clip** — copies clip with fresh UUIDs for clip + effects, inserts after original, shifts subsequent clips forward. Transition nulled on copy to avoid doubled transitions.
+- **Merge clips** — merges selected clip with next adjacent clip from same source. Extends trimEndMs, combines effects, shifts subsequent clips back. Only works for same-source clips.
 - **Copy/Paste effects** — `copiedEffects` in EditorState stores copied effect list. Paste creates fresh UUIDs to avoid ID collisions.
 - **Freeze frame** — extracts JPEG via MediaMetadataRetriever at playhead, splits clip, inserts 2s still image clip between halves.
-- **Share after export** — FileProvider URI + ACTION_SEND intent via `getShareIntent()`. Requires `<external-files-path>` in file_paths.xml.
+- **Share after export** — FileProvider URI + ACTION_SEND intent via `getShareIntent()`. Authority is `${applicationId}.fileprovider`. Requires `<external-files-path>` in file_paths.xml.
 - **Save to gallery** — MediaStore API with IS_PENDING pattern (API 29+), direct file copy for API 26-28. No WRITE_EXTERNAL_STORAGE needed on API 29+.
 - **Project search/sort** — `ProjectListViewModel` combines allProjects with searchQuery + sortMode flows. SortMode enum: DATE_DESC, DATE_ASC, NAME_ASC, NAME_DESC, DURATION_DESC.
 - **Project duplicate** — copies Room DB record + auto-save JSON file with fresh projectId and timestamp.
 - **Social media crop presets** — CropPanel redesigned with platform labels (YouTube/TV, TikTok/Reels, Instagram Square/Portrait, Classic, Cinematic). Added RATIO_4_5 to AspectRatio enum.
 - **PowerDirector-style layout** — EditorTopBar (Home/Undo/Redo/Delete/More/Export) + BottomToolArea with two-mode tab bar. Project mode: Edit/Audio/Text/Effects/AI/Aspect tabs. Clip mode: Back/Edit/Audio Tool/Speed/Transform/Effects/Transition/AI tabs. Tabs with sub-menus (Text, AI, clip-Edit) toggle SubMenuGrid overlays. Direct-action tabs dispatch via onAction string IDs to EditorScreen's when-block routing to ViewModel methods. Tab state resets on clip mode change via LaunchedEffect.
+- **Voiceover recording** — VoiceoverRecorderEngine (MediaRecorder @Singleton) injected into EditorViewModel. Recording state tracked via StateFlow. Duration updated via polling coroutine (100ms). Recorded audio auto-added to AUDIO track as new clip. Cleanup in onCleared().
+- **Loop playback** — ExoPlayer REPEAT_MODE_ALL/OFF toggled via PreviewPanel loop button. State persisted in EditorState.
+- **Transition duration control** — Slider in TransitionPicker (100-2000ms, 100ms steps). Updates Transition.durationMs on selected clip.
+- **Font selector** — TextEditorSheet offers 6 font families (sans-serif, serif, monospace, cursive, condensed, medium). Stored in TextOverlay.fontFamily.
+- **Photo Picker (API 33+)** — PickVisualMedia/PickMultipleVisualMedia for video, image, and multi-select on Android 13+. Falls back to OpenDocument on older APIs.
 
 ## Features Wired & Working
 - Project gallery (create, open, delete, swipe-to-delete with confirm)
@@ -87,12 +93,15 @@ v0.9.0
 - Multi-clip playback via ExoPlayer (setMediaItems with clipping)
 - Interactive trim handles (drag to adjust in/out points)
 - Split clip at playhead
+- Merge clip with next adjacent clip (same-source only)
 - 40+ video effects (color, filters, blur, distortion, keying) with adjustable parameters
-- 25 transition types with GLSL shaders
+- 25 transition types with GLSL shaders + adjustable duration (100-2000ms)
 - Speed control (0.1x-16x) + reverse
+- Loop playback toggle
 - Keyframe opacity applied during export via RgbMatrix
-- Text overlays with 10 animation styles
+- Text overlays with 10 animation styles + font family selector (6 fonts)
 - Audio panel with volume, fade in/out (persisted on clip), waveform visualization (requires clip selection)
+- Voiceover recording (MediaRecorder, auto-added to audio track)
 - Effects panel with add -> adjust flow (EffectsPanel -> EffectAdjustmentPanel)
 - Transform panel: position X/Y, scale X/Y, rotation, opacity sliders with reset
 - Crop panel: social media presets (YouTube/TV 16:9, TikTok/Reels 9:16, Instagram Square 1:1, Instagram Portrait 4:5, Classic 4:3, Portrait Classic 3:4, Cinematic 21:9) — project-level, no clip selection required
@@ -108,6 +117,7 @@ v0.9.0
 - Duplicate project (Room + auto-save copy)
 - AI tools: scene detection (auto-split at boundaries), auto captions (audio energy speech segmentation), smart crop (saliency analysis), auto color correction (histogram-based), video stabilization (motion vector compensation), audio denoise (noise floor analysis), background removal (chroma key auto-detect), motion tracking (template matching keyframes)
 - Camera capture via system camera app (CaptureVideo intent)
+- Photo Picker for Android 13+ (PickVisualMedia) with OpenDocument fallback
 - Project thumbnails on gallery cards (Coil VideoFrameDecoder)
 - Export: resolution, codec, bitrate from config; aspect-ratio-aware output dimensions; foreground service with MEDIA_PROCESSING type
 - R8 minification enabled with comprehensive ProGuard keep rules (~5MB APK)
@@ -133,6 +143,7 @@ v0.9.0
 - Auto-save deserialization uses `opt*` methods throughout to survive missing/corrupt fields
 - Room DB v1→v2→v3 migration handled by `fallbackToDestructiveMigration()` — drops all data on schema change. Acceptable for dev; needs proper migration before release with user data.
 - FileProvider requires `res/xml/file_paths.xml` with `<cache-path>` entry matching the directory used for camera temp files
+- FileProvider authority is `${applicationId}.fileprovider` — must match in manifest, file_paths.xml, and all code references
 - AI scene detection splits clips in reverse-order (sortedByDescending) to prevent timeline position shifts from invalidating subsequent split points
 - AI auto color replaces existing effects of same type (brightness/contrast/saturation/temperature) to prevent stacking
 - AI stabilize applies zoom + position keyframes — both stored on Clip model (scaleX/Y + keyframes list)
@@ -142,11 +153,13 @@ v0.9.0
 - TRIM and SPLIT tools must call `dismissAllPanels()` — they bypass the boolean-panel pattern since they don't have their own panels
 - Speed panel visibility driven by `currentTool == EditorTool.SPEED` (not a boolean flag like other panels), so it self-dismisses on tool change
 - BottomToolArea manages `activeTabId` internally — sub-menu visibility is derived from activeTabId + isClipMode, not stored in ViewModel. LaunchedEffect resets activeTabId when isClipMode changes.
+- Merge clips only works with adjacent clips from the same source URI (extends trim range)
+- VoiceoverRecorderEngine is @Singleton but `release()` is safe to call from onCleared() (unlike VideoEngine) since each recording session is independent
+- Photo Picker `takePersistableUriPermission` may throw SecurityException for picker-selected URIs — caught silently since picker grants temporary access
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
 - Integrate MediaPipe SelfieSegmentation for pixel-accurate background removal (current version uses chroma key auto-detect)
 - Template system (save/load project templates)
 - Proper Room migration strategy (replace destructive migration before production)
-- Photo picker for Android 13+ (ACTION_PICK_IMAGES)
 - FFmpeg integration for broader codec support

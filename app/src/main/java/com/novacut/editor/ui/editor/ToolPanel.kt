@@ -73,6 +73,7 @@ private val projectAiSubMenu = listOf(
 private val clipEditSubMenu = listOf(
     SubMenuItem("split", Icons.AutoMirrored.Filled.CallSplit, "Split"),
     SubMenuItem("trim", Icons.Default.ContentCut, "Trim"),
+    SubMenuItem("merge", Icons.Default.Compress, "Merge\nNext"),
     SubMenuItem("duplicate", Icons.Default.ContentCopy, "Duplicate"),
     SubMenuItem("freeze", Icons.Default.AcUnit, "Freeze\nFrame"),
     SubMenuItem("copy_fx", Icons.Default.FileCopy, "Copy\nEffects"),
@@ -911,6 +912,7 @@ fun CropPanel(
 fun TransitionPicker(
     onTransitionSelected: (TransitionType) -> Unit,
     onRemoveTransition: () -> Unit,
+    onDurationChanged: (Long) -> Unit,
     onClose: () -> Unit,
     currentTransition: Transition?,
     modifier: Modifier = Modifier
@@ -973,6 +975,29 @@ fun TransitionPicker(
                     )
                 }
             }
+        }
+
+        // Duration control (visible when a transition is applied)
+        if (currentTransition != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Duration", color = Mocha.Subtext1, fontSize = 12.sp)
+                Text("${currentTransition.durationMs}ms", color = Mocha.Subtext0, fontSize = 12.sp)
+            }
+            Slider(
+                value = currentTransition.durationMs.toFloat(),
+                onValueChange = { onDurationChanged(it.toLong()) },
+                valueRange = 100f..2000f,
+                steps = 18,
+                colors = SliderDefaults.colors(
+                    thumbColor = Mocha.Mauve,
+                    activeTrackColor = Mocha.Mauve,
+                    inactiveTrackColor = Mocha.Surface1
+                )
+            )
         }
     }
 }

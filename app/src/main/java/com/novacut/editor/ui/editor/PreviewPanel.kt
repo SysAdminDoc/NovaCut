@@ -27,7 +27,9 @@ fun PreviewPanel(
     playheadMs: Long,
     totalDurationMs: Long,
     isPlaying: Boolean,
+    isLooping: Boolean = false,
     onTogglePlayback: () -> Unit,
+    onToggleLoop: () -> Unit = {},
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -166,6 +168,19 @@ fun PreviewPanel(
                     Icons.Default.Forward5,
                     contentDescription = "Forward 5s",
                     tint = Mocha.Text,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Loop toggle
+            IconButton(
+                onClick = onToggleLoop,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Loop,
+                    contentDescription = if (isLooping) "Disable loop" else "Enable loop",
+                    tint = if (isLooping) Mocha.Mauve else Mocha.Overlay0,
                     modifier = Modifier.size(20.dp)
                 )
             }

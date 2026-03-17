@@ -38,7 +38,17 @@ fun TextEditorSheet(
     var strokeWidth by remember { mutableFloatStateOf(existingOverlay?.strokeWidth ?: 0f) }
     var animIn by remember { mutableStateOf(existingOverlay?.animationIn ?: TextAnimation.FADE) }
     var animOut by remember { mutableStateOf(existingOverlay?.animationOut ?: TextAnimation.FADE) }
+    var fontFamily by remember { mutableStateOf(existingOverlay?.fontFamily ?: "sans-serif") }
     var duration by remember { mutableFloatStateOf((existingOverlay?.let { it.endTimeMs - it.startTimeMs } ?: 3000L).toFloat()) }
+
+    val fontFamilies = listOf(
+        "sans-serif" to "Sans Serif",
+        "serif" to "Serif",
+        "monospace" to "Monospace",
+        "cursive" to "Cursive",
+        "sans-serif-condensed" to "Condensed",
+        "sans-serif-medium" to "Medium"
+    )
 
     val colorOptions = listOf(
         0xFFFFFFFF, 0xFF000000, 0xFFF38BA8, 0xFFFAB387,
@@ -65,6 +75,7 @@ fun TextEditorSheet(
                         id = existingOverlay?.id ?: java.util.UUID.randomUUID().toString(),
                         text = text,
                         fontSize = fontSize,
+                        fontFamily = fontFamily,
                         color = selectedColor,
                         bold = bold,
                         italic = italic,
@@ -109,6 +120,28 @@ fun TextEditorSheet(
 
         // Font size
         EffectSlider("Font Size", fontSize, 12f, 120f) { fontSize = it }
+
+        // Font family
+        Text("Font", color = Mocha.Subtext1, fontSize = 12.sp)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            items(fontFamilies) { (family, label) ->
+                FilterChip(
+                    onClick = { fontFamily = family },
+                    label = { Text(label, fontSize = 11.sp) },
+                    selected = fontFamily == family,
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Mocha.Surface0,
+                        selectedContainerColor = Mocha.Mauve.copy(alpha = 0.3f),
+                        selectedLabelColor = Mocha.Mauve
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Style buttons
         Row(
