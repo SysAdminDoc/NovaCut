@@ -3,11 +3,15 @@
     <cloud-backup>
         <include domain="database" path="." />
         <include domain="file" path="autosave" />
+        <include domain="file" path="freeze_frames" />
+        <include domain="file" path="voiceovers" />
         <exclude domain="file" path="autosave/*.tmp" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="." />
         <include domain="file" path="autosave" />
+        <include domain="file" path="freeze_frames" />
+        <include domain="file" path="voiceovers" />
         <exclude domain="file" path="autosave/*.tmp" />
     </device-transfer>
 </data-extraction-rules>

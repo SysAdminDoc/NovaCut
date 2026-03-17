@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.30.0
+v0.31.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -303,6 +303,9 @@ v0.30.0
 - **Back action dismisses panels** — "back" action in BottomToolArea now calls `dismissAllPanels()` before `selectClip(null)`. Prevents NPE from open panels referencing deselected clip.
 - **Export progress poll timeout** — Progress polling loop capped at 2400 iterations (10 minutes at 250ms intervals). On timeout, calls `transformer.cancel()`, sets ERROR state, and reports "Export timed out". Prevents infinite loop if Transformer hangs.
 
+- **Version string in strings.xml** — `app_version` resource must be updated alongside NovaCutApp.VERSION and build.gradle.kts versionName. Was stuck at v0.1.0 for 30 releases.
+- **Backup rules include freeze_frames and voiceovers** — Both directories live in `filesDir` and are now included in `backup_rules.xml` (legacy) and `data_extraction_rules.xml` (Android 12+). Without this, user recordings and freeze frames would be lost on device transfer.
+- **ProGuard keeps Room Converters** — Explicit `-keep class com.novacut.editor.engine.db.Converters { *; }` rule added. Without it, R8 could strip the class since it's only referenced by annotation, causing AspectRatio/Resolution TypeConverter crashes at runtime.
 - **VoiceoverRecorder double-start cleanup** — `startRecording()` now stops and releases any existing MediaRecorder before creating a new one. Prevents resource leak (mic hardware lock, memory) if called while already recording.
 - **estimateRegionMotion divide-by-zero guard** — `estimateRegionMotion()` in AiFeatures.kt now returns `0f to 0f` when bitmap width or height < 8, matching the guard in `estimateMotion()`. Prevents ArithmeticException on malformed video frames during motion tracking.
 - **createProject race condition fixed** — `createProject()` now accepts an `onCreated` callback that fires after the Room insert completes, instead of returning the ID synchronously before the async insert. Prevents navigation to a non-existent project.

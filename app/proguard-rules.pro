@@ -8,6 +8,7 @@
 -keep class * implements androidx.room.DatabaseConfiguration
 -keep @androidx.room.Database class * { *; }
 -keep @androidx.room.Dao class * { *; }
+-keep class com.novacut.editor.engine.db.Converters { *; }
 
 # Hilt / Dagger
 -keep class dagger.hilt.** { *; }
