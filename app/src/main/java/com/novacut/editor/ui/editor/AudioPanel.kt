@@ -33,9 +33,6 @@ fun AudioPanel(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var fadeInMs by remember { mutableFloatStateOf(0f) }
-    var fadeOutMs by remember { mutableFloatStateOf(0f) }
-
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -99,14 +96,12 @@ fun AudioPanel(
         }
 
         // Fade In
-        EffectSlider("Fade In (ms)", fadeInMs, 0f, 5000f) {
-            fadeInMs = it
+        EffectSlider("Fade In (ms)", (clip?.fadeInMs ?: 0L).toFloat(), 0f, 5000f) {
             onFadeInChanged(it.toLong())
         }
 
         // Fade Out
-        EffectSlider("Fade Out (ms)", fadeOutMs, 0f, 5000f) {
-            fadeOutMs = it
+        EffectSlider("Fade Out (ms)", (clip?.fadeOutMs ?: 0L).toFloat(), 0f, 5000f) {
             onFadeOutChanged(it.toLong())
         }
 

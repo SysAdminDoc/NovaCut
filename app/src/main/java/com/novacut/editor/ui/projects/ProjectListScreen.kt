@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,13 +16,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.decode.VideoFrameDecoder
+import coil.request.ImageRequest
 import com.novacut.editor.model.Project
+import com.novacut.editor.model.SortMode
 import com.novacut.editor.ui.theme.Mocha
 
 @Composable
@@ -30,6 +37,8 @@ fun ProjectListScreen(
     viewModel: ProjectListViewModel = hiltViewModel()
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
 
     Box(
         modifier = Modifier
@@ -43,31 +52,103 @@ fun ProjectListScreen(
                 tonalElevation = 2.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Movie,
-                        contentDescription = null,
-                        tint = Mocha.Mauve,
-                        modifier = Modifier.size(28.dp)
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Movie,
+                            contentDescription = null,
+                            tint = Mocha.Mauve,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "NovaCut",
+                            color = Mocha.Text,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            "${projects.size} project${if (projects.size != 1) "s" else ""}",
+                            color = Mocha.Subtext0,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    // Search bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = viewModel::setSearchQuery,
+                        placeholder = { Text("Search projects...", fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = Mocha.Subtext0,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { viewModel.setSearchQuery("") },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Clear,
+                                        contentDescription = "Clear",
+                                        tint = Mocha.Subtext0,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Mocha.Surface0,
+                            unfocusedContainerColor = Mocha.Surface0,
+                            focusedBorderColor = Mocha.Mauve,
+                            unfocusedBorderColor = Mocha.Surface1,
+                            cursorColor = Mocha.Mauve,
+                            focusedTextColor = Mocha.Text,
+                            unfocusedTextColor = Mocha.Text,
+                            focusedPlaceholderColor = Mocha.Overlay0,
+                            unfocusedPlaceholderColor = Mocha.Overlay0
+                        ),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "NovaCut",
-                        color = Mocha.Text,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        "${projects.size} project${if (projects.size != 1) "s" else ""}",
-                        color = Mocha.Subtext0,
-                        fontSize = 13.sp
-                    )
+
+                    // Sort chips
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(SortMode.entries.toList()) { mode ->
+                            FilterChip(
+                                onClick = { viewModel.setSortMode(mode) },
+                                label = { Text(mode.label, fontSize = 12.sp) },
+                                selected = sortMode == mode,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = Mocha.Surface0,
+                                    selectedContainerColor = Mocha.Mauve.copy(alpha = 0.3f),
+                                    selectedLabelColor = Mocha.Mauve,
+                                    labelColor = Mocha.Subtext0
+                                ),
+                                modifier = Modifier.height(32.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -88,13 +169,15 @@ fun ProjectListScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "No projects yet",
+                            if (searchQuery.isNotEmpty()) "No matching projects"
+                            else "No projects yet",
                             color = Mocha.Subtext0,
                             fontSize = 16.sp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Tap + to create your first project",
+                            if (searchQuery.isNotEmpty()) "Try a different search"
+                            else "Tap + to create your first project",
                             color = Mocha.Overlay0,
                             fontSize = 13.sp
                         )
@@ -112,7 +195,8 @@ fun ProjectListScreen(
                         ProjectCard(
                             project = project,
                             onClick = { onProjectSelected(project.id) },
-                            onDelete = { viewModel.deleteProject(project) }
+                            onDelete = { viewModel.deleteProject(project) },
+                            onDuplicate = { viewModel.duplicateProject(project) }
                         )
                     }
                 }
@@ -142,9 +226,11 @@ fun ProjectListScreen(
 private fun ProjectCard(
     project: Project,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -194,7 +280,7 @@ private fun ProjectCard(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Thumbnail placeholder
+                // Project thumbnail
                 Box(
                     modifier = Modifier
                         .size(56.dp)
@@ -202,12 +288,26 @@ private fun ProjectCard(
                         .background(Mocha.Mantle),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Movie,
-                        contentDescription = null,
-                        tint = Mocha.Overlay0,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (project.thumbnailUri != null) {
+                        val context = LocalContext.current
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(android.net.Uri.parse(project.thumbnailUri))
+                                .decoderFactory(VideoFrameDecoder.Factory())
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Project thumbnail",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Movie,
+                            contentDescription = null,
+                            tint = Mocha.Overlay0,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -246,12 +346,56 @@ private fun ProjectCard(
                     )
                 }
 
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = Mocha.Overlay0,
-                    modifier = Modifier.size(20.dp)
-                )
+                // Overflow menu
+                Box {
+                    IconButton(
+                        onClick = { showOverflowMenu = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "More",
+                            tint = Mocha.Overlay0,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showOverflowMenu,
+                        onDismissRequest = { showOverflowMenu = false },
+                        containerColor = Mocha.Surface1
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Duplicate", color = Mocha.Text, fontSize = 14.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    tint = Mocha.Subtext0,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            onClick = {
+                                onDuplicate()
+                                showOverflowMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = Mocha.Red, fontSize = 14.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = Mocha.Red,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            onClick = {
+                                showOverflowMenu = false
+                                showDeleteConfirm = true
+                            }
+                        )
+                    }
+                }
             }
         }
     }

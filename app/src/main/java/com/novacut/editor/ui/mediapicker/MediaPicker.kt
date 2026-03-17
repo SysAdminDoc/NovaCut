@@ -20,8 +20,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.novacut.editor.ui.theme.Mocha
+import java.io.File
 
 @Composable
 fun MediaPickerSheet(
@@ -32,6 +34,7 @@ fun MediaPickerSheet(
     val context = LocalContext.current
     var selectedUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingMediaType by remember { mutableStateOf("video") }
+    var cameraVideoUri by remember { mutableStateOf<Uri?>(null) }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -59,6 +62,14 @@ fun MediaPickerSheet(
                 )
             } catch (_: SecurityException) { }
             onMediaSelected(uri, pendingMediaType)
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CaptureVideo()
+    ) { success ->
+        if (success) {
+            cameraVideoUri?.let { uri -> onMediaSelected(uri, "video") }
         }
     }
 
@@ -141,7 +152,15 @@ fun MediaPickerSheet(
 
         // Record option
         OutlinedButton(
-            onClick = { /* Camera capture - future */ },
+            onClick = {
+                val cameraDir = File(context.cacheDir, "camera").apply { mkdirs() }
+                val videoFile = File(cameraDir, "novacut_${System.currentTimeMillis()}.mp4")
+                val uri = FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", videoFile
+                )
+                cameraVideoUri = uri
+                cameraLauncher.launch(uri)
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = Mocha.Red

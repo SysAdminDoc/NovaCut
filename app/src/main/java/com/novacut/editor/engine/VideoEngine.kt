@@ -388,6 +388,27 @@ class VideoEngine @Inject constructor(
         }
     }
 
+    fun extractFrameToFile(uri: Uri, timeMs: Long): File? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            val frame = retriever.getFrameAtTime(
+                timeMs * 1000L,
+                MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            ) ?: return null
+            val file = File(context.cacheDir, "freeze_${System.currentTimeMillis()}.jpg")
+            file.outputStream().use { out ->
+                frame.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            }
+            frame.recycle()
+            file
+        } catch (_: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
     fun clearThumbnailCache() {
         synchronized(cacheLock) {
             thumbnailCache.values.forEach { it.recycle() }

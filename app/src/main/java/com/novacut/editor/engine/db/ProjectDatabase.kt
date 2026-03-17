@@ -6,7 +6,7 @@ import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Resolution
 import kotlinx.coroutines.flow.Flow
 
-@Database(entities = [Project::class], version = 1, exportSchema = false)
+@Database(entities = [Project::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class ProjectDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao

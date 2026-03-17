@@ -39,7 +39,9 @@ val mainTools = listOf(
     ToolItem(EditorTool.AUDIO, Icons.Default.MusicNote, "Audio", true),
     ToolItem(EditorTool.TRANSITION, Icons.Default.SwapHoriz, "Transition", true),
     ToolItem(EditorTool.TRANSFORM, Icons.Default.Transform, "Transform", true),
-    ToolItem(EditorTool.CROP, Icons.Default.Crop, "Crop", true),
+    ToolItem(EditorTool.CROP, Icons.Default.Crop, "Crop"),
+    ToolItem(EditorTool.AI, Icons.Default.AutoAwesome, "AI"),
+    ToolItem(EditorTool.FREEZE_FRAME, Icons.Default.AcUnit, "Freeze", true),
     ToolItem(EditorTool.EXPORT, Icons.Default.FileUpload, "Export")
 )
 
@@ -53,6 +55,10 @@ fun ToolPanel(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit = {},
+    onCopyEffects: () -> Unit = {},
+    onPasteEffects: () -> Unit = {},
+    hasCopiedEffects: Boolean = false,
     canUndo: Boolean,
     canRedo: Boolean,
     modifier: Modifier = Modifier
@@ -117,18 +123,59 @@ fun ToolPanel(
                 Text("Add", fontSize = 13.sp)
             }
 
-            // Delete selected
-            IconButton(
-                onClick = onDelete,
-                enabled = selectedClipId != null,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = if (selectedClipId != null) Mocha.Red else Mocha.Surface2,
-                    modifier = Modifier.size(20.dp)
-                )
+            Row {
+                // Duplicate clip
+                IconButton(
+                    onClick = onDuplicate,
+                    enabled = selectedClipId != null,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Duplicate",
+                        tint = if (selectedClipId != null) Mocha.Text else Mocha.Surface2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                // Copy effects
+                IconButton(
+                    onClick = onCopyEffects,
+                    enabled = selectedClipId != null,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.CopyAll,
+                        contentDescription = "Copy Effects",
+                        tint = if (selectedClipId != null) Mocha.Text else Mocha.Surface2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                // Paste effects
+                IconButton(
+                    onClick = onPasteEffects,
+                    enabled = selectedClipId != null && hasCopiedEffects,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentPaste,
+                        contentDescription = "Paste Effects",
+                        tint = if (selectedClipId != null && hasCopiedEffects) Mocha.Peach else Mocha.Surface2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                // Delete selected
+                IconButton(
+                    onClick = onDelete,
+                    enabled = selectedClipId != null,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = if (selectedClipId != null) Mocha.Red else Mocha.Surface2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -688,6 +735,21 @@ fun TransformPanel(
     }
 }
 
+private data class CropPreset(
+    val ratio: AspectRatio,
+    val platform: String
+)
+
+private val cropPresets = listOf(
+    CropPreset(AspectRatio.RATIO_16_9, "YouTube / TV"),
+    CropPreset(AspectRatio.RATIO_9_16, "TikTok / Reels"),
+    CropPreset(AspectRatio.RATIO_1_1, "Instagram Square"),
+    CropPreset(AspectRatio.RATIO_4_5, "Instagram Portrait"),
+    CropPreset(AspectRatio.RATIO_4_3, "Classic"),
+    CropPreset(AspectRatio.RATIO_3_4, "Portrait Classic"),
+    CropPreset(AspectRatio.RATIO_21_9, "Cinematic")
+)
+
 @Composable
 fun CropPanel(
     onCropSelected: (AspectRatio) -> Unit,
@@ -717,29 +779,29 @@ fun CropPanel(
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(AspectRatio.entries.toList()) { ratio ->
-                val isActive = currentAspect == ratio
+            items(cropPresets) { preset ->
+                val isActive = currentAspect == preset.ratio
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { onCropSelected(ratio) }
+                        .clickable { onCropSelected(preset.ratio) }
                         .background(
                             if (isActive) Mocha.Mauve.copy(alpha = 0.2f) else Mocha.Surface0
                         )
                         .padding(12.dp)
-                        .width(70.dp),
+                        .width(80.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Aspect ratio preview box
                     val previewW: Float
                     val previewH: Float
                     val maxDim = 32f
-                    if (ratio.toFloat() >= 1f) {
+                    if (preset.ratio.toFloat() >= 1f) {
                         previewW = maxDim
-                        previewH = maxDim / ratio.toFloat()
+                        previewH = maxDim / preset.ratio.toFloat()
                     } else {
                         previewH = maxDim
-                        previewW = maxDim * ratio.toFloat()
+                        previewW = maxDim * preset.ratio.toFloat()
                     }
                     Box(
                         modifier = Modifier
@@ -752,11 +814,19 @@ fun CropPanel(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        ratio.label,
-                        fontSize = 11.sp,
+                        preset.ratio.label,
+                        fontSize = 12.sp,
                         color = if (isActive) Mocha.Mauve else Mocha.Text,
                         textAlign = TextAlign.Center,
                         maxLines = 1
+                    )
+                    Text(
+                        preset.platform,
+                        fontSize = 9.sp,
+                        color = if (isActive) Mocha.Mauve.copy(alpha = 0.7f) else Mocha.Subtext0,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

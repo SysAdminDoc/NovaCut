@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.Intent
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.export.ExportSheet
@@ -75,12 +76,19 @@ fun EditorScreen(
                         EditorTool.AUDIO -> viewModel.showAudioPanel()
                         EditorTool.TRANSFORM -> viewModel.showTransformPanel()
                         EditorTool.CROP -> viewModel.showCropPanel()
+                        EditorTool.AI -> viewModel.showAiToolsPanel()
                         EditorTool.SPEED -> viewModel.dismissAllPanels()
                         EditorTool.SPLIT -> {
+                            viewModel.dismissAllPanels()
                             viewModel.splitClipAtPlayhead()
                             viewModel.setTool(EditorTool.NONE)
                         }
-                        EditorTool.TRIM -> { /* Trim handles activate in Timeline when clip selected */ }
+                        EditorTool.TRIM -> viewModel.dismissAllPanels()
+                        EditorTool.FREEZE_FRAME -> {
+                            viewModel.dismissAllPanels()
+                            viewModel.insertFreezeFrame()
+                            viewModel.setTool(EditorTool.NONE)
+                        }
                         else -> {}
                     }
                 },
@@ -91,6 +99,10 @@ fun EditorScreen(
                 onUndo = viewModel::undo,
                 onRedo = viewModel::redo,
                 onDelete = viewModel::deleteSelectedClip,
+                onDuplicate = viewModel::duplicateSelectedClip,
+                onCopyEffects = viewModel::copyEffects,
+                onPasteEffects = viewModel::pasteEffects,
+                hasCopiedEffects = state.copiedEffects.isNotEmpty(),
                 canUndo = state.undoStack.isNotEmpty(),
                 canRedo = state.redoStack.isNotEmpty(),
                 modifier = Modifier.weight(0.25f)
@@ -206,6 +218,7 @@ fun EditorScreen(
                 config = state.exportConfig,
                 exportState = state.exportState,
                 exportProgress = state.exportProgress,
+                aspectRatio = state.project.aspectRatio,
                 onConfigChanged = viewModel::updateExportConfig,
                 onStartExport = {
                     // Use app-private external dir — works on all Android versions including 11+
@@ -213,6 +226,12 @@ fun EditorScreen(
                     val outputDir = File(moviesDir ?: context.filesDir, "NovaCut").apply { mkdirs() }
                     viewModel.startExport(outputDir)
                 },
+                onShare = {
+                    viewModel.getShareIntent()?.let { intent ->
+                        context.startActivity(Intent.createChooser(intent, "Share video"))
+                    }
+                },
+                onSaveToGallery = viewModel::saveToGallery,
                 onClose = viewModel::hideExportSheet
             )
         }
@@ -241,7 +260,7 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@AudioPanel
                     viewModel.setClipFadeOut(clipId, fadeMs)
                 },
-                onStartVoiceover = { /* Future: voiceover recording */ },
+                onStartVoiceover = { viewModel.showToast("Voiceover recording: Coming soon") },
                 onClose = viewModel::hideAudioPanel
             )
         }
@@ -278,7 +297,6 @@ fun EditorScreen(
             CropPanel(
                 currentAspect = state.project.aspectRatio,
                 onCropSelected = { ratio ->
-                    viewModel.renameProject(state.project.name) // trigger save
                     viewModel.updateProjectAspect(ratio)
                 },
                 onClose = viewModel::hideCropPanel
@@ -294,10 +312,9 @@ fun EditorScreen(
         ) {
             AiToolsPanel(
                 hasSelectedClip = state.selectedClipId != null,
-                onToolSelected = { toolId ->
-                    viewModel.showToast("AI tool: $toolId (processing...)")
-                },
-                onClose = viewModel::hideAiToolsPanel
+                onToolSelected = { toolId -> viewModel.runAiTool(toolId) },
+                onClose = viewModel::hideAiToolsPanel,
+                processingTool = state.aiProcessingTool
             )
         }
 

@@ -13,7 +13,8 @@ data class Project(
     val resolution: Resolution = Resolution.FHD_1080P,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val thumbnailUri: String? = null
 )
 
 enum class AspectRatio(val widthRatio: Int, val heightRatio: Int, val label: String) {
@@ -22,6 +23,7 @@ enum class AspectRatio(val widthRatio: Int, val heightRatio: Int, val label: Str
     RATIO_1_1(1, 1, "1:1"),
     RATIO_4_3(4, 3, "4:3"),
     RATIO_3_4(3, 4, "3:4"),
+    RATIO_4_5(4, 5, "4:5"),
     RATIO_21_9(21, 9, "21:9");
 
     fun toFloat(): Float = widthRatio.toFloat() / heightRatio.toFloat()
@@ -71,6 +73,8 @@ data class Clip(
     val scaleY: Float = 1f,
     val positionX: Float = 0f,
     val positionY: Float = 0f,
+    val fadeInMs: Long = 0L,
+    val fadeOutMs: Long = 0L,
     val keyframes: List<Keyframe> = emptyList()
 ) {
     val durationMs: Long get() = ((trimEndMs - trimStartMs) / speed).toLong()
@@ -276,4 +280,12 @@ enum class ExportQuality(val label: String) {
     LOW("Small File"),
     MEDIUM("Balanced"),
     HIGH("Best Quality")
+}
+
+enum class SortMode(val label: String) {
+    DATE_DESC("Recent"),
+    DATE_ASC("Oldest"),
+    NAME_ASC("A-Z"),
+    NAME_DESC("Z-A"),
+    DURATION_DESC("Longest")
 }

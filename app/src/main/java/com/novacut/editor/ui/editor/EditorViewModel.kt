@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
+import com.novacut.editor.ai.AiFeatures
 import com.novacut.editor.engine.AudioEngine
 import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ExportService
@@ -24,8 +25,13 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.ContentValues
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import java.io.File
+import java.util.UUID
 import javax.inject.Inject
 
 data class EditorState(
@@ -59,7 +65,10 @@ data class EditorState(
     val selectedEffectId: String? = null,
     val undoStack: List<UndoAction> = emptyList(),
     val redoStack: List<UndoAction> = emptyList(),
-    val toastMessage: String? = null
+    val toastMessage: String? = null,
+    val aiProcessingTool: String? = null,
+    val lastExportedFilePath: String? = null,
+    val copiedEffects: List<Effect> = emptyList()
 )
 
 enum class EditorTool(val displayName: String) {
@@ -73,6 +82,8 @@ enum class EditorTool(val displayName: String) {
     TRANSITION("Transition"),
     TRANSFORM("Transform"),
     CROP("Crop"),
+    AI("AI"),
+    FREEZE_FRAME("Freeze"),
     EXPORT("Export")
 }
 
@@ -88,6 +99,7 @@ class EditorViewModel @Inject constructor(
     private val projectDao: ProjectDao,
     private val audioEngine: AudioEngine,
     private val autoSave: ProjectAutoSave,
+    private val aiFeatures: AiFeatures,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -288,6 +300,39 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
+    fun duplicateSelectedClip() {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Duplicate clip")
+
+        _state.update { s ->
+            val trackAndClip = s.tracks.flatMapIndexed { idx, track ->
+                track.clips.filter { it.id == clipId }.map { idx to it }
+            }.firstOrNull() ?: return@update s
+
+            val (trackIdx, clip) = trackAndClip
+            val newClip = clip.copy(
+                id = UUID.randomUUID().toString(),
+                timelineStartMs = clip.timelineEndMs,
+                effects = clip.effects.map { it.copy(id = UUID.randomUUID().toString()) },
+                transition = null
+            )
+
+            val track = s.tracks[trackIdx]
+            val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+            val updatedClips = track.clips.toMutableList().apply { add(clipIndex + 1, newClip) }
+
+            // Shift subsequent clips forward
+            val shifted = updatedClips.mapIndexed { i, c ->
+                if (i > clipIndex + 1) c.copy(timelineStartMs = c.timelineStartMs + newClip.durationMs) else c
+            }
+
+            val tracks = s.tracks.mapIndexed { i, t -> if (i == trackIdx) t.copy(clips = shifted) else t }
+            recalculateDuration(s.copy(tracks = tracks, selectedClipId = newClip.id))
+        }
+        rebuildPlayerTimeline()
+        saveProject()
+    }
+
     fun splitClipAtPlayhead() {
         val state = _state.value
         val clipId = state.selectedClipId ?: return
@@ -430,6 +475,38 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        saveProject()
+    }
+
+    fun copyEffects() {
+        val clip = getSelectedClip() ?: return
+        if (clip.effects.isEmpty()) {
+            showToast("No effects to copy")
+            return
+        }
+        _state.update { it.copy(copiedEffects = clip.effects) }
+        showToast("Copied ${clip.effects.size} effects")
+    }
+
+    fun pasteEffects() {
+        val clipId = _state.value.selectedClipId ?: return
+        val toPaste = _state.value.copiedEffects
+        if (toPaste.isEmpty()) {
+            showToast("No effects copied")
+            return
+        }
+        saveUndoState("Paste effects")
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(effects = clip.effects + toPaste.map { it.copy(id = UUID.randomUUID().toString()) })
+                    } else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
+        showToast("Pasted ${toPaste.size} effects")
         saveProject()
     }
 
@@ -647,12 +724,27 @@ class EditorViewModel @Inject constructor(
     }
 
     fun setClipFadeIn(clipId: String, fadeInMs: Long) {
-        // Fade in/out are metadata only — no undo spam needed
-        showToast("Fade in: ${fadeInMs}ms (applied on export)")
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(fadeInMs = fadeInMs.coerceAtLeast(0L))
+                    else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
     }
 
     fun setClipFadeOut(clipId: String, fadeOutMs: Long) {
-        showToast("Fade out: ${fadeOutMs}ms (applied on export)")
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(fadeOutMs = fadeOutMs.coerceAtLeast(0L))
+                    else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
     }
 
     // Export
@@ -690,6 +782,7 @@ class EditorViewModel @Inject constructor(
                     _state.update { it.copy(exportProgress = progress) }
                 },
                 onComplete = {
+                    _state.update { it.copy(lastExportedFilePath = outputFile.absolutePath) }
                     showToast("Export complete: ${outputFile.name}")
                     appContext.stopService(serviceIntent)
                 },
@@ -698,6 +791,65 @@ class EditorViewModel @Inject constructor(
                     appContext.stopService(serviceIntent)
                 }
             )
+        }
+    }
+
+    fun getShareIntent(): Intent? {
+        val filePath = _state.value.lastExportedFilePath ?: return null
+        val file = File(filePath)
+        if (!file.exists()) return null
+        val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.provider", file)
+        return Intent(Intent.ACTION_SEND).apply {
+            type = "video/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    fun saveToGallery() {
+        val filePath = _state.value.lastExportedFilePath ?: run {
+            showToast("No exported video")
+            return
+        }
+        val file = File(filePath)
+        if (!file.exists()) {
+            showToast("Export file not found")
+            return
+        }
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Video.Media.DISPLAY_NAME, file.name)
+                            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                            put(MediaStore.Video.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/NovaCut")
+                            put(MediaStore.Video.Media.IS_PENDING, 1)
+                        }
+                        val resolver = appContext.contentResolver
+                        val contentUri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                        if (contentUri != null) {
+                            resolver.openOutputStream(contentUri)?.use { out ->
+                                file.inputStream().use { input -> input.copyTo(out) }
+                            }
+                            values.clear()
+                            values.put(MediaStore.Video.Media.IS_PENDING, 0)
+                            resolver.update(contentUri, values, null, null)
+                        }
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val moviesDir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                            "NovaCut"
+                        ).apply { mkdirs() }
+                        file.copyTo(File(moviesDir, file.name), overwrite = true)
+                    }
+                    withContext(Dispatchers.Main) { showToast("Saved to gallery") }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { showToast("Save failed: ${e.message}") }
+                }
+            }
         }
     }
 
@@ -770,9 +922,15 @@ class EditorViewModel @Inject constructor(
     // Project persistence
     fun saveProject() {
         viewModelScope.launch {
+            val firstClipUri = _state.value.tracks
+                .filter { it.type == TrackType.VIDEO }
+                .flatMap { it.clips }
+                .firstOrNull()?.sourceUri?.toString()
+
             val project = _state.value.project.copy(
                 updatedAt = System.currentTimeMillis(),
-                durationMs = _state.value.totalDurationMs
+                durationMs = _state.value.totalDurationMs,
+                thumbnailUri = firstClipUri
             )
             projectDao.insertProject(project)
             _state.update { it.copy(project = project) }
@@ -801,6 +959,167 @@ class EditorViewModel @Inject constructor(
                 undoStack = (state.undoStack + action).takeLast(50),
                 redoStack = emptyList()
             )
+        }
+    }
+
+    // AI Tools
+    fun runAiTool(toolId: String) {
+        val clip = getSelectedClip()
+        if (clip == null && toolId != "auto_color") {
+            showToast("Select a clip first")
+            return
+        }
+
+        _state.update { it.copy(aiProcessingTool = toolId) }
+
+        viewModelScope.launch {
+            try {
+                when (toolId) {
+                    "scene_detect" -> {
+                        val scenes = aiFeatures.detectScenes(clip!!.sourceUri)
+                        if (scenes.isEmpty()) {
+                            showToast("No scene changes detected")
+                        } else {
+                            // Auto-split the clip at each detected scene boundary
+                            saveUndoState("AI scene detect")
+                            _state.update { state ->
+                                var tracks = state.tracks
+                                for (scene in scenes.sortedByDescending { it.timestampMs }) {
+                                    val splitMs = clip.timelineStartMs +
+                                        ((scene.timestampMs - clip.trimStartMs) / clip.speed).toLong()
+                                    if (splitMs <= clip.timelineStartMs || splitMs >= clip.timelineEndMs) continue
+
+                                    tracks = tracks.map { track ->
+                                        val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                        if (idx < 0) return@map track
+                                        val c = track.clips[idx]
+                                        if (splitMs <= c.timelineStartMs || splitMs >= c.timelineEndMs) return@map track
+
+                                        val relPos = splitMs - c.timelineStartMs
+                                        val srcSplit = c.trimStartMs + (relPos * c.speed).toLong()
+                                        val first = c.copy(trimEndMs = srcSplit)
+                                        val second = c.copy(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            timelineStartMs = splitMs,
+                                            trimStartMs = srcSplit
+                                        )
+                                        val newClips = buildList {
+                                            addAll(track.clips.subList(0, idx))
+                                            add(first)
+                                            add(second)
+                                            addAll(track.clips.subList(idx + 1, track.clips.size))
+                                        }
+                                        track.copy(clips = newClips)
+                                    }
+                                }
+                                recalculateDuration(state.copy(tracks = tracks))
+                            }
+                            rebuildPlayerTimeline()
+                            saveProject()
+                            showToast("Split into ${scenes.size + 1} clips at scene boundaries")
+                        }
+                    }
+                    "auto_captions" -> {
+                        val captions = aiFeatures.generateAutoCaptions(clip!!.sourceUri)
+                        if (captions.isEmpty()) {
+                            showToast("No speech detected")
+                        } else {
+                            saveUndoState("AI auto captions")
+                            val overlays = aiFeatures.captionsToOverlays(captions)
+                            _state.update { it.copy(textOverlays = it.textOverlays + overlays) }
+                            saveProject()
+                            showToast("Added ${captions.size} captions")
+                        }
+                    }
+                    "smart_crop" -> {
+                        val suggestion = aiFeatures.suggestCrop(
+                            clip!!.sourceUri,
+                            _state.value.project.aspectRatio.toFloat()
+                        )
+                        showToast("Suggested crop: center(${
+                            "%.0f".format(suggestion.centerX * 100)
+                        }%, ${"%.0f".format(suggestion.centerY * 100)}%) confidence: ${
+                            "%.0f".format(suggestion.confidence * 100)
+                        }%")
+                    }
+                    else -> showToast("${toolId.replace('_', ' ').replaceFirstChar { it.uppercase() }}: Coming soon")
+                }
+            } catch (e: Exception) {
+                showToast("AI tool failed: ${e.message}")
+            } finally {
+                _state.update { it.copy(aiProcessingTool = null) }
+            }
+        }
+    }
+
+    fun insertFreezeFrame() {
+        val clip = getSelectedClip() ?: return
+        val playheadMs = _state.value.playheadMs
+        if (playheadMs < clip.timelineStartMs || playheadMs >= clip.timelineEndMs) {
+            showToast("Move playhead over the selected clip")
+            return
+        }
+
+        val relativeMs = playheadMs - clip.timelineStartMs
+        val sourceTimeMs = clip.trimStartMs + (relativeMs * clip.speed).toLong()
+
+        viewModelScope.launch {
+            showToast("Extracting frame...")
+            val frameFile = withContext(Dispatchers.IO) {
+                videoEngine.extractFrameToFile(clip.sourceUri, sourceTimeMs)
+            }
+            if (frameFile == null) {
+                showToast("Failed to extract frame")
+                return@launch
+            }
+
+            val frameUri = Uri.fromFile(frameFile)
+            val freezeDurationMs = 2000L
+
+            saveUndoState("Freeze frame")
+
+            // Split at playhead, then insert freeze frame between halves
+            _state.update { s ->
+                val tracks = s.tracks.map { track ->
+                    val clipIndex = track.clips.indexOfFirst { it.id == clip.id }
+                    if (clipIndex < 0) return@map track
+
+                    val c = track.clips[clipIndex]
+                    val splitInSource = c.trimStartMs + (relativeMs * c.speed).toLong()
+
+                    val firstHalf = c.copy(trimEndMs = splitInSource)
+                    val freezeClip = Clip(
+                        id = UUID.randomUUID().toString(),
+                        sourceUri = frameUri,
+                        sourceDurationMs = freezeDurationMs,
+                        timelineStartMs = firstHalf.timelineEndMs,
+                        trimStartMs = 0L,
+                        trimEndMs = freezeDurationMs
+                    )
+                    val secondHalf = c.copy(
+                        id = UUID.randomUUID().toString(),
+                        timelineStartMs = freezeClip.timelineEndMs,
+                        trimStartMs = splitInSource
+                    )
+
+                    // Shift subsequent clips
+                    val shift = freezeDurationMs
+                    val newClips = buildList {
+                        addAll(track.clips.subList(0, clipIndex))
+                        add(firstHalf)
+                        add(freezeClip)
+                        add(secondHalf)
+                        addAll(track.clips.subList(clipIndex + 1, track.clips.size).map { cl ->
+                            cl.copy(timelineStartMs = cl.timelineStartMs + shift)
+                        })
+                    }
+                    track.copy(clips = newClips)
+                }
+                recalculateDuration(s.copy(tracks = tracks))
+            }
+            rebuildPlayerTimeline()
+            saveProject()
+            showToast("Freeze frame inserted (2s)")
         }
     }
 

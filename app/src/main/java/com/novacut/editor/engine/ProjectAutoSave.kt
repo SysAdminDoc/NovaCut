@@ -60,6 +60,18 @@ class ProjectAutoSave @Inject constructor(
         getAutoSaveFile(projectId).delete()
     }
 
+    fun copyAutoSave(fromProjectId: String, toProjectId: String) {
+        val fromFile = getAutoSaveFile(fromProjectId)
+        if (!fromFile.exists()) return
+        try {
+            val json = JSONObject(fromFile.readText())
+            json.put("projectId", toProjectId)
+            json.put("timestamp", System.currentTimeMillis())
+            val toFile = getAutoSaveFile(toProjectId)
+            toFile.writeText(json.toString(2))
+        } catch (_: Exception) { }
+    }
+
     fun stop() {
         autoSaveJob?.cancel()
         autoSaveJob = null
@@ -155,6 +167,8 @@ data class AutoSaveState(
                 put("scaleY", clip.scaleY.toDouble())
                 put("positionX", clip.positionX.toDouble())
                 put("positionY", clip.positionY.toDouble())
+                put("fadeInMs", clip.fadeInMs)
+                put("fadeOutMs", clip.fadeOutMs)
                 put("effects", JSONArray().apply {
                     clip.effects.forEach { put(serializeEffect(it)) }
                 })
@@ -262,6 +276,8 @@ data class AutoSaveState(
                 scaleY = json.optDouble("scaleY", 1.0).toFloat(),
                 positionX = json.optDouble("positionX", 0.0).toFloat(),
                 positionY = json.optDouble("positionY", 0.0).toFloat(),
+                fadeInMs = json.optLong("fadeInMs", 0L),
+                fadeOutMs = json.optLong("fadeOutMs", 0L),
                 effects = (0 until effectsArr.length()).mapNotNull {
                     try { deserializeEffect(effectsArr.getJSONObject(it)) } catch (_: Exception) { null }
                 },

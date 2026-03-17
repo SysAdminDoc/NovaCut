@@ -20,8 +20,11 @@ fun ExportSheet(
     config: ExportConfig,
     exportState: ExportState,
     exportProgress: Float,
+    aspectRatio: AspectRatio = AspectRatio.RATIO_16_9,
     onConfigChanged: (ExportConfig) -> Unit,
     onStartExport: () -> Unit,
+    onShare: () -> Unit = {},
+    onSaveToGallery: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -92,11 +95,29 @@ fun ExportSheet(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Export Complete!", color = Mocha.Green, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = onClose,
-                    colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Done", color = Mocha.Crust)
+                    Button(
+                        onClick = onShare,
+                        colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Share", color = Mocha.Crust)
+                    }
+                    Button(
+                        onClick = onSaveToGallery,
+                        colors = ButtonDefaults.buttonColors(containerColor = Mocha.Green)
+                    ) {
+                        Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Save to Gallery", color = Mocha.Crust)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onClose) {
+                    Text("Done", color = Mocha.Subtext0)
                 }
             }
             return
@@ -207,7 +228,7 @@ fun ExportSheet(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Estimated file info
-        val (w, h) = config.resolution.forAspect(AspectRatio.RATIO_16_9)
+        val (w, h) = config.resolution.forAspect(aspectRatio)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Mocha.Surface0)
