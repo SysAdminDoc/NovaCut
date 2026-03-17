@@ -124,6 +124,27 @@ fun ExportSheet(
             return
         }
 
+        if (exportState == ExportState.CANCELLED) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Cancel,
+                    contentDescription = "Cancelled",
+                    tint = Mocha.Peach,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Export Cancelled", color = Mocha.Peach, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onClose) {
+                    Text("Done", color = Mocha.Subtext0)
+                }
+            }
+            return
+        }
+
         if (exportState == ExportState.ERROR) {
             Column(
                 modifier = Modifier.fillMaxWidth(),

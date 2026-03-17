@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.20.0
+v0.21.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -131,6 +131,10 @@ v0.20.0
 - Export notification live progress (ExportService observes VideoEngine StateFlows, updates notification in real-time)
 - Export cancellation (notification Cancel button triggers Transformer.cancel(), CANCELLED state propagated)
 - Export audio volume + fades (VolumeAudioProcessor applies clip volume/fadeIn/fadeOut to exported audio)
+- Export CANCELLED state UI in ExportSheet (icon + message + Done button)
+- Text overlay list/edit/delete UI (BottomToolArea text tab shows existing overlays with edit/delete buttons)
+- Text overlay editing (TextEditorSheet opens with existing overlay data, save updates instead of creating new)
+- Camera temp file cleanup (stale files older than 1 hour deleted on MediaPicker open)
 - R8 minification enabled with comprehensive ProGuard keep rules (~5MB APK)
 - Undo/redo (50 levels, immutable state snapshots)
 - Project auto-save every 30s with full state recovery (errors logged to logcat)
@@ -265,6 +269,12 @@ v0.20.0
 - **Export cancellation** — `VideoEngine.cancelExport()` sets `CANCELLED` state and calls `transformer.cancel()`. `activeTransformer` stored as `@Volatile` field, cleared after export completes or fails. ExportService `ACTION_CANCEL` now calls `videoEngine.cancelExport()` instead of just `stopSelf()`. CANCELLED state added to `ExportState` enum.
 - **VolumeAudioProcessor** — Custom `BaseAudioProcessor` that applies volume scaling and fade in/out envelope to 16-bit PCM audio during export. Tracks sample position to compute time offset for fade calculations. Only created when `volume != 1.0f` or `fadeInMs > 0` or `fadeOutMs > 0`.
 - **Export audio effects wired** — `Effects(audioProcessors, videoEffects)` now passes `VolumeAudioProcessor` list instead of `emptyList()` for audio. Each clip gets its own processor with its specific volume/fade settings.
+- **VolumeAudioProcessor encoding validation** — `onConfigure()` validates `C.ENCODING_PCM_16BIT`. Non-16-bit audio formats rejected with `UnhandledAudioFormatException` to prevent garbled output.
+- **ExportSheet CANCELLED state** — Dedicated UI state for cancelled exports: `Icons.Default.Cancel` in Mocha.Peach + "Export Cancelled" text + Done button. Prevents CANCELLED falling through to idle/config view.
+- **Text overlay editing flow** — `editingTextOverlayId: String?` in EditorState. `editTextOverlay(id)` sets the ID and shows TextEditorSheet. EditorScreen resolves overlay by ID and passes to sheet. onSave calls `updateTextOverlay` (edit) vs `addTextOverlay` (new).
+- **Text overlay list UI** — `TextOverlayList` composable in ToolPanel. Shows when text tab active and overlays exist. Each item: colored icon, text preview (1 line), time range, edit + delete buttons. Scrollable with 150dp max height.
+- **Camera temp cleanup** — `LaunchedEffect(Unit)` in MediaPickerSheet deletes files in `cacheDir/camera/` older than 1 hour. Safe because camera launcher completes before user opens picker again.
+- **dismissedPanelState includes editingTextOverlayId** — Reset to null alongside all panel booleans to prevent stale overlay editing state.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

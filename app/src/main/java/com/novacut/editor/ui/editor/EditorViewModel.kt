@@ -74,7 +74,8 @@ data class EditorState(
     val showVoiceoverRecorder: Boolean = false,
     val isRecordingVoiceover: Boolean = false,
     val voiceoverDurationMs: Long = 0L,
-    val isLooping: Boolean = false
+    val isLooping: Boolean = false,
+    val editingTextOverlayId: String? = null
 )
 
 enum class EditorTool(val displayName: String) {
@@ -781,7 +782,8 @@ class EditorViewModel @Inject constructor(
         showTransformPanel = false,
         showCropPanel = false,
         showVoiceoverRecorder = false,
-        selectedEffectId = null
+        selectedEffectId = null,
+        editingTextOverlayId = null
     )
 
     fun dismissAllPanels() { _state.update { dismissedPanelState(it) } }
@@ -797,8 +799,9 @@ class EditorViewModel @Inject constructor(
     fun hideExportSheet() { _state.update { it.copy(showExportSheet = false) } }
     fun showEffectsPanel() { _state.update { dismissedPanelState(it).copy(showEffectsPanel = true) } }
     fun hideEffectsPanel() { _state.update { it.copy(showEffectsPanel = false) } }
-    fun showTextEditor() { _state.update { dismissedPanelState(it).copy(showTextEditor = true) } }
-    fun hideTextEditor() { _state.update { it.copy(showTextEditor = false) } }
+    fun showTextEditor() { _state.update { dismissedPanelState(it).copy(showTextEditor = true, editingTextOverlayId = null) } }
+    fun editTextOverlay(id: String) { _state.update { dismissedPanelState(it).copy(showTextEditor = true, editingTextOverlayId = id) } }
+    fun hideTextEditor() { _state.update { it.copy(showTextEditor = false, editingTextOverlayId = null) } }
     fun showTransitionPicker() { _state.update { dismissedPanelState(it).copy(showTransitionPicker = true) } }
     fun hideTransitionPicker() { _state.update { it.copy(showTransitionPicker = false) } }
     fun showAudioPanel() { _state.update { dismissedPanelState(it).copy(showAudioPanel = true) } }

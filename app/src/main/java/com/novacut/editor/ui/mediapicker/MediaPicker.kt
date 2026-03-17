@@ -127,6 +127,15 @@ fun MediaPickerSheet(
         }
     }
 
+    // Clean up stale camera temp files (older than 1 hour)
+    LaunchedEffect(Unit) {
+        val cameraDir = File(context.cacheDir, "camera")
+        if (cameraDir.exists()) {
+            val cutoff = System.currentTimeMillis() - 3_600_000L
+            cameraDir.listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.delete() }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()

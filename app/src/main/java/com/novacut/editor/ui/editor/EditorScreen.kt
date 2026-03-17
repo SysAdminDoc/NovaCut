@@ -90,6 +90,11 @@ fun EditorScreen(
             BottomToolArea(
                 selectedClipId = state.selectedClipId,
                 hasCopiedEffects = state.copiedEffects.isNotEmpty(),
+                textOverlays = state.textOverlays,
+                onEditTextOverlay = { id -> viewModel.editTextOverlay(id) },
+                onDeleteTextOverlay = { id ->
+                    viewModel.removeTextOverlay(id)
+                },
                 onAction = { actionId ->
                     when (actionId) {
                         "edit" -> viewModel.showMediaPicker()
@@ -217,10 +222,18 @@ fun EditorScreen(
             exit = slideOutVertically(targetOffsetY = { it }),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
+            val editingOverlay = state.editingTextOverlayId?.let { id ->
+                state.textOverlays.firstOrNull { it.id == id }
+            }
             TextEditorSheet(
+                existingOverlay = editingOverlay,
                 playheadMs = state.playheadMs,
                 onSave = { overlay ->
-                    viewModel.addTextOverlay(overlay)
+                    if (editingOverlay != null) {
+                        viewModel.updateTextOverlay(overlay)
+                    } else {
+                        viewModel.addTextOverlay(overlay)
+                    }
                     viewModel.hideTextEditor()
                 },
                 onClose = viewModel::hideTextEditor

@@ -85,7 +85,10 @@ private val clipAiSubMenu = listOf(
 fun BottomToolArea(
     selectedClipId: String?,
     hasCopiedEffects: Boolean,
+    textOverlays: List<TextOverlay> = emptyList(),
     onAction: (String) -> Unit,
+    onEditTextOverlay: (String) -> Unit = {},
+    onDeleteTextOverlay: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isClipMode = selectedClipId != null
@@ -113,13 +116,23 @@ fun BottomToolArea(
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
             subMenuItems?.let { items ->
-                SubMenuGrid(
-                    items = items,
-                    onItemSelected = { itemId ->
-                        onAction(itemId)
-                        activeTabId = null
+                Column {
+                    SubMenuGrid(
+                        items = items,
+                        onItemSelected = { itemId ->
+                            onAction(itemId)
+                            activeTabId = null
+                        }
+                    )
+                    // Text overlay list when text tab active
+                    if (!isClipMode && activeTabId == "text" && textOverlays.isNotEmpty()) {
+                        TextOverlayList(
+                            overlays = textOverlays,
+                            onEdit = onEditTextOverlay,
+                            onDelete = onDeleteTextOverlay
+                        )
                     }
-                )
+                }
             }
         }
 
@@ -1012,6 +1025,78 @@ fun TransitionPicker(
                     inactiveTrackColor = Mocha.Surface1
                 )
             )
+        }
+    }
+}
+
+@Composable
+private fun TextOverlayList(
+    overlays: List<TextOverlay>,
+    onEdit: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Mocha.Mantle)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Text("Text Overlays", color = Mocha.Subtext1, fontSize = 11.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 150.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            overlays.forEach { overlay ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Mocha.Surface0)
+                        .clickable { onEdit(overlay.id) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Title,
+                        contentDescription = null,
+                        tint = Color(overlay.color),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            overlay.text,
+                            color = Mocha.Text,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val startSec = overlay.startTimeMs / 1000f
+                        val endSec = overlay.endTimeMs / 1000f
+                        Text(
+                            "%.1fs — %.1fs".format(startSec, endSec),
+                            color = Mocha.Subtext0,
+                            fontSize = 10.sp
+                        )
+                    }
+                    IconButton(
+                        onClick = { onEdit(overlay.id) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, "Edit", tint = Mocha.Mauve, modifier = Modifier.size(14.dp))
+                    }
+                    IconButton(
+                        onClick = { onDelete(overlay.id) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, "Delete", tint = Mocha.Red, modifier = Modifier.size(14.dp))
+                    }
+                }
+            }
         }
     }
 }

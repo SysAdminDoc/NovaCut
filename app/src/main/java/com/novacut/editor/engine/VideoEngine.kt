@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
@@ -509,7 +510,8 @@ private class VolumeAudioProcessor(
     private var processedFrames: Long = 0L
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.sampleRate == 0) {
+        if (inputAudioFormat.sampleRate == 0 ||
+            inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
         }
         return inputAudioFormat
@@ -522,7 +524,6 @@ private class VolumeAudioProcessor(
         val outputBuffer = replaceOutputBuffer(remaining)
         val sampleRate = inputAudioFormat.sampleRate
         val channelCount = inputAudioFormat.channelCount
-        val bytesPerFrame = channelCount * 2 // 16-bit = 2 bytes per sample
 
         while (inputBuffer.hasRemaining()) {
             val sample = inputBuffer.short
