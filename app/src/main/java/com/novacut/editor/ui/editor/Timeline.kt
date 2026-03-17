@@ -293,6 +293,7 @@ fun Timeline(
                                                             onDragEnd = {},
                                                             onDragCancel = {},
                                                             onHorizontalDrag = { _, dragAmount ->
+                                                                if (currentPixelsPerMs < 0.001f) return@detectHorizontalDragGestures
                                                                 val deltaMs = (dragAmount / currentPixelsPerMs).toLong()
                                                                 val newStart = (clip.trimStartMs + deltaMs)
                                                                     .coerceAtLeast(0L)
@@ -322,6 +323,7 @@ fun Timeline(
                                                             onDragEnd = {},
                                                             onDragCancel = {},
                                                             onHorizontalDrag = { _, dragAmount ->
+                                                                if (currentPixelsPerMs < 0.001f) return@detectHorizontalDragGestures
                                                                 val deltaMs = (dragAmount / currentPixelsPerMs).toLong()
                                                                 val newEnd = (clip.trimEndMs + deltaMs)
                                                                     .coerceAtLeast(clip.trimStartMs + 100L)

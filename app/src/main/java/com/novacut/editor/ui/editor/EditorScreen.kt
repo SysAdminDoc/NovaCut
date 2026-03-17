@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
+import android.util.Log
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.export.ExportSheet
@@ -116,6 +117,7 @@ fun EditorScreen(
                         "denoise" -> viewModel.runAiTool("denoise")
                         "remove_bg" -> viewModel.runAiTool("remove_bg")
                         "track_motion" -> viewModel.runAiTool("track_motion")
+                        else -> Log.w("EditorScreen", "Unknown action: $actionId")
                     }
                 }
             )
@@ -369,6 +371,7 @@ fun EditorScreen(
                         val clipId = state.selectedClipId ?: return@EffectAdjustmentPanel
                         viewModel.updateEffect(clipId, effect.id, params)
                     },
+                    onEffectDragStarted = viewModel::beginEffectAdjust,
                     onRemove = {
                         val clipId = state.selectedClipId ?: return@EffectAdjustmentPanel
                         viewModel.removeEffect(clipId, effect.id)

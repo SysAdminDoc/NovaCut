@@ -73,9 +73,17 @@ class ProjectListViewModel @Inject constructor(
 
     fun duplicateProject(project: Project) {
         val newId = UUID.randomUUID().toString()
+        val existingNames = allProjects.value.map { it.name }.toSet()
+        val baseName = project.name.replace("""\s*\(Copy\s*\d*\)\s*$""".toRegex(), "").trim()
+        var copyName = "$baseName (Copy)"
+        var counter = 2
+        while (copyName in existingNames) {
+            copyName = "$baseName (Copy $counter)"
+            counter++
+        }
         val newProject = project.copy(
             id = newId,
-            name = "${project.name} (Copy)",
+            name = copyName,
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )

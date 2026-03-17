@@ -70,25 +70,28 @@ fun TextEditorSheet(
         ) {
             Text("Text Overlay", color = Mocha.Text, fontSize = 16.sp)
             Row {
-                TextButton(onClick = {
-                    val overlay = TextOverlay(
-                        id = existingOverlay?.id ?: java.util.UUID.randomUUID().toString(),
-                        text = text,
-                        fontSize = fontSize,
-                        fontFamily = fontFamily,
-                        color = selectedColor,
-                        bold = bold,
-                        italic = italic,
-                        alignment = alignment,
-                        strokeWidth = strokeWidth,
-                        startTimeMs = existingOverlay?.startTimeMs ?: playheadMs,
-                        endTimeMs = (existingOverlay?.startTimeMs ?: playheadMs) + duration.toLong(),
-                        animationIn = animIn,
-                        animationOut = animOut
-                    )
-                    onSave(overlay)
-                }) {
-                    Text("Save", color = Mocha.Mauve)
+                TextButton(
+                    onClick = {
+                        val overlay = TextOverlay(
+                            id = existingOverlay?.id ?: java.util.UUID.randomUUID().toString(),
+                            text = text,
+                            fontSize = fontSize,
+                            fontFamily = fontFamily,
+                            color = selectedColor,
+                            bold = bold,
+                            italic = italic,
+                            alignment = alignment,
+                            strokeWidth = strokeWidth,
+                            startTimeMs = existingOverlay?.startTimeMs ?: playheadMs,
+                            endTimeMs = (existingOverlay?.startTimeMs ?: playheadMs) + duration.toLong(),
+                            animationIn = animIn,
+                            animationOut = animOut
+                        )
+                        onSave(overlay)
+                    },
+                    enabled = text.isNotBlank()
+                ) {
+                    Text("Save", color = if (text.isNotBlank()) Mocha.Mauve else Mocha.Surface1)
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))

@@ -21,19 +21,26 @@ class ProjectAutoSave @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val autoSaveDir = File(context.filesDir, "autosave").apply { mkdirs() }
     private var autoSaveJob: Job? = null
+    private var consecutiveFailures = 0
 
     fun startAutoSave(
         projectId: String,
         getState: () -> AutoSaveState
     ) {
         autoSaveJob?.cancel()
+        consecutiveFailures = 0
         autoSaveJob = scope.launch {
             while (isActive) {
                 delay(30_000)
                 try {
                     saveState(projectId, getState())
+                    consecutiveFailures = 0
                 } catch (e: Exception) {
-                    Log.e(TAG, "Auto-save failed for $projectId", e)
+                    consecutiveFailures++
+                    Log.e(TAG, "Auto-save failed for $projectId (attempt $consecutiveFailures)", e)
+                    if (consecutiveFailures >= 3) {
+                        Log.w(TAG, "Auto-save has failed $consecutiveFailures times in a row for $projectId")
+                    }
                 }
             }
         }
@@ -54,11 +61,18 @@ class ProjectAutoSave @Inject constructor(
     }
 
     fun loadRecoveryData(projectId: String): AutoSaveState? {
+        // Clean up stale temp file if present
+        val tempFile = File(autoSaveDir, "${projectId}.tmp")
+        if (tempFile.exists()) {
+            Log.w(TAG, "Cleaning up stale temp file for $projectId")
+            tempFile.delete()
+        }
         val file = getAutoSaveFile(projectId)
         if (!file.exists()) return null
         return try {
             AutoSaveState.deserialize(file.readText())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load recovery data for $projectId", e)
             null
         }
     }
@@ -76,7 +90,9 @@ class ProjectAutoSave @Inject constructor(
             json.put("timestamp", System.currentTimeMillis())
             val toFile = getAutoSaveFile(toProjectId)
             toFile.writeText(json.toString(2))
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to copy auto-save from $fromProjectId to $toProjectId", e)
+        }
     }
 
     fun stop() {
@@ -87,11 +103,17 @@ class ProjectAutoSave @Inject constructor(
     private fun saveState(projectId: String, state: AutoSaveState) {
         val file = getAutoSaveFile(projectId)
         val tempFile = File(autoSaveDir, "${projectId}.tmp")
-        tempFile.writeText(state.serialize())
-        // renameTo can fail on some filesystems — fallback to copy+delete
-        if (!tempFile.renameTo(file)) {
-            tempFile.copyTo(file, overwrite = true)
+        try {
+            tempFile.writeText(state.serialize())
+            // renameTo can fail on some filesystems — fallback to copy+delete
+            if (!tempFile.renameTo(file)) {
+                tempFile.copyTo(file, overwrite = true)
+                tempFile.delete()
+            }
+        } catch (e: Exception) {
+            // Clean up temp file on failure to prevent stale data
             tempFile.delete()
+            throw e
         }
     }
 

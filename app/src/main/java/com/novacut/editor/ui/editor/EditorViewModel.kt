@@ -419,6 +419,13 @@ class EditorViewModel @Inject constructor(
         val clipId = state.selectedClipId ?: return
         val playhead = state.playheadMs
 
+        // Validate split is possible before saving undo state
+        val canSplit = state.tracks.any { track ->
+            val clip = track.clips.firstOrNull { it.id == clipId }
+            clip != null && playhead > clip.timelineStartMs && playhead < clip.timelineEndMs
+        }
+        if (!canSplit) return
+
         saveUndoState("Split clip")
 
         _state.update { s ->
@@ -527,6 +534,10 @@ class EditorViewModel @Inject constructor(
             state.copy(tracks = tracks)
         }
         saveProject()
+    }
+
+    fun beginEffectAdjust() {
+        saveUndoState("Adjust effect")
     }
 
     fun updateEffect(clipId: String, effectId: String, params: Map<String, Float>) {

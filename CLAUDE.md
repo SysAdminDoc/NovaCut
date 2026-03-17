@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.13.0
+v0.14.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -143,6 +143,13 @@ v0.13.0
 - Centralized effect default parameters (EffectType.defaultParams companion)
 - SubMenuGrid scroll support for small screens
 - Accessibility content descriptions on interactive icons
+- Effect adjustment undo debounce (save once on drag start, not every tick)
+- Text editor blank text guard (Save disabled when empty)
+- Smart project duplicate naming (incremental "Copy N" suffix)
+- Auto-save consecutive failure tracking with Log.w after 3 failures
+- Unknown action dispatch logging (Log.w for debugging)
+- Timeline trim handle division-by-zero guard
+- Split validation before undo state (no-op splits don't pollute undo stack)
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -191,6 +198,13 @@ v0.13.0
 - **Centralized effect defaults** — `EffectType.defaultParams(type)` companion method in `Project.kt` replaces duplicate default maps in `EditorScreen.kt` and `ToolPanel.kt`. Single source of truth for all 40+ effect default parameters.
 - **AI tool cancellation** — `runAiTool()` stores `Job` reference in `aiJob` field. `cancelAiTool()` cancels the coroutine. `CancellationException` re-thrown after toast. AiToolsPanel processing indicator shows "Cancel" button.
 - **Accessibility content descriptions** — Added to ExportSheet (Share, Save to gallery, Retry, Export video), AudioPanel (Record voiceover), EditorScreen (Add media) icons.
+- **Effect adjustment undo debounce** — `EffectSlider` now has `onDragStarted` callback (like SpeedSlider). `beginEffectAdjust()` saves undo state once when slider drag begins, preventing undo spam during continuous adjustment. Threaded through `EffectAdjustmentPanel.onEffectDragStarted` → `EditorScreen` → `EditorViewModel.beginEffectAdjust()`.
+- **Split validation before undo** — `splitClipAtPlayhead()` now validates that the playhead is within the selected clip's bounds BEFORE saving undo state. Prevents polluting undo stack with no-op split attempts.
+- **Timeline trim guard** — Both left and right trim handle drag handlers now guard against `currentPixelsPerMs < 0.001f` to prevent division-by-zero at extreme zoom levels.
+- **Text editor blank guard** — TextEditorSheet Save button disabled when text is blank. Button color dims to indicate disabled state.
+- **Smart duplicate naming** — `ProjectListViewModel.duplicateProject()` strips existing `(Copy N)` suffix and increments: "Project (Copy)" → "Project (Copy 2)" → "Project (Copy 3)" to avoid cascading "(Copy) (Copy)" names.
+- **Action dispatch logging** — EditorScreen `onAction` when-block has `else` branch with `Log.w("EditorScreen", "Unknown action: $actionId")` for debugging unhandled action IDs.
+- **Auto-save failure tracking** — `ProjectAutoSave` tracks consecutive failures. After 3+ in a row, logs `Log.w` warning. Counter resets on success or `startAutoSave()`. Stale `.tmp` files cleaned up on `loadRecoveryData()`. `saveState()` ensures temp file cleanup on write failure. `copyAutoSave()` and `loadRecoveryData()` now log errors instead of silently swallowing.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

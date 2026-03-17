@@ -425,6 +425,7 @@ fun EffectsPanel(
 fun EffectAdjustmentPanel(
     effect: Effect,
     onUpdateParams: (Map<String, Float>) -> Unit,
+    onEffectDragStarted: () -> Unit = {},
     onRemove: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -457,157 +458,158 @@ fun EffectAdjustmentPanel(
         val defaults = EffectType.defaultParams(effect.type)
         fun param(key: String) = effect.params[key] ?: defaults[key] ?: 0f
 
+        val ds = onEffectDragStarted
         when (effect.type) {
             EffectType.BRIGHTNESS -> {
-                EffectSlider("Brightness", param("value"), -1f, 1f) {
+                EffectSlider("Brightness", param("value"), -1f, 1f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.CONTRAST -> {
-                EffectSlider("Contrast", param("value"), 0f, 3f) {
+                EffectSlider("Contrast", param("value"), 0f, 3f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.SATURATION -> {
-                EffectSlider("Saturation", param("value"), 0f, 3f) {
+                EffectSlider("Saturation", param("value"), 0f, 3f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.TEMPERATURE -> {
-                EffectSlider("Temperature", param("value"), -5f, 5f) {
+                EffectSlider("Temperature", param("value"), -5f, 5f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.EXPOSURE -> {
-                EffectSlider("Exposure", param("value"), -2f, 2f) {
+                EffectSlider("Exposure", param("value"), -2f, 2f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.VIGNETTE -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 1f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
-                EffectSlider("Radius", param("radius"), 0.1f, 1f) {
+                EffectSlider("Radius", param("radius"), 0.1f, 1f, ds) {
                     onUpdateParams(mapOf("radius" to it))
                 }
             }
             EffectType.GAUSSIAN_BLUR -> {
-                EffectSlider("Radius", param("radius"), 0f, 25f) {
+                EffectSlider("Radius", param("radius"), 0f, 25f, ds) {
                     onUpdateParams(mapOf("radius" to it))
                 }
             }
             EffectType.CHROMA_KEY -> {
-                EffectSlider("Similarity", param("similarity"), 0f, 1f) {
+                EffectSlider("Similarity", param("similarity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("similarity" to it))
                 }
-                EffectSlider("Smoothness", param("smoothness"), 0f, 0.5f) {
+                EffectSlider("Smoothness", param("smoothness"), 0f, 0.5f, ds) {
                     onUpdateParams(mapOf("smoothness" to it))
                 }
-                EffectSlider("Spill", param("spill"), 0f, 1f) {
+                EffectSlider("Spill", param("spill"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("spill" to it))
                 }
             }
             EffectType.FILM_GRAIN -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 0.5f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 0.5f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.SHARPEN -> {
-                EffectSlider("Strength", param("strength"), 0f, 2f) {
+                EffectSlider("Strength", param("strength"), 0f, 2f, ds) {
                     onUpdateParams(mapOf("strength" to it))
                 }
             }
             EffectType.GLITCH -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 1f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.PIXELATE -> {
-                EffectSlider("Size", param("size"), 2f, 50f) {
+                EffectSlider("Size", param("size"), 2f, 50f, ds) {
                     onUpdateParams(mapOf("size" to it))
                 }
             }
             EffectType.CHROMATIC_ABERRATION -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 2f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 2f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.CYBERPUNK, EffectType.NOIR, EffectType.VINTAGE, EffectType.COOL_TONE, EffectType.WARM_TONE -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 1f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.TILT_SHIFT -> {
-                EffectSlider("Blur", param("blur"), 0f, 0.05f) {
+                EffectSlider("Blur", param("blur"), 0f, 0.05f, ds) {
                     onUpdateParams(mapOf("blur" to it))
                 }
-                EffectSlider("Focus Y", param("focusY"), 0f, 1f) {
+                EffectSlider("Focus Y", param("focusY"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("focusY" to it))
                 }
-                EffectSlider("Width", param("width"), 0.01f, 0.5f) {
+                EffectSlider("Width", param("width"), 0.01f, 0.5f, ds) {
                     onUpdateParams(mapOf("width" to it))
                 }
             }
             EffectType.TINT -> {
-                EffectSlider("Tint", param("value"), -1f, 1f) {
+                EffectSlider("Tint", param("value"), -1f, 1f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.GAMMA -> {
-                EffectSlider("Gamma", param("value"), 0.2f, 3f) {
+                EffectSlider("Gamma", param("value"), 0.2f, 3f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.HIGHLIGHTS -> {
-                EffectSlider("Highlights", param("value"), -1f, 1f) {
+                EffectSlider("Highlights", param("value"), -1f, 1f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.SHADOWS -> {
-                EffectSlider("Shadows", param("value"), -1f, 1f) {
+                EffectSlider("Shadows", param("value"), -1f, 1f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.VIBRANCE -> {
-                EffectSlider("Vibrance", param("value"), -1f, 1f) {
+                EffectSlider("Vibrance", param("value"), -1f, 1f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
             EffectType.MOSAIC -> {
-                EffectSlider("Size", param("size"), 2f, 50f) {
+                EffectSlider("Size", param("size"), 2f, 50f, ds) {
                     onUpdateParams(mapOf("size" to it))
                 }
             }
             EffectType.RADIAL_BLUR -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 1f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.MOTION_BLUR -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 1f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.FISHEYE -> {
-                EffectSlider("Intensity", param("intensity"), 0f, 1f) {
+                EffectSlider("Intensity", param("intensity"), 0f, 1f, ds) {
                     onUpdateParams(mapOf("intensity" to it))
                 }
             }
             EffectType.WAVE -> {
-                EffectSlider("Amplitude", param("amplitude"), 0f, 0.1f) {
+                EffectSlider("Amplitude", param("amplitude"), 0f, 0.1f, ds) {
                     onUpdateParams(mapOf("amplitude" to it))
                 }
-                EffectSlider("Frequency", param("frequency"), 1f, 30f) {
+                EffectSlider("Frequency", param("frequency"), 1f, 30f, ds) {
                     onUpdateParams(mapOf("frequency" to it))
                 }
             }
             EffectType.POSTERIZE -> {
-                EffectSlider("Levels", param("levels"), 2f, 16f) {
+                EffectSlider("Levels", param("levels"), 2f, 16f, ds) {
                     onUpdateParams(mapOf("levels" to it))
                 }
             }
             EffectType.SPEED -> {
-                EffectSlider("Speed", param("value"), 0.1f, 16f) {
+                EffectSlider("Speed", param("value"), 0.1f, 16f, ds) {
                     onUpdateParams(mapOf("value" to it))
                 }
             }
@@ -624,8 +626,10 @@ fun EffectSlider(
     value: Float,
     min: Float,
     max: Float,
+    onDragStarted: () -> Unit = {},
     onValueChange: (Float) -> Unit
 ) {
+    var isDragging by remember { mutableStateOf(false) }
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -636,7 +640,14 @@ fun EffectSlider(
         }
         Slider(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = {
+                if (!isDragging) {
+                    isDragging = true
+                    onDragStarted()
+                }
+                onValueChange(it)
+            },
+            onValueChangeFinished = { isDragging = false },
             valueRange = min..max,
             colors = SliderDefaults.colors(
                 thumbColor = Mocha.Mauve,
