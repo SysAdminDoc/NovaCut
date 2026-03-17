@@ -24,15 +24,16 @@ android {
         create("release") {
             val props = Properties()
             val propsFile = rootProject.file("keystore.properties")
+            val bundledKs = rootProject.file("novacut-release.jks")
             if (propsFile.exists()) {
                 props.load(propsFile.inputStream())
                 storeFile = file(props["storeFile"] as String)
                 storePassword = props["storePassword"] as String
                 keyAlias = props["keyAlias"] as String
                 keyPassword = props["keyPassword"] as String
-            } else {
+            } else if (bundledKs.exists()) {
                 // Fallback: use bundled keystore for local builds
-                storeFile = rootProject.file("novacut-release.jks")
+                storeFile = bundledKs
                 storePassword = "novacut123"
                 keyAlias = "novacut"
                 keyPassword = "novacut123"
@@ -48,7 +49,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile?.exists() == true) {
+                releaseSigning
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

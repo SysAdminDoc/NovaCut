@@ -303,6 +303,7 @@ v0.31.0
 - **Back action dismisses panels** — "back" action in BottomToolArea now calls `dismissAllPanels()` before `selectClip(null)`. Prevents NPE from open panels referencing deselected clip.
 - **Export progress poll timeout** — Progress polling loop capped at 2400 iterations (10 minutes at 250ms intervals). On timeout, calls `transformer.cancel()`, sets ERROR state, and reports "Export timed out". Prevents infinite loop if Transformer hangs.
 
+- **Release signing CI fallback** — `build.gradle.kts` release signingConfig now falls back to debug signing when neither `keystore.properties` nor bundled `novacut-release.jks` exist (CI environment). Previously failed with "Keystore file not found" on GitHub Actions.
 - **Version string in strings.xml** — `app_version` resource must be updated alongside NovaCutApp.VERSION and build.gradle.kts versionName. Was stuck at v0.1.0 for 30 releases.
 - **Backup rules include freeze_frames and voiceovers** — Both directories live in `filesDir` and are now included in `backup_rules.xml` (legacy) and `data_extraction_rules.xml` (Android 12+). Without this, user recordings and freeze frames would be lost on device transfer.
 - **ProGuard keeps Room Converters** — Explicit `-keep class com.novacut.editor.engine.db.Converters { *; }` rule added. Without it, R8 could strip the class since it's only referenced by annotation, causing AspectRatio/Resolution TypeConverter crashes at runtime.
