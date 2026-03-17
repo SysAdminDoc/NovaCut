@@ -23,6 +23,14 @@ class VoiceoverRecorderEngine @Inject constructor(
     val isRecording: StateFlow<Boolean> = _isRecording
 
     fun startRecording(): File? {
+        // Release any existing recorder to prevent resource leak on double-start
+        if (recorder != null) {
+            try { recorder?.stop() } catch (_: Exception) { }
+            recorder?.release()
+            recorder = null
+            _isRecording.value = false
+        }
+
         val dir = File(context.filesDir, "voiceovers").also { it.mkdirs() }
         val file = File(dir, "voiceover_${System.currentTimeMillis()}.m4a")
         outputFile = file
