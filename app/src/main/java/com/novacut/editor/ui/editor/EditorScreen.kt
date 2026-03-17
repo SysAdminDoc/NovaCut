@@ -106,7 +106,7 @@ fun EditorScreen(
                         "effects_disabled" -> viewModel.showToast("Select a clip to use Effects")
                         "transition" -> viewModel.showTransitionPicker()
                         "aspect" -> viewModel.showCropPanel()
-                        "back" -> viewModel.selectClip(null)
+                        "back" -> { viewModel.dismissAllPanels(); viewModel.selectClip(null) }
                         "add_text" -> viewModel.showTextEditor()
                         "split" -> { viewModel.splitClipAtPlayhead(); viewModel.setTool(EditorTool.NONE) }
                         "trim" -> { viewModel.setTool(EditorTool.TRIM); viewModel.dismissAllPanels() }

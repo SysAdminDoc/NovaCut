@@ -456,13 +456,22 @@ class VideoEngine @Inject constructor(
                 transformer.start(composition, outputFile.absolutePath)
 
                 val holder = ProgressHolder()
-                while (_exportState.value == ExportState.EXPORTING) {
+                var pollCount = 0
+                val maxPolls = 2400 // 10 minutes at 250ms intervals
+                while (_exportState.value == ExportState.EXPORTING && pollCount++ < maxPolls) {
                     val state = transformer.getProgress(holder)
                     if (state == Transformer.PROGRESS_STATE_AVAILABLE) {
                         _exportProgress.value = holder.progress / 100f
                         onProgress(holder.progress / 100f)
                     }
                     delay(250)
+                }
+                if (pollCount >= maxPolls && _exportState.value == ExportState.EXPORTING) {
+                    Log.w(TAG, "Export progress polling timeout after 10 minutes")
+                    transformer.cancel()
+                    _exportState.value = ExportState.ERROR
+                    _exportProgress.value = 0f
+                    onError(Exception("Export timed out"))
                 }
                 activeTransformer = null
             }

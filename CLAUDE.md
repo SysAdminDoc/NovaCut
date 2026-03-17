@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.24.0
+v0.25.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -300,6 +300,8 @@ v0.24.0
 - **Waveform extraction on project recovery** — Auto-save restore now launches `extractWaveform()` for all recovered clips. Previously only new clips got waveforms; recovered projects showed placeholders.
 - **Text overlay animation export** — `ExportTextOverlay.getOverlaySettings()` now computes per-frame alpha, position offset, scale, and rotation based on `animationIn`/`animationOut` fields. 500ms animation duration. Typewriter handled in `getText()` via progressive character reveal. Bounce uses multi-segment ease-out. Animations compose: in + out can be different types.
 - **clip.isReversed not exported** — Known limitation. Media3 Transformer has no reverse playback support. Would require FFmpeg or custom frame-reversal pipeline. `isReversed` works in preview but not in export.
+- **Back action dismisses panels** — "back" action in BottomToolArea now calls `dismissAllPanels()` before `selectClip(null)`. Prevents NPE from open panels referencing deselected clip.
+- **Export progress poll timeout** — Progress polling loop capped at 2400 iterations (10 minutes at 250ms intervals). On timeout, calls `transformer.cancel()`, sets ERROR state, and reports "Export timed out". Prevents infinite loop if Transformer hangs.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
