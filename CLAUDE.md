@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.31.0
+v0.32.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -47,7 +47,7 @@ v0.31.0
   - `engine/ProjectAutoSave.kt` - Periodic auto-save with full JSON serialization/deserialization
   - `engine/AppModule.kt` - Hilt DI module (Room DB + DAO)
   - `engine/db/ProjectDatabase.kt` - Room database (v3) + ProjectDao + converters
-  - `effects/` - Removed (ShaderEffects.kt was dead code, all effects use RgbMatrix in VideoEngine)
+  - `engine/ShaderEffect.kt` - Custom GLSL shader framework (ShaderEffect/ShaderProgram/EffectShaders) for 14 visual effects + 25 transition shaders via BaseGlShaderProgram
   - `ai/AiFeatures.kt` - AI features (auto captions, bg removal, scene detect, motion track, auto color, stabilize, denoise)
   - `model/Project.kt` - All data models (Project, Track, Clip, Effect, Transition, Keyframe, etc.)
 
@@ -194,6 +194,8 @@ v0.31.0
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
+- Export 14 GLSL shader effects (vignette, sharpen, film grain, gaussian/radial/motion blur, tilt shift, mosaic, fisheye, glitch, pixelate, wave, chromatic aberration, chroma key)
+- Export 25 transition types via GLSL shaders (dissolve, fade black/white, wipe 4-way, slide 2-way, zoom in/out, spin, flip, cube, ripple, pixelate, directional warp, wind, morph, glitch, circle open, cross zoom, dreamy, heart, swirl)
 
 ## Gotchas
 - Media3 Transformer effects use `@UnstableApi` annotation - suppress with `@OptIn`
@@ -316,6 +318,13 @@ v0.31.0
 - **Text overlay time validation** — `addTextOverlay()` and `updateTextOverlay()` reject overlays where `startTimeMs >= endTimeMs` with toast feedback.
 - **Transition duration bounds on deserialization** — `deserializeTransition()` clamps `durationMs` to 100-2000ms range via `coerceIn()` to match UI slider bounds.
 - **Export state snapshot** — `startExport()` captures `tracks`, `textOverlays`, and `config` before launching coroutine, preventing race conditions where state changes between validation and export call.
+- **ShaderEffect.kt GLSL framework** — `ShaderEffect` implements `GlEffect`, wraps GLES 3.0 fragment shader + uniforms map. `ShaderProgram` extends `BaseGlShaderProgram`, creates VAO/VBO once in `configure()`, draws fullscreen quad per frame. Uses `androidx.media3.common.util.Size` (NOT `android.util.Size`).
+- **Media3 presentationTimeUs is 0-based** — In Transformer export with ClippingConfiguration, `presentationTimeUs` in effects starts from 0 for each clip (not the original media timestamp). Verified by working keyframe opacity and text overlay timing.
+- **Transition shaders use uTime for progress** — `uTime = presentationTimeUs / 1_000_000f` (seconds). Progress computed as `uTime * 1000000.0 / uDurationUs`. `uDurationUs = transition.durationMs * 1000f`. After transition duration, progress clamps to 1.0 (fully revealed, no visual change).
+- **Wipe shader direction normalization** — `FRAG_WIPE_IN` uses `pos = vTexCoord.x * uDirX + vTexCoord.y * uDirY` with lo/hi range normalization. The `1.04/-0.02` adjusted progress ensures clean black at progress=0 and full reveal at progress=1 (no soft-edge artifact at boundaries).
+- **Transition rendering order** — Transitions inserted after regular effects but before opacity/transform/speed/text/Presentation in the videoEffects chain. This means the transition reveals the fully-effected video.
+- **GLSL `float a, b` declaration** — Valid in GLSL ES 3.0. Used for `float cs = cos(angle), sn = sin(angle);` in spin/swirl shaders.
+- **Heart shape parametric formula** — Uses implicit equation `(x^2 + y^2 - 1)^3 - x^2*y^3 = 0` for clean heart mask in GLSL. Center offset at (0.5, 0.6) for aesthetic framing.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

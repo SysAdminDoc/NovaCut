@@ -260,6 +260,60 @@ class VideoEngine @Inject constructor(
                         if (!effect.enabled) continue
                         buildVideoEffect(effect)?.let { add(it) }
                     }
+                    // Transition-in effect (reveals clip at start)
+                    clip.transition?.let { transition ->
+                        val durationUs = transition.durationMs * 1000f
+                        add(when (transition.type) {
+                            TransitionType.DISSOLVE, TransitionType.FADE_BLACK ->
+                                EffectShaders.transitionFadeIn(durationUs)
+                            TransitionType.FADE_WHITE ->
+                                EffectShaders.transitionFadeIn(durationUs, fadeToWhite = true)
+                            TransitionType.WIPE_LEFT ->
+                                EffectShaders.transitionWipe(durationUs, -1f, 0f)
+                            TransitionType.WIPE_RIGHT ->
+                                EffectShaders.transitionWipe(durationUs, 1f, 0f)
+                            TransitionType.WIPE_UP ->
+                                EffectShaders.transitionWipe(durationUs, 0f, 1f)
+                            TransitionType.WIPE_DOWN ->
+                                EffectShaders.transitionWipe(durationUs, 0f, -1f)
+                            TransitionType.SLIDE_LEFT ->
+                                EffectShaders.transitionSlideIn(durationUs, 1f, 0f)
+                            TransitionType.SLIDE_RIGHT ->
+                                EffectShaders.transitionSlideIn(durationUs, -1f, 0f)
+                            TransitionType.ZOOM_IN ->
+                                EffectShaders.transitionZoomIn(durationUs)
+                            TransitionType.ZOOM_OUT ->
+                                EffectShaders.transitionZoomOut(durationUs)
+                            TransitionType.SPIN ->
+                                EffectShaders.transitionSpin(durationUs)
+                            TransitionType.FLIP ->
+                                EffectShaders.transitionFlip(durationUs)
+                            TransitionType.CUBE ->
+                                EffectShaders.transitionCube(durationUs)
+                            TransitionType.RIPPLE ->
+                                EffectShaders.transitionRipple(durationUs)
+                            TransitionType.PIXELATE ->
+                                EffectShaders.transitionPixelate(durationUs)
+                            TransitionType.DIRECTIONAL_WARP ->
+                                EffectShaders.transitionDirectionalWarp(durationUs)
+                            TransitionType.WIND ->
+                                EffectShaders.transitionWind(durationUs)
+                            TransitionType.MORPH ->
+                                EffectShaders.transitionMorph(durationUs)
+                            TransitionType.GLITCH ->
+                                EffectShaders.transitionGlitch(durationUs)
+                            TransitionType.CIRCLE_OPEN ->
+                                EffectShaders.transitionCircleOpen(durationUs)
+                            TransitionType.CROSS_ZOOM ->
+                                EffectShaders.transitionCrossZoom(durationUs)
+                            TransitionType.DREAMY ->
+                                EffectShaders.transitionDreamy(durationUs)
+                            TransitionType.HEART ->
+                                EffectShaders.transitionHeart(durationUs)
+                            TransitionType.SWIRL ->
+                                EffectShaders.transitionSwirl(durationUs)
+                        })
+                    }
                     // Apply static opacity (if no keyframe opacity overrides)
                     val hasKeyframeOpacity = clip.keyframes.any { it.property == KeyframeProperty.OPACITY }
                     if (hasKeyframeOpacity) {
@@ -733,12 +787,73 @@ class VideoEngine @Inject constructor(
                     .setScale(-1f, 1f)
                     .build()
             }
-            // Effects requiring custom GL shaders — not yet implementable with RgbMatrix
-            EffectType.VIGNETTE, EffectType.SHARPEN, EffectType.FILM_GRAIN,
-            EffectType.GAUSSIAN_BLUR, EffectType.RADIAL_BLUR, EffectType.MOTION_BLUR,
-            EffectType.TILT_SHIFT, EffectType.MOSAIC, EffectType.FISHEYE,
-            EffectType.GLITCH, EffectType.PIXELATE, EffectType.WAVE,
-            EffectType.CHROMATIC_ABERRATION, EffectType.CHROMA_KEY,
+            EffectType.VIGNETTE -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                val radius = (effect.params["radius"] ?: 0.7f).coerceIn(0f, 1f)
+                EffectShaders.vignette(intensity, radius)
+            }
+            EffectType.SHARPEN -> {
+                val strength = (effect.params["strength"] ?: 0.5f).coerceIn(0f, 3f)
+                EffectShaders.sharpen(strength)
+            }
+            EffectType.FILM_GRAIN -> {
+                val intensity = (effect.params["intensity"] ?: 0.1f).coerceIn(0f, 1f)
+                EffectShaders.filmGrain(intensity)
+            }
+            EffectType.GAUSSIAN_BLUR -> {
+                val radius = (effect.params["radius"] ?: 5f).coerceIn(1f, 25f)
+                EffectShaders.gaussianBlur(radius)
+            }
+            EffectType.RADIAL_BLUR -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                EffectShaders.radialBlur(intensity)
+            }
+            EffectType.MOTION_BLUR -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                val angle = (effect.params["angle"] ?: 0f).coerceIn(0f, 360f)
+                EffectShaders.motionBlur(intensity, angle)
+            }
+            EffectType.TILT_SHIFT -> {
+                val focusY = (effect.params["focusY"] ?: 0.5f).coerceIn(0f, 1f)
+                val width = (effect.params["width"] ?: 0.1f).coerceIn(0.01f, 0.5f)
+                val blur = (effect.params["blur"] ?: 0.01f).coerceIn(0f, 1f)
+                EffectShaders.tiltShift(focusY, width, blur)
+            }
+            EffectType.MOSAIC -> {
+                val size = (effect.params["size"] ?: 15f).coerceIn(2f, 50f)
+                EffectShaders.mosaic(size)
+            }
+            EffectType.FISHEYE -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                EffectShaders.fisheye(intensity)
+            }
+            EffectType.GLITCH -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                EffectShaders.glitch(intensity)
+            }
+            EffectType.PIXELATE -> {
+                val size = (effect.params["size"] ?: 10f).coerceIn(2f, 50f)
+                EffectShaders.pixelate(size)
+            }
+            EffectType.WAVE -> {
+                val amplitude = (effect.params["amplitude"] ?: 0.02f).coerceIn(0f, 0.1f)
+                val frequency = (effect.params["frequency"] ?: 10f).coerceIn(1f, 50f)
+                EffectShaders.wave(amplitude, frequency)
+            }
+            EffectType.CHROMATIC_ABERRATION -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 2f)
+                EffectShaders.chromaticAberration(intensity)
+            }
+            EffectType.CHROMA_KEY -> {
+                val similarity = (effect.params["similarity"] ?: 0.4f).coerceIn(0f, 1f)
+                val smoothness = (effect.params["smoothness"] ?: 0.1f).coerceIn(0f, 0.5f)
+                // Default to green screen (0, 1, 0)
+                val keyR = (effect.params["keyR"] ?: 0f).coerceIn(0f, 1f)
+                val keyG = (effect.params["keyG"] ?: 1f).coerceIn(0f, 1f)
+                val keyB = (effect.params["keyB"] ?: 0f).coerceIn(0f, 1f)
+                EffectShaders.chromaKey(keyR, keyG, keyB, similarity, smoothness)
+            }
+            // Speed/Reverse handled separately in export pipeline, not as visual effects
             EffectType.SPEED, EffectType.REVERSE -> null
         }
     }
