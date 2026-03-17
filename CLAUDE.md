@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.14.0
+v0.15.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -150,6 +150,11 @@ v0.14.0
 - Unknown action dispatch logging (Log.w for debugging)
 - Timeline trim handle division-by-zero guard
 - Split validation before undo state (no-op splits don't pollute undo stack)
+- Merge validation before undo state (same-source check before undo save)
+- Transition duration undo debounce (save once on drag start)
+- Waveform extraction error logging (Log.e on codec failure)
+- Atomic auto-save copy for project duplication
+- Fade envelope bounds guard for tiny clip durations
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -205,6 +210,11 @@ v0.14.0
 - **Smart duplicate naming** — `ProjectListViewModel.duplicateProject()` strips existing `(Copy N)` suffix and increments: "Project (Copy)" → "Project (Copy 2)" → "Project (Copy 3)" to avoid cascading "(Copy) (Copy)" names.
 - **Action dispatch logging** — EditorScreen `onAction` when-block has `else` branch with `Log.w("EditorScreen", "Unknown action: $actionId")` for debugging unhandled action IDs.
 - **Auto-save failure tracking** — `ProjectAutoSave` tracks consecutive failures. After 3+ in a row, logs `Log.w` warning. Counter resets on success or `startAutoSave()`. Stale `.tmp` files cleaned up on `loadRecoveryData()`. `saveState()` ensures temp file cleanup on write failure. `copyAutoSave()` and `loadRecoveryData()` now log errors instead of silently swallowing.
+- **Merge validation before undo** — `mergeWithNextClip()` now validates next-clip existence and same-source URI BEFORE saving undo state. Prevents undo stack pollution from failed merge attempts. Toasts shown for specific failure reasons.
+- **Transition duration undo debounce** — `beginTransitionDurationChange()` saves undo state once when slider drag starts. `TransitionPicker` slider has `onDurationDragStarted` callback with isDragging tracking (same pattern as EffectSlider and SpeedSlider).
+- **AudioEngine error logging** — `extractWaveform()` catch block now logs `Log.e(TAG, ...)` with exception details instead of silently returning empty array. TAG = "AudioEngine".
+- **Fade envelope bounds guard** — `drawFadeEnvelope()` now returns early for `durationMs <= 10` (previously `<= 0`), preventing extreme path coordinates from tiny clip durations.
+- **Atomic copyAutoSave** — `copyAutoSave()` now uses the same temp-file + rename pattern as `saveState()` to prevent partial writes on failure.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

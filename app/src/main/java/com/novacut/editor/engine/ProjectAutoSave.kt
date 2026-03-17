@@ -89,7 +89,17 @@ class ProjectAutoSave @Inject constructor(
             json.put("projectId", toProjectId)
             json.put("timestamp", System.currentTimeMillis())
             val toFile = getAutoSaveFile(toProjectId)
-            toFile.writeText(json.toString(2))
+            val tempFile = File(autoSaveDir, "${toProjectId}.tmp")
+            try {
+                tempFile.writeText(json.toString(2))
+                if (!tempFile.renameTo(toFile)) {
+                    tempFile.copyTo(toFile, overwrite = true)
+                    tempFile.delete()
+                }
+            } catch (e: Exception) {
+                tempFile.delete()
+                throw e
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to copy auto-save from $fromProjectId to $toProjectId", e)
         }

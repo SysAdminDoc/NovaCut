@@ -930,6 +930,7 @@ fun TransitionPicker(
     onTransitionSelected: (TransitionType) -> Unit,
     onRemoveTransition: () -> Unit,
     onDurationChanged: (Long) -> Unit,
+    onDurationDragStarted: () -> Unit = {},
     onClose: () -> Unit,
     currentTransition: Transition?,
     modifier: Modifier = Modifier
@@ -1004,9 +1005,17 @@ fun TransitionPicker(
                 Text("Duration", color = Mocha.Subtext1, fontSize = 12.sp)
                 Text("${currentTransition.durationMs}ms", color = Mocha.Subtext0, fontSize = 12.sp)
             }
+            var isDragging by remember { mutableStateOf(false) }
             Slider(
                 value = currentTransition.durationMs.toFloat(),
-                onValueChange = { onDurationChanged(it.toLong()) },
+                onValueChange = {
+                    if (!isDragging) {
+                        isDragging = true
+                        onDurationDragStarted()
+                    }
+                    onDurationChanged(it.toLong())
+                },
+                onValueChangeFinished = { isDragging = false },
                 valueRange = 100f..2000f,
                 steps = 18,
                 colors = SliderDefaults.colors(

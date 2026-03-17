@@ -11,9 +11,12 @@ import java.nio.ByteOrder
 import java.nio.ShortBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.util.Log
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+
+private const val TAG = "AudioEngine"
 
 /**
  * Audio processing engine for waveform extraction, mixing, and effects.
@@ -131,6 +134,7 @@ class AudioEngine @Inject constructor(
             }
             result
         } catch (e: Exception) {
+            Log.e(TAG, "Waveform extraction failed for $uri", e)
             FloatArray(sampleCount) { 0f }
         } finally {
             extractor.release()

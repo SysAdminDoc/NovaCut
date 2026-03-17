@@ -369,6 +369,27 @@ class EditorViewModel @Inject constructor(
     fun mergeWithNextClip() {
         val clipId = _state.value.selectedClipId ?: return
 
+        // Validate merge is possible before saving undo state
+        val state = _state.value
+        val trackAndClipInfo = state.tracks.flatMapIndexed { idx, track ->
+            track.clips.filter { it.id == clipId }.map { idx to it }
+        }.firstOrNull()
+        if (trackAndClipInfo == null) return
+        val (vTrackIdx, vClip) = trackAndClipInfo
+        val vTrack = state.tracks[vTrackIdx]
+        val vClipIndex = vTrack.clips.indexOfFirst { it.id == clipId }
+        if (vClipIndex >= vTrack.clips.size - 1) {
+            showToast("No next clip to merge")
+            return
+        }
+        val vNextClip = vTrack.clips[vClipIndex + 1]
+        if (vClip.sourceUri != vNextClip.sourceUri) {
+            showToast("Can only merge clips from the same source")
+            return
+        }
+
+        saveUndoState("Merge clips")
+
         _state.update { s ->
             val trackAndClip = s.tracks.flatMapIndexed { idx, track ->
                 track.clips.filter { it.id == clipId }.map { idx to it }
@@ -378,18 +399,9 @@ class EditorViewModel @Inject constructor(
             val track = s.tracks[trackIdx]
             val clipIndex = track.clips.indexOfFirst { it.id == clipId }
 
-            if (clipIndex >= track.clips.size - 1) {
-                // No next clip to merge with
-                return@update s.copy(toastMessage = "No next clip to merge")
-            }
-
-            saveUndoState("Merge clips")
+            if (clipIndex >= track.clips.size - 1) return@update s
             val nextClip = track.clips[clipIndex + 1]
-
-            // Only merge clips from the same source
-            if (clip.sourceUri != nextClip.sourceUri) {
-                return@update s.copy(toastMessage = "Can only merge clips from the same source")
-            }
+            if (clip.sourceUri != nextClip.sourceUri) return@update s
 
             val merged = clip.copy(
                 trimEndMs = nextClip.trimEndMs,
@@ -614,6 +626,10 @@ class EditorViewModel @Inject constructor(
             state.copy(tracks = tracks)
         }
         saveProject()
+    }
+
+    fun beginTransitionDurationChange() {
+        saveUndoState("Change transition duration")
     }
 
     fun setTransitionDuration(clipId: String, durationMs: Long) {

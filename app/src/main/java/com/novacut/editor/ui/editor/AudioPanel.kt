@@ -129,7 +129,7 @@ fun AudioPanel(
 }
 
 private fun DrawScope.drawFadeEnvelope(fadeInMs: Long, fadeOutMs: Long, durationMs: Long, color: Color) {
-    if (durationMs <= 0) return
+    if (durationMs <= 10) return // Guard against tiny durations causing extreme path values
     val path = Path()
     val w = size.width
     val h = size.height

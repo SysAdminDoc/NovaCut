@@ -203,6 +203,7 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@TransitionPicker
                     viewModel.setTransitionDuration(clipId, durationMs)
                 },
+                onDurationDragStarted = viewModel::beginTransitionDurationChange,
                 onClose = viewModel::hideTransitionPicker,
                 currentTransition = clip?.transition
             )
