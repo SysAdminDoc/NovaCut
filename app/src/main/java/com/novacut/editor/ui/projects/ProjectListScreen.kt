@@ -206,8 +206,7 @@ fun ProjectListScreen(
         // FAB
         FloatingActionButton(
             onClick = {
-                val id = viewModel.createProject()
-                onProjectSelected(id)
+                viewModel.createProject { id -> onProjectSelected(id) }
             },
             containerColor = Mocha.Mauve,
             contentColor = Mocha.Crust,

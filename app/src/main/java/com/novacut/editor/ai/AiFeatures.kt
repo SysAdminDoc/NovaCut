@@ -849,6 +849,7 @@ class AiFeatures @Inject constructor(
     ): Pair<Float, Float> {
         val w = min(prev.width, curr.width)
         val h = min(prev.height, curr.height)
+        if (w < 8 || h < 8) return 0f to 0f
         val searchRange = max(2, radius / 2)
 
         var bestDx = 0

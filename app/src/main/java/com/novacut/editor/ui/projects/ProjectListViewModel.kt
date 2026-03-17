@@ -50,12 +50,12 @@ class ProjectListViewModel @Inject constructor(
         _sortMode.value = mode
     }
 
-    fun createProject(name: String = "Untitled"): String {
+    fun createProject(name: String = "Untitled", onCreated: (String) -> Unit = {}) {
         val project = Project(name = name)
         viewModelScope.launch {
             projectDao.insertProject(project)
+            onCreated(project.id)
         }
-        return project.id
     }
 
     fun deleteProject(project: Project) {

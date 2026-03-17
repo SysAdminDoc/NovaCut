@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.28.0
+v0.29.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -303,6 +303,8 @@ v0.28.0
 - **Back action dismisses panels** — "back" action in BottomToolArea now calls `dismissAllPanels()` before `selectClip(null)`. Prevents NPE from open panels referencing deselected clip.
 - **Export progress poll timeout** — Progress polling loop capped at 2400 iterations (10 minutes at 250ms intervals). On timeout, calls `transformer.cancel()`, sets ERROR state, and reports "Export timed out". Prevents infinite loop if Transformer hangs.
 
+- **estimateRegionMotion divide-by-zero guard** — `estimateRegionMotion()` in AiFeatures.kt now returns `0f to 0f` when bitmap width or height < 8, matching the guard in `estimateMotion()`. Prevents ArithmeticException on malformed video frames during motion tracking.
+- **createProject race condition fixed** — `createProject()` now accepts an `onCreated` callback that fires after the Room insert completes, instead of returning the ID synchronously before the async insert. Prevents navigation to a non-existent project.
 - **Timeline waveform empty array guard** — `drawWaveform()` now returns early if `samples.isEmpty()` to prevent `coerceIn(0, -1)` IllegalArgumentException when AudioEngine returns empty FloatArray on decode failure.
 - **Gallery save null URI handling** — `saveToGallery()` now shows error toast and returns early when `ContentResolver.insert()` returns null (e.g., scoped storage rejection on API 30+). Previously silently fell through to "Saved to gallery" success toast.
 - **Auto-scroll pixelsPerMs guard** — Playhead sync loop guards `pixelsPerMs >= 0.001f` before computing `visibleMs` to prevent division-by-zero at very low zoom levels.

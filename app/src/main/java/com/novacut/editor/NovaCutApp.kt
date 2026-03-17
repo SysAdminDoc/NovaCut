@@ -10,7 +10,7 @@ class NovaCutApp : Application() {
 
     companion object {
         const val CHANNEL_EXPORT = "novacut_export"
-        const val VERSION = "v0.28.0"
+        const val VERSION = "v0.29.0"
     }
 
     override fun onCreate() {
