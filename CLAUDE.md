@@ -28,11 +28,11 @@ v0.7.0
   - `MainActivity.kt` - Single activity with NavHost (projects -> editor/{projectId})
   - `ui/projects/ProjectListScreen.kt` - Project gallery with search, sort, create/delete/duplicate/open
   - `ui/projects/ProjectListViewModel.kt` - Project list state management (search, sort, duplicate)
-  - `ui/editor/EditorScreen.kt` - Main editor composable (preview + timeline + tools)
+  - `ui/editor/EditorScreen.kt` - Main editor composable (EditorTopBar + preview + timeline + BottomToolArea) with onAction dispatch
   - `ui/editor/EditorViewModel.kt` - Editor state management (tracks, clips, effects, undo/redo)
   - `ui/editor/Timeline.kt` - Custom multi-track timeline with thumbnail strips + waveforms + trim handles
   - `ui/editor/PreviewPanel.kt` - ExoPlayer-based video preview with playback controls
-  - `ui/editor/ToolPanel.kt` - Tool strip + effects panel + speed panel + transitions
+  - `ui/editor/ToolPanel.kt` - PowerDirector-style BottomToolArea (two-mode tab bar + sub-menu grids) + effects/speed/transform/crop/transition panels
   - `ui/editor/TextEditorSheet.kt` - Text overlay editor with animations
   - `ui/editor/AudioPanel.kt` - Audio controls, waveform visualization, voiceover
   - `ui/editor/AiToolsPanel.kt` - AI tools UI (captions, bg removal, scene detect, smart crop)
@@ -78,6 +78,7 @@ v0.7.0
 - **Project search/sort** — `ProjectListViewModel` combines allProjects with searchQuery + sortMode flows. SortMode enum: DATE_DESC, DATE_ASC, NAME_ASC, NAME_DESC, DURATION_DESC.
 - **Project duplicate** — copies Room DB record + auto-save JSON file with fresh projectId and timestamp.
 - **Social media crop presets** — CropPanel redesigned with platform labels (YouTube/TV, TikTok/Reels, Instagram Square/Portrait, Classic, Cinematic). Added RATIO_4_5 to AspectRatio enum.
+- **PowerDirector-style layout** — EditorTopBar (Home/Undo/Redo/Delete/More/Export) + BottomToolArea with two-mode tab bar. Project mode: Edit/Audio/Text/Effects/AI/Aspect tabs. Clip mode: Back/Edit/Audio Tool/Speed/Transform/Effects/Transition/AI tabs. Tabs with sub-menus (Text, AI, clip-Edit) toggle SubMenuGrid overlays. Direct-action tabs dispatch via onAction string IDs to EditorScreen's when-block routing to ViewModel methods. Tab state resets on clip mode change via LaunchedEffect.
 
 ## Features Wired & Working
 - Project gallery (create, open, delete, swipe-to-delete with confirm)
@@ -95,7 +96,8 @@ v0.7.0
 - Effects panel with add -> adjust flow (EffectsPanel -> EffectAdjustmentPanel)
 - Transform panel: position X/Y, scale X/Y, rotation, opacity sliders with reset
 - Crop panel: social media presets (YouTube/TV 16:9, TikTok/Reels 9:16, Instagram Square 1:1, Instagram Portrait 4:5, Classic 4:3, Portrait Classic 3:4, Cinematic 21:9) — project-level, no clip selection required
-- Disabled tool feedback: "Select a clip to use X" toast when tapping tools without selection
+- PowerDirector-style UI: compact top bar + two-mode bottom tab bar with contextual sub-menu grids
+- Disabled tool feedback: "Select a clip to use Effects" toast when tapping Effects without selection
 - Duplicate clip (inserts copy after selected clip)
 - Copy/Paste effects between clips
 - Freeze frame (extract frame at playhead, insert as 2s still image)
@@ -134,6 +136,7 @@ v0.7.0
 - AI scene detection splits clips in reverse-order (sortedByDescending) to prevent timeline position shifts from invalidating subsequent split points
 - TRIM and SPLIT tools must call `dismissAllPanels()` — they bypass the boolean-panel pattern since they don't have their own panels
 - Speed panel visibility driven by `currentTool == EditorTool.SPEED` (not a boolean flag like other panels), so it self-dismisses on tool change
+- BottomToolArea manages `activeTabId` internally — sub-menu visibility is derived from activeTabId + isClipMode, not stored in ViewModel. LaunchedEffect resets activeTabId when isClipMode changes.
 
 ## Next Steps
 - Integrate Whisper ONNX for real auto captions (currently placeholder frame-based detection)

@@ -8,6 +8,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,210 +26,280 @@ import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
 
-data class ToolItem(
-    val tool: EditorTool,
-    val icon: ImageVector,
-    val label: String,
-    val requiresSelection: Boolean = false
+// --- Tab & sub-menu data ---
+
+data class TabItem(val id: String, val icon: ImageVector, val label: String)
+data class SubMenuItem(val id: String, val icon: ImageVector, val label: String)
+
+// Project mode tabs (no clip selected)
+val projectTabs = listOf(
+    TabItem("edit", Icons.Default.Edit, "Edit"),
+    TabItem("audio", Icons.Default.MusicNote, "Audio"),
+    TabItem("text", Icons.Default.Title, "Text"),
+    TabItem("effects", Icons.Default.AutoFixHigh, "Effects"),
+    TabItem("ai", Icons.Default.AutoAwesome, "AI Magic"),
+    TabItem("aspect", Icons.Default.AspectRatio, "Aspect\nRatio")
 )
 
-val mainTools = listOf(
-    ToolItem(EditorTool.TRIM, Icons.Default.ContentCut, "Trim", true),
-    ToolItem(EditorTool.SPLIT, Icons.Default.CallSplit, "Split", true),
-    ToolItem(EditorTool.SPEED, Icons.Default.Speed, "Speed", true),
-    ToolItem(EditorTool.EFFECTS, Icons.Default.AutoFixHigh, "Effects", true),
-    ToolItem(EditorTool.TEXT, Icons.Default.Title, "Text"),
-    ToolItem(EditorTool.AUDIO, Icons.Default.MusicNote, "Audio", true),
-    ToolItem(EditorTool.TRANSITION, Icons.Default.SwapHoriz, "Transition", true),
-    ToolItem(EditorTool.TRANSFORM, Icons.Default.Transform, "Transform", true),
-    ToolItem(EditorTool.CROP, Icons.Default.Crop, "Crop"),
-    ToolItem(EditorTool.AI, Icons.Default.AutoAwesome, "AI"),
-    ToolItem(EditorTool.FREEZE_FRAME, Icons.Default.AcUnit, "Freeze", true),
-    ToolItem(EditorTool.EXPORT, Icons.Default.FileUpload, "Export")
+// Clip mode tabs (clip selected)
+val clipTabs = listOf(
+    TabItem("back", Icons.AutoMirrored.Filled.ArrowBack, ""),
+    TabItem("edit", Icons.Default.Edit, "Edit"),
+    TabItem("audio", Icons.Default.MusicNote, "Audio Tool"),
+    TabItem("speed", Icons.Default.Speed, "Speed"),
+    TabItem("transform", Icons.Default.Transform, "Transform"),
+    TabItem("effects", Icons.Default.AutoFixHigh, "Effects"),
+    TabItem("transition", Icons.Default.SwapHoriz, "Transition"),
+    TabItem("ai", Icons.Default.AutoAwesome, "AI Magic")
 )
+
+// Project mode — Text tab sub-menu
+private val textSubMenu = listOf(
+    SubMenuItem("add_text", Icons.Default.Title, "Add Text"),
+    SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions")
+)
+
+// Project mode — AI Magic tab sub-menu
+private val projectAiSubMenu = listOf(
+    SubMenuItem("scene_detect", Icons.Default.ContentCut, "Scene\nDetect"),
+    SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions"),
+    SubMenuItem("smart_crop", Icons.Default.Crop, "Smart\nCrop"),
+    SubMenuItem("auto_color", Icons.Default.Palette, "Auto\nColor"),
+    SubMenuItem("stabilize", Icons.Default.Straighten, "Stabilize"),
+    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise\nAudio")
+)
+
+// Clip mode — Edit tab sub-menu
+private val clipEditSubMenu = listOf(
+    SubMenuItem("split", Icons.AutoMirrored.Filled.CallSplit, "Split"),
+    SubMenuItem("trim", Icons.Default.ContentCut, "Trim"),
+    SubMenuItem("duplicate", Icons.Default.ContentCopy, "Duplicate"),
+    SubMenuItem("freeze", Icons.Default.AcUnit, "Freeze\nFrame"),
+    SubMenuItem("copy_fx", Icons.Default.FileCopy, "Copy\nEffects"),
+    SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects")
+)
+
+// Clip mode — AI Magic tab sub-menu
+private val clipAiSubMenu = listOf(
+    SubMenuItem("scene_detect", Icons.Default.ContentCut, "Scene\nDetect"),
+    SubMenuItem("remove_bg", Icons.Default.Wallpaper, "Remove\nBG"),
+    SubMenuItem("track_motion", Icons.Default.GpsFixed, "Track\nMotion"),
+    SubMenuItem("smart_crop", Icons.Default.Crop, "Smart\nCrop"),
+    SubMenuItem("stabilize", Icons.Default.Straighten, "Stabilize"),
+    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise\nAudio")
+)
+
+// --- Bottom tool area (tab bar + contextual sub-menu grids) ---
 
 @Composable
-fun ToolPanel(
-    currentTool: EditorTool,
+fun BottomToolArea(
     selectedClipId: String?,
-    onToolSelected: (EditorTool) -> Unit,
-    onDisabledToolTap: (String) -> Unit,
-    onAddMedia: () -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onDelete: () -> Unit,
-    onDuplicate: () -> Unit = {},
-    onCopyEffects: () -> Unit = {},
-    onPasteEffects: () -> Unit = {},
-    hasCopiedEffects: Boolean = false,
-    canUndo: Boolean,
-    canRedo: Boolean,
+    hasCopiedEffects: Boolean,
+    onAction: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Mocha.Crust)
-    ) {
-        // Top action bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    val isClipMode = selectedClipId != null
+    val tabs = if (isClipMode) clipTabs else projectTabs
+    var activeTabId by remember { mutableStateOf<String?>(null) }
+
+    // Reset active tab when switching between project/clip mode
+    LaunchedEffect(isClipMode) {
+        activeTabId = null
+    }
+
+    // Resolve sub-menu for the currently active tab
+    val subMenuItems: List<SubMenuItem>? = when {
+        !isClipMode && activeTabId == "text" -> textSubMenu
+        !isClipMode && activeTabId == "ai" -> projectAiSubMenu
+        isClipMode && activeTabId == "edit" -> clipEditSubMenu
+        isClipMode && activeTabId == "ai" -> clipAiSubMenu
+        else -> null
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Sub-menu grid (slides up above tab bar)
+        AnimatedVisibility(
+            visible = subMenuItems != null,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
-            // Undo/Redo
-            Row {
-                IconButton(
-                    onClick = onUndo,
-                    enabled = canUndo,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Undo,
-                        contentDescription = "Undo",
-                        tint = if (canUndo) Mocha.Text else Mocha.Surface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onRedo,
-                    enabled = canRedo,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Redo,
-                        contentDescription = "Redo",
-                        tint = if (canRedo) Mocha.Text else Mocha.Surface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // Add media button
-            FilledTonalButton(
-                onClick = onAddMedia,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = Mocha.Mauve.copy(alpha = 0.2f),
-                    contentColor = Mocha.Mauve
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+            subMenuItems?.let { items ->
+                SubMenuGrid(
+                    items = items,
+                    onItemSelected = { itemId ->
+                        onAction(itemId)
+                        activeTabId = null
+                    }
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Add", fontSize = 13.sp)
-            }
-
-            Row {
-                // Duplicate clip
-                IconButton(
-                    onClick = onDuplicate,
-                    enabled = selectedClipId != null,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = "Duplicate",
-                        tint = if (selectedClipId != null) Mocha.Text else Mocha.Surface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                // Copy effects
-                IconButton(
-                    onClick = onCopyEffects,
-                    enabled = selectedClipId != null,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.CopyAll,
-                        contentDescription = "Copy Effects",
-                        tint = if (selectedClipId != null) Mocha.Text else Mocha.Surface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                // Paste effects
-                IconButton(
-                    onClick = onPasteEffects,
-                    enabled = selectedClipId != null && hasCopiedEffects,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ContentPaste,
-                        contentDescription = "Paste Effects",
-                        tint = if (selectedClipId != null && hasCopiedEffects) Mocha.Peach else Mocha.Surface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                // Delete selected
-                IconButton(
-                    onClick = onDelete,
-                    enabled = selectedClipId != null,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = if (selectedClipId != null) Mocha.Red else Mocha.Surface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
             }
         }
 
-        // Tool strip
+        // Tab bar
+        BottomTabBar(
+            tabs = tabs,
+            activeTabId = activeTabId,
+            onTabTapped = { tabId ->
+                when (tabId) {
+                    "back" -> {
+                        activeTabId = null
+                        onAction("back")
+                    }
+                    "edit" -> {
+                        if (isClipMode) {
+                            activeTabId = if (activeTabId == "edit") null else "edit"
+                        } else {
+                            activeTabId = null
+                            onAction("edit")
+                        }
+                    }
+                    "audio" -> {
+                        activeTabId = null
+                        onAction(if (isClipMode) "audio_tool" else "audio_add")
+                    }
+                    "text" -> {
+                        if (!isClipMode) {
+                            activeTabId = if (activeTabId == "text") null else "text"
+                        }
+                    }
+                    "speed" -> {
+                        activeTabId = null
+                        onAction("speed")
+                    }
+                    "transform" -> {
+                        activeTabId = null
+                        onAction("transform")
+                    }
+                    "effects" -> {
+                        activeTabId = null
+                        onAction(if (isClipMode) "effects" else "effects_disabled")
+                    }
+                    "transition" -> {
+                        activeTabId = null
+                        onAction("transition")
+                    }
+                    "ai" -> {
+                        activeTabId = if (activeTabId == "ai") null else "ai"
+                    }
+                    "aspect" -> {
+                        activeTabId = null
+                        onAction("aspect")
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BottomTabBar(
+    tabs: List<TabItem>,
+    activeTabId: String?,
+    onTabTapped: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = Mocha.Crust,
+        modifier = modifier.fillMaxWidth()
+    ) {
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp)
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
         ) {
-            items(mainTools) { tool ->
-                val isActive = currentTool == tool.tool
-                val isEnabled = !tool.requiresSelection || selectedClipId != null
+            items(tabs, key = { it.id }) { tab ->
+                val isActive = activeTabId == tab.id
+                val isBack = tab.id == "back"
 
                 Column(
                     modifier = Modifier
+                        .width(64.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            if (isEnabled) onToolSelected(tool.tool)
-                            else onDisabledToolTap(tool.label)
-                        }
+                        .clickable { onTabTapped(tab.id) }
                         .background(
-                            if (isActive) Mocha.Mauve.copy(alpha = 0.2f)
+                            if (isActive && !isBack) Mocha.Mauve.copy(alpha = 0.2f)
                             else Color.Transparent
                         )
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
-                        tool.icon,
-                        contentDescription = tool.label,
-                        tint = when {
-                            isActive -> Mocha.Mauve
-                            !isEnabled -> Mocha.Surface2
-                            else -> Mocha.Subtext0
-                        },
-                        modifier = Modifier.size(22.dp)
+                        tab.icon,
+                        contentDescription = tab.label.ifEmpty { tab.id },
+                        tint = if (isActive && !isBack) Mocha.Mauve else Mocha.Subtext0,
+                        modifier = Modifier.size(24.dp)
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = tool.label,
-                        fontSize = 10.sp,
-                        color = when {
-                            isActive -> Mocha.Mauve
-                            !isEnabled -> Mocha.Surface2
-                            else -> Mocha.Subtext0
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    if (tab.label.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = tab.label,
+                            fontSize = 10.sp,
+                            color = if (isActive) Mocha.Mauve else Mocha.Subtext0,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 12.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubMenuGrid(
+    items: List<SubMenuItem>,
+    onItemSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val itemsPerRow = 5
+    val rows = items.chunked(itemsPerRow)
+
+    Surface(
+        color = Mocha.Mantle,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
+        ) {
+            rows.forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    rowItems.forEach { item ->
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onItemSelected(item.id) }
+                                .padding(8.dp)
+                                .width(56.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                item.icon,
+                                contentDescription = item.label,
+                                tint = Mocha.Text,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = item.label,
+                                fontSize = 10.sp,
+                                color = Mocha.Subtext0,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                lineHeight = 12.sp
+                            )
+                        }
+                    }
+                    // Fill empty slots so items don't stretch
+                    repeat(itemsPerRow - rowItems.size) {
+                        Spacer(modifier = Modifier.width(72.dp))
+                    }
                 }
             }
         }

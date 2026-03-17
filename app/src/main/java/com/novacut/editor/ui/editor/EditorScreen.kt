@@ -4,6 +4,10 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +36,20 @@ fun EditorScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Mocha.Base)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Preview panel (top)
+            // Top bar (Home / Undo / Redo / Delete / More / Export)
+            EditorTopBar(
+                onBack = onBack,
+                onUndo = viewModel::undo,
+                onRedo = viewModel::redo,
+                canUndo = state.undoStack.isNotEmpty(),
+                canRedo = state.redoStack.isNotEmpty(),
+                selectedClipId = state.selectedClipId,
+                onDelete = viewModel::deleteSelectedClip,
+                onAddMedia = viewModel::showMediaPicker,
+                onExport = viewModel::showExportSheet
+            )
+
+            // Preview panel
             PreviewPanel(
                 engine = viewModel.engine,
                 playheadMs = state.playheadMs,
@@ -40,10 +57,10 @@ fun EditorScreen(
                 isPlaying = state.isPlaying,
                 onTogglePlayback = viewModel::togglePlayback,
                 onSeek = viewModel::seekTo,
-                modifier = Modifier.weight(0.4f)
+                modifier = Modifier.weight(0.45f)
             )
 
-            // Timeline (middle)
+            // Timeline
             Timeline(
                 tracks = state.tracks,
                 playheadMs = state.playheadMs,
@@ -59,53 +76,42 @@ fun EditorScreen(
                 onTrimChanged = viewModel::trimClip,
                 onTrimDragStarted = viewModel::beginTrim,
                 engine = viewModel.engine,
-                modifier = Modifier.weight(0.35f)
+                modifier = Modifier.weight(0.55f)
             )
 
-            // Tool panel (bottom)
-            ToolPanel(
-                currentTool = state.currentTool,
+            // Bottom tool area (PowerDirector-style tab bar + sub-menu grids)
+            BottomToolArea(
                 selectedClipId = state.selectedClipId,
-                onToolSelected = { tool ->
-                    viewModel.setTool(tool)
-                    when (tool) {
-                        EditorTool.EFFECTS -> viewModel.showEffectsPanel()
-                        EditorTool.TEXT -> viewModel.showTextEditor()
-                        EditorTool.TRANSITION -> viewModel.showTransitionPicker()
-                        EditorTool.EXPORT -> viewModel.showExportSheet()
-                        EditorTool.AUDIO -> viewModel.showAudioPanel()
-                        EditorTool.TRANSFORM -> viewModel.showTransformPanel()
-                        EditorTool.CROP -> viewModel.showCropPanel()
-                        EditorTool.AI -> viewModel.showAiToolsPanel()
-                        EditorTool.SPEED -> viewModel.dismissAllPanels()
-                        EditorTool.SPLIT -> {
-                            viewModel.dismissAllPanels()
-                            viewModel.splitClipAtPlayhead()
-                            viewModel.setTool(EditorTool.NONE)
-                        }
-                        EditorTool.TRIM -> viewModel.dismissAllPanels()
-                        EditorTool.FREEZE_FRAME -> {
-                            viewModel.dismissAllPanels()
-                            viewModel.insertFreezeFrame()
-                            viewModel.setTool(EditorTool.NONE)
-                        }
-                        else -> {}
-                    }
-                },
-                onDisabledToolTap = { label ->
-                    viewModel.showToast("Select a clip to use $label")
-                },
-                onAddMedia = viewModel::showMediaPicker,
-                onUndo = viewModel::undo,
-                onRedo = viewModel::redo,
-                onDelete = viewModel::deleteSelectedClip,
-                onDuplicate = viewModel::duplicateSelectedClip,
-                onCopyEffects = viewModel::copyEffects,
-                onPasteEffects = viewModel::pasteEffects,
                 hasCopiedEffects = state.copiedEffects.isNotEmpty(),
-                canUndo = state.undoStack.isNotEmpty(),
-                canRedo = state.redoStack.isNotEmpty(),
-                modifier = Modifier.weight(0.25f)
+                onAction = { actionId ->
+                    when (actionId) {
+                        "edit" -> viewModel.showMediaPicker()
+                        "audio_add" -> viewModel.showMediaPicker()
+                        "audio_tool" -> viewModel.showAudioPanel()
+                        "speed" -> { viewModel.setTool(EditorTool.SPEED); viewModel.dismissAllPanels() }
+                        "transform" -> viewModel.showTransformPanel()
+                        "effects" -> viewModel.showEffectsPanel()
+                        "effects_disabled" -> viewModel.showToast("Select a clip to use Effects")
+                        "transition" -> viewModel.showTransitionPicker()
+                        "aspect" -> viewModel.showCropPanel()
+                        "back" -> viewModel.selectClip(null)
+                        "add_text" -> viewModel.showTextEditor()
+                        "split" -> { viewModel.splitClipAtPlayhead(); viewModel.setTool(EditorTool.NONE) }
+                        "trim" -> { viewModel.setTool(EditorTool.TRIM); viewModel.dismissAllPanels() }
+                        "duplicate" -> viewModel.duplicateSelectedClip()
+                        "freeze" -> { viewModel.insertFreezeFrame(); viewModel.setTool(EditorTool.NONE) }
+                        "copy_fx" -> viewModel.copyEffects()
+                        "paste_fx" -> viewModel.pasteEffects()
+                        "auto_captions" -> viewModel.runAiTool("auto_captions")
+                        "scene_detect" -> viewModel.runAiTool("scene_detect")
+                        "smart_crop" -> viewModel.runAiTool("smart_crop")
+                        "auto_color" -> viewModel.runAiTool("auto_color")
+                        "stabilize" -> viewModel.runAiTool("stabilize")
+                        "denoise" -> viewModel.runAiTool("denoise")
+                        "remove_bg" -> viewModel.runAiTool("remove_bg")
+                        "track_motion" -> viewModel.runAiTool("track_motion")
+                    }
+                }
             )
         }
 
@@ -355,6 +361,130 @@ fun EditorScreen(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(message, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditorTopBar(
+    onBack: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    selectedClipId: String?,
+    onDelete: () -> Unit,
+    onAddMedia: () -> Unit,
+    onExport: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showOverflow by remember { mutableStateOf(false) }
+
+    Surface(
+        color = Mocha.Crust,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Home,
+                    contentDescription = "Home",
+                    tint = Mocha.Text,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            IconButton(
+                onClick = onUndo,
+                enabled = canUndo,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Undo,
+                    contentDescription = "Undo",
+                    tint = if (canUndo) Mocha.Text else Mocha.Surface2,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            IconButton(
+                onClick = onRedo,
+                enabled = canRedo,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Redo,
+                    contentDescription = "Redo",
+                    tint = if (canRedo) Mocha.Text else Mocha.Surface2,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (selectedClipId != null) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Mocha.Red,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Box {
+                IconButton(
+                    onClick = { showOverflow = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "More",
+                        tint = Mocha.Text,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = showOverflow,
+                    onDismissRequest = { showOverflow = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Add Media") },
+                        onClick = {
+                            showOverflow = false
+                            onAddMedia()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                        }
+                    )
+                }
+            }
+
+            Button(
+                onClick = onExport,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Mocha.Mauve,
+                    contentColor = Mocha.Crust
+                ),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text("Export", fontSize = 13.sp)
             }
         }
     }
