@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.16.0
+v0.17.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -160,6 +160,10 @@ v0.16.0
 - Split minimum duration validation (100ms minimum per half, toast feedback)
 - Delete/duplicate undo pre-validation (confirm clip exists before saving undo state)
 - Deserialization failure logging (Log.w on corrupt clips/effects/keyframes/overlays)
+- Fade undo debounce (save once on drag start for fade in/out sliders)
+- Fade bounds coercion (fadeIn + fadeOut cannot exceed clip duration)
+- Share intent toast feedback (user-visible errors for missing export or deleted file)
+- Export progress reset on error (0f on both Transformer.Listener.onError and catch block)
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -225,6 +229,10 @@ v0.16.0
 - **Split minimum duration** — `splitClipAtPlayhead()` validates both resulting halves are >= 100ms in source time before proceeding. Shows "Clip too short to split here" toast on failure.
 - **Delete/duplicate undo pre-validation** — Both `deleteSelectedClip()` and `duplicateSelectedClip()` now verify clip existence in tracks before calling `saveUndoState()`. Same pattern as merge/split validation.
 - **Deserialization failure logging** — All `mapNotNull` catch blocks in `ProjectAutoSave` deserialization now log `Log.w(TAG, ...)` with index and exception. Covers clips, effects, keyframes, and text overlays.
+- **Fade undo debounce** — `beginFadeAdjust()` saves undo state once on drag start for fade in/out sliders. Uses same `onDragStarted` callback pattern as volume/speed/effect sliders. Wired through `AudioPanel.onFadeDragStarted` → `EditorViewModel.beginFadeAdjust()`.
+- **Fade bounds coercion** — `setClipFadeIn()` constrains fadeInMs to `0..(durationMs - fadeOutMs)`. `setClipFadeOut()` constrains fadeOutMs to `0..(durationMs - fadeInMs)`. Prevents fade overlap exceeding clip duration.
+- **Share intent toast feedback** — `getShareIntent()` now shows toast before returning null: "No exported video to share" for missing path, "Export file no longer available" for deleted file.
+- **Export progress reset on error** — Both error paths in VideoEngine (Transformer.Listener.onError and outer catch) now reset `_exportProgress.value = 0f` alongside setting ERROR state. Ensures retry shows fresh progress bar.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

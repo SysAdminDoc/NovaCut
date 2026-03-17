@@ -288,6 +288,7 @@ class VideoEngine @Inject constructor(
                     ) {
                         Log.e(TAG, "Export failed", exportException)
                         _exportState.value = ExportState.ERROR
+                        _exportProgress.value = 0f
                         onError(exportException)
                     }
                 }
@@ -308,6 +309,7 @@ class VideoEngine @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Export setup failed", e)
             _exportState.value = ExportState.ERROR
+            _exportProgress.value = 0f
             onError(e)
         }
     }

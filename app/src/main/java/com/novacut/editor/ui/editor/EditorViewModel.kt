@@ -900,12 +900,18 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun beginFadeAdjust() {
+        saveUndoState("Adjust fade")
+    }
+
     fun setClipFadeIn(clipId: String, fadeInMs: Long) {
         _state.update { state ->
             val tracks = state.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
-                    if (clip.id == clipId) clip.copy(fadeInMs = fadeInMs.coerceAtLeast(0L))
-                    else clip
+                    if (clip.id == clipId) {
+                        val maxFade = (clip.durationMs - clip.fadeOutMs).coerceAtLeast(0L)
+                        clip.copy(fadeInMs = fadeInMs.coerceIn(0L, maxFade))
+                    } else clip
                 })
             }
             state.copy(tracks = tracks)
@@ -916,8 +922,10 @@ class EditorViewModel @Inject constructor(
         _state.update { state ->
             val tracks = state.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
-                    if (clip.id == clipId) clip.copy(fadeOutMs = fadeOutMs.coerceAtLeast(0L))
-                    else clip
+                    if (clip.id == clipId) {
+                        val maxFade = (clip.durationMs - clip.fadeInMs).coerceAtLeast(0L)
+                        clip.copy(fadeOutMs = fadeOutMs.coerceIn(0L, maxFade))
+                    } else clip
                 })
             }
             state.copy(tracks = tracks)
@@ -972,9 +980,15 @@ class EditorViewModel @Inject constructor(
     }
 
     fun getShareIntent(): Intent? {
-        val filePath = _state.value.lastExportedFilePath ?: return null
+        val filePath = _state.value.lastExportedFilePath ?: run {
+            showToast("No exported video to share")
+            return null
+        }
         val file = File(filePath)
-        if (!file.exists()) return null
+        if (!file.exists()) {
+            showToast("Export file no longer available")
+            return null
+        }
         val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", file)
         return Intent(Intent.ACTION_SEND).apply {
             type = "video/*"

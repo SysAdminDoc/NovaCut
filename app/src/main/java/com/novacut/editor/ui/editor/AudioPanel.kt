@@ -29,6 +29,7 @@ fun AudioPanel(
     onVolumeDragStarted: () -> Unit = {},
     onFadeInChanged: (Long) -> Unit,
     onFadeOutChanged: (Long) -> Unit,
+    onFadeDragStarted: () -> Unit = {},
     onStartVoiceover: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -103,12 +104,12 @@ fun AudioPanel(
         }
 
         // Fade In
-        EffectSlider("Fade In (ms)", (clip?.fadeInMs ?: 0L).toFloat(), 0f, 5000f) {
+        EffectSlider("Fade In (ms)", (clip?.fadeInMs ?: 0L).toFloat(), 0f, 5000f, onFadeDragStarted) {
             onFadeInChanged(it.toLong())
         }
 
         // Fade Out
-        EffectSlider("Fade Out (ms)", (clip?.fadeOutMs ?: 0L).toFloat(), 0f, 5000f) {
+        EffectSlider("Fade Out (ms)", (clip?.fadeOutMs ?: 0L).toFloat(), 0f, 5000f, onFadeDragStarted) {
             onFadeOutChanged(it.toLong())
         }
 

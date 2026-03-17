@@ -280,6 +280,7 @@ fun EditorScreen(
                     val clipId = state.selectedClipId ?: return@AudioPanel
                     viewModel.setClipFadeOut(clipId, fadeMs)
                 },
+                onFadeDragStarted = viewModel::beginFadeAdjust,
                 onStartVoiceover = viewModel::showVoiceoverPanel,
                 onClose = viewModel::hideAudioPanel
             )
