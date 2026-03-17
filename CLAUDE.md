@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.22.0
+v0.23.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -136,7 +136,9 @@ v0.22.0
 - Text overlay editing (TextEditorSheet opens with existing overlay data, save updates instead of creating new)
 - Camera temp file cleanup (stale files older than 1 hour deleted on MediaPicker open)
 - Export 20+ color/filter effects via RgbMatrix (tint, exposure, gamma, highlights, shadows, vibrance, posterize, cool/warm tone, cyberpunk, noir, vintage, mirror)
-- Export clip transforms (rotation, scale via ScaleAndRotateTransformation)
+- Export clip transforms (rotation, scale, position via MatrixTransformation — static + keyframe-animated)
+- Export keyframe-animated scale/rotation/position (per-frame MatrixTransformation with KeyframeEngine interpolation)
+- Export keyframe-animated volume (VolumeAudioProcessor evaluates KeyframeEngine per audio sample)
 - Export static clip opacity (RgbMatrix when no keyframe opacity override)
 - Export audio track (background music, voiceovers mixed into output via second EditedMediaItemSequence)
 - Export text overlays (timed OverlayEffect with styled SpannableString, position anchoring, per-frame alpha gating)
@@ -286,6 +288,12 @@ v0.22.0
 - **Export text overlays** — `ExportTextOverlay` class extends `androidx.media3.effect.TextOverlay` (not to be confused with model `TextOverlay`). Renders styled SpannableString with ForegroundColorSpan, AbsoluteSizeSpan, StyleSpan. Time-gated: returns empty string + alpha 0 outside `relStartMs..relEndMs`. Position converted from 0..1 model space to -1..1 anchor space (Y inverted). Added via `OverlayEffect(ImmutableList.copyOf(typed))` after effects but before Presentation.
 - **TextOverlay name collision** — `com.novacut.editor.model.TextOverlay` and `androidx.media3.effect.TextOverlay` both imported via wildcards. Export function parameter uses fully qualified `com.novacut.editor.model.TextOverlay`. `ExportTextOverlay` extends fully qualified `androidx.media3.effect.TextOverlay()`.
 - **EditedMediaItemSequence.Builder** — Migrated from deprecated `EditedMediaItemSequence(list)` constructor to `EditedMediaItemSequence.Builder(list).build()` pattern (Media3 1.5.x).
+- **Portrait resolution fix** — `Resolution.forAspect()` now branches on aspect ratio >= 1 vs < 1. For portrait aspects (9:16, 3:4, 4:5), height (shorter dimension) becomes width and the taller dimension is derived. FHD_1080P + 9:16 now correctly produces 1080x1920 instead of 608x1080.
+- **Undo/redo recalculates totalDurationMs** — Both `undo()` and `redo()` now wrap restored state through `recalculateDuration()` to keep timeline duration accurate after state restoration.
+- **Auto_captions in clip AI menu** — Moved from project-mode textSubMenu (unreachable, required clip) to clip-mode clipAiSubMenu. `auto_color` also added to clipAiSubMenu (was wired in EditorScreen but missing from menu).
+- **Keyframe-animated transforms in export** — `MatrixTransformation` replaces static `ScaleAndRotateTransformation` when keyframes exist for SCALE_X/SCALE_Y/ROTATION/POSITION_X/POSITION_Y. Uses `android.graphics.Matrix` with `postScale`/`postRotate`/`postTranslate` (scale → rotate → translate order). Falls back to static keyframe values when no keyframe for a property.
+- **Static clip position in export** — `clip.positionX`/`positionY` now applied via `MatrixTransformation` (previously only rotation/scale were exported). Y axis inverted (`-py`) to match GL coordinate system.
+- **Keyframe volume in export** — `VolumeAudioProcessor` accepts optional `keyframes` list. When present, evaluates `KeyframeEngine.getValueAt(VOLUME)` per audio sample instead of using static `volume`. Fade envelopes still applied on top of keyframe volume.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

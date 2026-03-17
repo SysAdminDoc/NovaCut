@@ -54,8 +54,7 @@ val clipTabs = listOf(
 
 // Project mode — Text tab sub-menu
 private val textSubMenu = listOf(
-    SubMenuItem("add_text", Icons.Default.Title, "Add Text"),
-    SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions")
+    SubMenuItem("add_text", Icons.Default.Title, "Add Text")
 )
 
 // Clip mode — Edit tab sub-menu
@@ -76,7 +75,9 @@ private val clipAiSubMenu = listOf(
     SubMenuItem("track_motion", Icons.Default.GpsFixed, "Track\nMotion"),
     SubMenuItem("smart_crop", Icons.Default.Crop, "Smart\nCrop"),
     SubMenuItem("stabilize", Icons.Default.Straighten, "Stabilize"),
-    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise\nAudio")
+    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise\nAudio"),
+    SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions"),
+    SubMenuItem("auto_color", Icons.Default.Palette, "Auto\nColor")
 )
 
 // --- Bottom tool area (tab bar + contextual sub-menu grids) ---

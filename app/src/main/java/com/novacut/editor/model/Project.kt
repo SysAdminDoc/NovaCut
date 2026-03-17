@@ -37,9 +37,16 @@ enum class Resolution(val width: Int, val height: Int, val label: String) {
     UHD_4K(3840, 2160, "4K");
 
     fun forAspect(aspect: AspectRatio): Pair<Int, Int> {
-        val h = height
-        val w = (h * aspect.toFloat()).toInt().let { it - (it % 2) }
-        return w to h
+        val ratio = aspect.toFloat()
+        return if (ratio >= 1f) {
+            val h = height
+            val w = (h * ratio).toInt().let { it - (it % 2) }
+            w to h
+        } else {
+            val w = height
+            val h = (w / ratio).toInt().let { it - (it % 2) }
+            w to h
+        }
     }
 }
 

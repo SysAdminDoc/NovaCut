@@ -1077,12 +1077,12 @@ class EditorViewModel @Inject constructor(
         )
 
         _state.update {
-            it.copy(
+            recalculateDuration(it.copy(
                 tracks = action.tracks,
                 textOverlays = action.textOverlays,
                 undoStack = undoStack.dropLast(1),
                 redoStack = it.redoStack + currentAction
-            )
+            ))
         }
         rebuildPlayerTimeline()
     }
@@ -1099,12 +1099,12 @@ class EditorViewModel @Inject constructor(
         )
 
         _state.update {
-            it.copy(
+            recalculateDuration(it.copy(
                 tracks = action.tracks,
                 textOverlays = action.textOverlays,
                 redoStack = redoStack.dropLast(1),
                 undoStack = it.undoStack + currentAction
-            )
+            ))
         }
         rebuildPlayerTimeline()
     }

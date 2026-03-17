@@ -286,12 +286,42 @@ class VideoEngine @Inject constructor(
                             )
                         })
                     }
-                    // Apply clip transform (rotation, scale)
-                    if (clip.rotation != 0f || clip.scaleX != 1f || clip.scaleY != 1f) {
-                        add(ScaleAndRotateTransformation.Builder()
-                            .setScale(clip.scaleX, clip.scaleY)
-                            .setRotationDegrees(clip.rotation)
-                            .build())
+                    // Apply clip transform (rotation, scale, position) — keyframe-animated or static
+                    val hasKfScale = clip.keyframes.any {
+                        it.property == KeyframeProperty.SCALE_X || it.property == KeyframeProperty.SCALE_Y
+                    }
+                    val hasKfRotation = clip.keyframes.any { it.property == KeyframeProperty.ROTATION }
+                    val hasKfPosition = clip.keyframes.any {
+                        it.property == KeyframeProperty.POSITION_X || it.property == KeyframeProperty.POSITION_Y
+                    }
+                    val needsStaticTransform = clip.rotation != 0f || clip.scaleX != 1f || clip.scaleY != 1f || clip.positionX != 0f || clip.positionY != 0f
+                    if (hasKfScale || hasKfRotation || hasKfPosition) {
+                        // Per-frame animated transform via MatrixTransformation
+                        val kfs = clip.keyframes
+                        val staticSx = clip.scaleX; val staticSy = clip.scaleY
+                        val staticRot = clip.rotation
+                        val staticPx = clip.positionX; val staticPy = clip.positionY
+                        add(MatrixTransformation { presentationTimeUs ->
+                            val timeMs = presentationTimeUs / 1000L
+                            val sx = KeyframeEngine.getValueAt(kfs, KeyframeProperty.SCALE_X, timeMs) ?: staticSx
+                            val sy = KeyframeEngine.getValueAt(kfs, KeyframeProperty.SCALE_Y, timeMs) ?: staticSy
+                            val rot = KeyframeEngine.getValueAt(kfs, KeyframeProperty.ROTATION, timeMs) ?: staticRot
+                            val px = KeyframeEngine.getValueAt(kfs, KeyframeProperty.POSITION_X, timeMs) ?: staticPx
+                            val py = KeyframeEngine.getValueAt(kfs, KeyframeProperty.POSITION_Y, timeMs) ?: staticPy
+                            android.graphics.Matrix().apply {
+                                postScale(sx, sy)
+                                postRotate(rot)
+                                postTranslate(px, -py)
+                            }
+                        })
+                    } else if (needsStaticTransform) {
+                        // Static transform
+                        val m = android.graphics.Matrix().apply {
+                            postScale(clip.scaleX, clip.scaleY)
+                            postRotate(clip.rotation)
+                            postTranslate(clip.positionX, -clip.positionY)
+                        }
+                        add(MatrixTransformation { m })
                     }
                     if (clip.speed != 1.0f) {
                         add(SpeedChangeEffect(clip.speed))
@@ -318,14 +348,16 @@ class VideoEngine @Inject constructor(
                 }
 
                 val audioProcessors = buildList<AudioProcessor> {
+                    val hasKfVolume = clip.keyframes.any { it.property == KeyframeProperty.VOLUME }
                     val needsVolume = clip.volume != 1.0f
                     val needsFade = clip.fadeInMs > 0L || clip.fadeOutMs > 0L
-                    if (needsVolume || needsFade) {
+                    if (hasKfVolume || needsVolume || needsFade) {
                         add(VolumeAudioProcessor(
                             volume = clip.volume,
                             fadeInMs = clip.fadeInMs,
                             fadeOutMs = clip.fadeOutMs,
-                            clipDurationMs = clip.durationMs
+                            clipDurationMs = clip.durationMs,
+                            keyframes = if (hasKfVolume) clip.keyframes else emptyList()
                         ))
                     }
                 }
@@ -353,14 +385,16 @@ class VideoEngine @Inject constructor(
                             )
                             .build()
                         val processors = buildList<AudioProcessor> {
+                            val hasKfVol = clip.keyframes.any { it.property == KeyframeProperty.VOLUME }
                             val needsVolume = clip.volume != 1.0f
                             val needsFade = clip.fadeInMs > 0L || clip.fadeOutMs > 0L
-                            if (needsVolume || needsFade) {
+                            if (hasKfVol || needsVolume || needsFade) {
                                 add(VolumeAudioProcessor(
                                     volume = clip.volume,
                                     fadeInMs = clip.fadeInMs,
                                     fadeOutMs = clip.fadeOutMs,
-                                    clipDurationMs = clip.durationMs
+                                    clipDurationMs = clip.durationMs,
+                                    keyframes = if (hasKfVol) clip.keyframes else emptyList()
                                 ))
                             }
                         }
@@ -752,7 +786,8 @@ private class VolumeAudioProcessor(
     private val volume: Float,
     private val fadeInMs: Long,
     private val fadeOutMs: Long,
-    private val clipDurationMs: Long
+    private val clipDurationMs: Long,
+    private val keyframes: List<com.novacut.editor.model.Keyframe> = emptyList()
 ) : BaseAudioProcessor() {
 
     private var processedFrames: Long = 0L
@@ -778,7 +813,14 @@ private class VolumeAudioProcessor(
             val frameIndex = processedFrames / channelCount
             val timeMs = frameIndex * 1000L / sampleRate
 
-            var gain = volume
+            // Use keyframe volume if available, otherwise static volume
+            var gain = if (keyframes.isNotEmpty()) {
+                KeyframeEngine.getValueAt(
+                    keyframes, com.novacut.editor.model.KeyframeProperty.VOLUME, timeMs
+                ) ?: volume
+            } else {
+                volume
+            }
 
             // Fade in envelope
             if (fadeInMs > 0 && timeMs < fadeInMs) {
