@@ -70,6 +70,7 @@ data class EditorState(
     val aiProcessingTool: String? = null,
     val lastExportedFilePath: String? = null,
     val copiedEffects: List<Effect> = emptyList(),
+    val exportErrorMessage: String? = null,
     val showVoiceoverRecorder: Boolean = false,
     val isRecordingVoiceover: Boolean = false,
     val voiceoverDurationMs: Long = 0L,
@@ -713,7 +714,7 @@ class EditorViewModel @Inject constructor(
     fun showExportSheet() {
         // Reset export state so stale COMPLETE/ERROR doesn't show on reopen
         videoEngine.resetExportState()
-        _state.update { dismissedPanelState(it).copy(showExportSheet = true, exportState = ExportState.IDLE, exportProgress = 0f) }
+        _state.update { dismissedPanelState(it).copy(showExportSheet = true, exportState = ExportState.IDLE, exportProgress = 0f, exportErrorMessage = null) }
     }
     fun hideExportSheet() { _state.update { it.copy(showExportSheet = false) } }
     fun showEffectsPanel() { _state.update { dismissedPanelState(it).copy(showEffectsPanel = true) } }
@@ -899,7 +900,7 @@ class EditorViewModel @Inject constructor(
                     appContext.stopService(serviceIntent)
                 },
                 onError = { e ->
-                    showToast("Export failed: ${e.message}")
+                    _state.update { it.copy(exportErrorMessage = e.message ?: "Unknown error") }
                     appContext.stopService(serviceIntent)
                 }
             )

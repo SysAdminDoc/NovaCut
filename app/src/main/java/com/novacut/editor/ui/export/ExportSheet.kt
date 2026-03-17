@@ -21,6 +21,7 @@ fun ExportSheet(
     exportState: ExportState,
     exportProgress: Float,
     aspectRatio: AspectRatio = AspectRatio.RATIO_16_9,
+    errorMessage: String? = null,
     onConfigChanged: (ExportConfig) -> Unit,
     onStartExport: () -> Unit,
     onShare: () -> Unit = {},
@@ -136,12 +137,31 @@ fun ExportSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Export Failed", color = Mocha.Red, fontSize = 16.sp)
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        errorMessage,
+                        color = Mocha.Subtext0,
+                        fontSize = 12.sp,
+                        maxLines = 3
+                    )
+                }
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = onClose,
-                    colors = ButtonDefaults.buttonColors(containerColor = Mocha.Surface1)
-                ) {
-                    Text("Close", color = Mocha.Text)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onStartExport,
+                        colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Retry", color = Mocha.Crust)
+                    }
+                    Button(
+                        onClick = onClose,
+                        colors = ButtonDefaults.buttonColors(containerColor = Mocha.Surface1)
+                    ) {
+                        Text("Close", color = Mocha.Text)
+                    }
                 }
             }
             return

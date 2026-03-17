@@ -36,6 +36,7 @@ fun Timeline(
     zoomLevel: Float,
     scrollOffsetMs: Long,
     selectedClipId: String?,
+    isTrimMode: Boolean = false,
     waveforms: Map<String, FloatArray> = emptyMap(),
     onClipSelected: (String, String) -> Unit,
     onPlayheadMoved: (Long) -> Unit,
@@ -77,6 +78,23 @@ fun Timeline(
             .fillMaxWidth()
             .background(Mocha.Mantle)
     ) {
+        // Trim mode indicator
+        if (isTrimMode && selectedClipId != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Mocha.Peach.copy(alpha = 0.15f))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "TRIM MODE — Drag clip edges to adjust",
+                    color = Mocha.Peach,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
         // Track headers + timeline content
         Row(modifier = Modifier.fillMaxWidth()) {
             // Track headers
@@ -322,6 +340,45 @@ fun Timeline(
                                                         RoundedCornerShape(2.dp)
                                                     )
                                             )
+                                        }
+
+                                        // Effects count badge
+                                        if (clip.effects.isNotEmpty()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(2.dp)
+                                                    .background(
+                                                        Mocha.Mauve.copy(alpha = 0.8f),
+                                                        RoundedCornerShape(4.dp)
+                                                    )
+                                                    .padding(horizontal = 3.dp, vertical = 1.dp)
+                                            ) {
+                                                Text(
+                                                    "FX${clip.effects.size}",
+                                                    color = Mocha.Crust,
+                                                    fontSize = 7.sp,
+                                                    lineHeight = 8.sp
+                                                )
+                                            }
+                                        }
+
+                                        // Keyframe dots
+                                        if (clip.keyframes.isNotEmpty() && clipWidthPx > 20) {
+                                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                                val clipDuration = clip.durationMs.toFloat()
+                                                if (clipDuration <= 0) return@Canvas
+                                                clip.keyframes.distinctBy { it.timeOffsetMs }.forEach { kf ->
+                                                    val x = (kf.timeOffsetMs / clipDuration) * size.width
+                                                    if (x in 0f..size.width) {
+                                                        drawCircle(
+                                                            color = Color(0xFFF5C2E7), // Mocha.Pink
+                                                            radius = 3f,
+                                                            center = Offset(x, size.height - 6f)
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

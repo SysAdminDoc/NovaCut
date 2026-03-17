@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.10.0
+v0.11.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -30,15 +30,15 @@ v0.10.0
   - `ui/projects/ProjectListViewModel.kt` - Project list state management (search, sort, duplicate)
   - `ui/editor/EditorScreen.kt` - Main editor composable (EditorTopBar + preview + timeline + BottomToolArea) with onAction dispatch
   - `ui/editor/EditorViewModel.kt` - Editor state management (tracks, clips, effects, undo/redo, voiceover, loop)
-  - `ui/editor/Timeline.kt` - Custom multi-track timeline with thumbnail strips + waveforms + trim handles
+  - `ui/editor/Timeline.kt` - Custom multi-track timeline with thumbnail strips + waveforms + trim handles + keyframe dots + effect badges + trim mode indicator
   - `ui/editor/PreviewPanel.kt` - ExoPlayer-based video preview with playback controls + loop toggle
   - `ui/editor/ToolPanel.kt` - PowerDirector-style BottomToolArea (two-mode tab bar + sub-menu grids) + effects/speed/transform/crop/transition panels
   - `ui/editor/TextEditorSheet.kt` - Text overlay editor with font selector, animations
-  - `ui/editor/AudioPanel.kt` - Audio controls, waveform visualization, voiceover recorder
+  - `ui/editor/AudioPanel.kt` - Audio controls, waveform visualization with fade envelope overlay, voiceover recorder
   - `ui/editor/AiToolsPanel.kt` - AI tools UI (captions, bg removal, scene detect, smart crop, etc.)
   - `ui/mediapicker/MediaPicker.kt` - Media picker with Photo Picker (API 33+) + OpenDocument fallback + camera capture
   - `res/xml/file_paths.xml` - FileProvider paths config for camera capture + export sharing
-  - `ui/export/ExportSheet.kt` - Export settings (resolution, codec, quality, progress, share, save to gallery)
+  - `ui/export/ExportSheet.kt` - Export settings (resolution, codec, quality, progress, error with retry, share, save to gallery)
   - `engine/VideoEngine.kt` - Media3 Transformer export + ExoPlayer + thumbnail extraction
   - `engine/AudioEngine.kt` - Audio waveform extraction + PCM mixing
   - `engine/KeyframeEngine.kt` - Keyframe interpolation with 5 easing curves
@@ -85,6 +85,14 @@ v0.10.0
 - **Transition duration control** — Slider in TransitionPicker (100-2000ms, 100ms steps). Updates Transition.durationMs on selected clip.
 - **Font selector** — TextEditorSheet offers 6 font families (sans-serif, serif, monospace, cursive, condensed, medium). Stored in TextOverlay.fontFamily.
 - **Photo Picker (API 33+)** — PickVisualMedia/PickMultipleVisualMedia for video, image, and multi-select on Android 13+. Falls back to OpenDocument on older APIs.
+- **Export error handling** — `exportErrorMessage: String?` in EditorState, displayed in ExportSheet with retry button. Error state set from both Transformer.Listener.onError and catch block. `showExportSheet()` resets error state.
+- **Auto-save error logging** — `Log.e(TAG, ...)` on auto-save failures instead of silent `catch (_: Exception) {}`. Still non-crashing but now debuggable via logcat.
+- **Project delete cleanup** — `ProjectListViewModel.deleteProject()` now calls `autoSave.clearRecoveryData()` to remove orphaned auto-save JSON files.
+- **Waveform fade envelope** — AudioPanel Canvas draws fade in/out envelope overlay (stroke line + dimmed fill) on top of waveform visualization. Reads `fadeInMs`/`fadeOutMs` from clip model.
+- **Trim mode indicator** — Timeline shows "TRIM MODE — Drag clip edges to adjust" banner (Mocha.Peach) when `currentTool == EditorTool.TRIM` and a clip is selected.
+- **Timeline keyframe dots** — Clips with keyframes display small pink dots along the bottom edge at each keyframe's time position.
+- **Timeline effects badge** — Clips with effects show "FX{n}" badge in top-right corner (Mocha.Mauve background).
+- **AI disabled tool feedback** — `onDisabledToolTapped` callback on AiToolsPanel. Tapping a tool that requires clip selection shows "Select a clip to use {toolName}" toast. Card always clickable (removed Material3 `enabled=false` which blocked taps).
 
 ## Features Wired & Working
 - Project gallery (create, open, delete, swipe-to-delete with confirm)
@@ -100,13 +108,13 @@ v0.10.0
 - Loop playback toggle
 - Keyframe opacity applied during export via RgbMatrix
 - Text overlays with 10 animation styles + font family selector (6 fonts)
-- Audio panel with volume, fade in/out (persisted on clip), waveform visualization (requires clip selection)
+- Audio panel with volume, fade in/out (persisted on clip), waveform visualization with fade envelope overlay (requires clip selection)
 - Voiceover recording (MediaRecorder, auto-added to audio track)
 - Effects panel with add -> adjust flow (EffectsPanel -> EffectAdjustmentPanel)
 - Transform panel: position X/Y, scale X/Y, rotation, opacity sliders with reset
 - Crop panel: social media presets (YouTube/TV 16:9, TikTok/Reels 9:16, Instagram Square 1:1, Instagram Portrait 4:5, Classic 4:3, Portrait Classic 3:4, Cinematic 21:9) — project-level, no clip selection required
 - PowerDirector-style UI: compact top bar + two-mode bottom tab bar with contextual sub-menu grids
-- Disabled tool feedback: "Select a clip to use Effects" toast when tapping Effects without selection
+- Disabled tool feedback: "Select a clip to use Effects/AI tools" toast when tapping disabled tools
 - Duplicate clip (inserts copy after selected clip)
 - Copy/Paste effects between clips
 - Freeze frame (extract frame at playhead, insert as 2s still image)
@@ -119,10 +127,12 @@ v0.10.0
 - Camera capture via system camera app (CaptureVideo intent)
 - Photo Picker for Android 13+ (PickVisualMedia) with OpenDocument fallback
 - Project thumbnails on gallery cards (Coil VideoFrameDecoder)
-- Export: resolution, codec, bitrate from config; aspect-ratio-aware output dimensions; foreground service with MEDIA_PROCESSING type
+- Export: resolution, codec, bitrate from config; aspect-ratio-aware output dimensions; foreground service with MEDIA_PROCESSING type; error display with retry button
 - R8 minification enabled with comprehensive ProGuard keep rules (~5MB APK)
 - Undo/redo (50 levels, immutable state snapshots)
-- Project auto-save every 30s with full state recovery
+- Project auto-save every 30s with full state recovery (errors logged to logcat)
+- Project delete cleans up orphaned auto-save files
+- Timeline visual indicators: keyframe dots, effects badge, trim mode banner
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -156,6 +166,9 @@ v0.10.0
 - Merge clips only works with adjacent clips from the same source URI (extends trim range)
 - VoiceoverRecorderEngine is @Singleton but `release()` is safe to call from onCleared() (unlike VideoEngine) since each recording session is independent
 - Photo Picker `takePersistableUriPermission` may throw SecurityException for picker-selected URIs — caught silently since picker grants temporary access
+- ExportSheet error state includes `exportErrorMessage` — reset in `showExportSheet()` to prevent stale errors on reopen
+- AiToolsPanel disabled tools use always-clickable Card (not Material3 `enabled=false`) to allow tap feedback dispatch
+- AudioPanel fade envelope `drawFadeEnvelope()` uses Compose Path — needs `import androidx.compose.ui.graphics.Path` (already imported via wildcard)
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

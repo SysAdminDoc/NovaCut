@@ -52,7 +52,7 @@ fun AudioPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Waveform visualization
+        // Waveform visualization with fade envelope
         if (waveform != null && waveform.isNotEmpty()) {
             Canvas(
                 modifier = Modifier
@@ -62,6 +62,13 @@ fun AudioPanel(
                     .background(Mocha.Surface0)
             ) {
                 drawWaveform(waveform, Mocha.Green)
+                // Draw fade envelope overlay
+                val fadeInMs = clip?.fadeInMs ?: 0L
+                val fadeOutMs = clip?.fadeOutMs ?: 0L
+                val durationMs = clip?.durationMs ?: 1L
+                if (fadeInMs > 0 || fadeOutMs > 0) {
+                    drawFadeEnvelope(fadeInMs, fadeOutMs, durationMs, Mocha.Mauve)
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -119,6 +126,61 @@ fun AudioPanel(
             Text("Record Voiceover")
         }
     }
+}
+
+private fun DrawScope.drawFadeEnvelope(fadeInMs: Long, fadeOutMs: Long, durationMs: Long, color: Color) {
+    if (durationMs <= 0) return
+    val path = Path()
+    val w = size.width
+    val h = size.height
+
+    path.moveTo(0f, h) // bottom-left
+
+    // Fade-in: ramp up
+    if (fadeInMs > 0) {
+        val fadeInX = (fadeInMs.toFloat() / durationMs) * w
+        path.lineTo(0f, h) // start at full fade (bottom = full volume shown inverted for overlay)
+        path.lineTo(fadeInX, 0f) // ramp to top
+    } else {
+        path.lineTo(0f, 0f)
+    }
+
+    // Fade-out: ramp down
+    if (fadeOutMs > 0) {
+        val fadeOutStartX = ((durationMs - fadeOutMs).toFloat() / durationMs) * w
+        path.lineTo(fadeOutStartX, 0f)
+        path.lineTo(w, h)
+    } else {
+        path.lineTo(w, 0f)
+        path.lineTo(w, h)
+    }
+
+    path.close()
+
+    // Draw the envelope line (not filled, just the envelope shape)
+    val strokePath = Path()
+    if (fadeInMs > 0) {
+        val fadeInX = (fadeInMs.toFloat() / durationMs) * w
+        strokePath.moveTo(0f, h)
+        strokePath.lineTo(fadeInX, 0f)
+    }
+    if (fadeOutMs > 0) {
+        val fadeOutStartX = ((durationMs - fadeOutMs).toFloat() / durationMs) * w
+        if (fadeInMs <= 0) strokePath.moveTo(fadeOutStartX, 0f)
+        else strokePath.lineTo(fadeOutStartX, 0f)
+        strokePath.lineTo(w, h)
+    }
+
+    drawPath(
+        path = strokePath,
+        color = color,
+        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+    )
+    // Dim region outside envelope
+    drawPath(
+        path = path,
+        color = color.copy(alpha = 0.1f)
+    )
 }
 
 private fun DrawScope.drawWaveform(waveform: FloatArray, color: Color) {

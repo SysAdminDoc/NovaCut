@@ -61,6 +61,7 @@ class ProjectListViewModel @Inject constructor(
     fun deleteProject(project: Project) {
         viewModelScope.launch {
             projectDao.deleteProject(project)
+            autoSave.clearRecoveryData(project.id)
         }
     }
 

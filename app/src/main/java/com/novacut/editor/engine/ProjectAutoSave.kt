@@ -7,9 +7,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import android.util.Log
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "ProjectAutoSave"
 
 @Singleton
 class ProjectAutoSave @Inject constructor(
@@ -29,7 +32,9 @@ class ProjectAutoSave @Inject constructor(
                 delay(30_000)
                 try {
                     saveState(projectId, getState())
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Auto-save failed for $projectId", e)
+                }
             }
         }
     }
@@ -38,7 +43,9 @@ class ProjectAutoSave @Inject constructor(
         scope.launch {
             try {
                 saveState(projectId, state)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                Log.e(TAG, "Manual save failed for $projectId", e)
+            }
         }
     }
 

@@ -75,6 +75,7 @@ val aiTools = listOf(
 fun AiToolsPanel(
     hasSelectedClip: Boolean,
     onToolSelected: (String) -> Unit,
+    onDisabledToolTapped: (String) -> Unit = {},
     onClose: () -> Unit,
     processingTool: String? = null,
     modifier: Modifier = Modifier
@@ -149,16 +150,21 @@ fun AiToolsPanel(
                 val isProcessing = processingTool == tool.id
 
                 Card(
-                    onClick = { if (isEnabled && !isProcessing) onToolSelected(tool.id) },
+                    onClick = {
+                        when {
+                            isProcessing -> { /* ignore */ }
+                            !isEnabled -> onDisabledToolTapped(tool.name)
+                            else -> onToolSelected(tool.id)
+                        }
+                    },
                     modifier = Modifier
                         .width(90.dp)
                         .height(100.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isProcessing) tool.color.copy(alpha = 0.2f)
-                        else Mocha.Surface0,
-                        disabledContainerColor = Mocha.Surface0.copy(alpha = 0.5f)
+                        else if (!isEnabled) Mocha.Surface0.copy(alpha = 0.5f)
+                        else Mocha.Surface0
                     ),
-                    enabled = isEnabled && !isProcessing,
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(

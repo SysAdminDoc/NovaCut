@@ -70,6 +70,7 @@ fun EditorScreen(
                 zoomLevel = state.zoomLevel,
                 scrollOffsetMs = state.scrollOffsetMs,
                 selectedClipId = state.selectedClipId,
+                isTrimMode = state.currentTool == EditorTool.TRIM,
                 waveforms = state.waveforms,
                 onClipSelected = viewModel::selectClip,
                 onPlayheadMoved = viewModel::seekTo,
@@ -232,6 +233,7 @@ fun EditorScreen(
                 exportState = state.exportState,
                 exportProgress = state.exportProgress,
                 aspectRatio = state.project.aspectRatio,
+                errorMessage = state.exportErrorMessage,
                 onConfigChanged = viewModel::updateExportConfig,
                 onStartExport = {
                     // Use app-private external dir — works on all Android versions including 11+
@@ -342,6 +344,7 @@ fun EditorScreen(
             AiToolsPanel(
                 hasSelectedClip = state.selectedClipId != null,
                 onToolSelected = { toolId -> viewModel.runAiTool(toolId) },
+                onDisabledToolTapped = { toolName -> viewModel.showToast("Select a clip to use $toolName") },
                 onClose = viewModel::hideAiToolsPanel,
                 processingTool = state.aiProcessingTool
             )
