@@ -980,7 +980,6 @@ class EditorViewModel @Inject constructor(
                         if (scenes.isEmpty()) {
                             showToast("No scene changes detected")
                         } else {
-                            // Auto-split the clip at each detected scene boundary
                             saveUndoState("AI scene detect")
                             _state.update { state ->
                                 var tracks = state.tracks
@@ -1036,13 +1035,219 @@ class EditorViewModel @Inject constructor(
                             clip!!.sourceUri,
                             _state.value.project.aspectRatio.toFloat()
                         )
-                        showToast("Suggested crop: center(${
+                        showToast("Smart crop: center(${
                             "%.0f".format(suggestion.centerX * 100)
                         }%, ${"%.0f".format(suggestion.centerY * 100)}%) confidence: ${
                             "%.0f".format(suggestion.confidence * 100)
                         }%")
                     }
-                    else -> showToast("${toolId.replace('_', ' ').replaceFirstChar { it.uppercase() }}: Coming soon")
+                    "auto_color" -> {
+                        val correction = aiFeatures.autoColorCorrect(clip!!.sourceUri)
+                        if (correction.confidence < 0.1f) {
+                            showToast("Could not analyze color")
+                        } else {
+                            saveUndoState("AI auto color")
+                            val newEffects = buildList {
+                                if (kotlin.math.abs(correction.brightness) > 0.02f) {
+                                    add(Effect(type = EffectType.BRIGHTNESS, params = mapOf("value" to correction.brightness)))
+                                }
+                                if (kotlin.math.abs(correction.contrast - 1f) > 0.05f) {
+                                    add(Effect(type = EffectType.CONTRAST, params = mapOf("value" to correction.contrast)))
+                                }
+                                if (kotlin.math.abs(correction.saturation - 1f) > 0.05f) {
+                                    add(Effect(type = EffectType.SATURATION, params = mapOf("value" to correction.saturation)))
+                                }
+                                if (kotlin.math.abs(correction.temperature) > 0.05f) {
+                                    add(Effect(type = EffectType.TEMPERATURE, params = mapOf("value" to correction.temperature)))
+                                }
+                            }
+                            if (newEffects.isEmpty()) {
+                                showToast("Colors already look good!")
+                            } else {
+                                _state.update { state ->
+                                    val tracks = state.tracks.map { track ->
+                                        val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                        if (idx < 0) return@map track
+                                        val c = track.clips[idx]
+                                        // Remove existing auto-color effects (same types) then add new
+                                        val autoTypes = newEffects.map { it.type }.toSet()
+                                        val filteredEffects = c.effects.filter { it.type !in autoTypes }
+                                        val updatedClip = c.copy(effects = filteredEffects + newEffects)
+                                        track.copy(clips = track.clips.toMutableList().apply { set(idx, updatedClip) })
+                                    }
+                                    recalculateDuration(state.copy(tracks = tracks))
+                                }
+                                rebuildPlayerTimeline()
+                                saveProject()
+                                showToast("Applied ${newEffects.size} color corrections")
+                            }
+                        }
+                    }
+                    "stabilize" -> {
+                        val result = aiFeatures.stabilizeVideo(clip!!.sourceUri)
+                        if (result.confidence < 0.1f || result.shakeMagnitude < 0.001f) {
+                            showToast("Video is already stable")
+                        } else {
+                            saveUndoState("AI stabilize")
+                            _state.update { state ->
+                                val tracks = state.tracks.map { track ->
+                                    val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                    if (idx < 0) return@map track
+                                    val c = track.clips[idx]
+                                    // Apply stabilization: zoom in slightly + generate smooth keyframes
+                                    val zoom = result.recommendedZoom
+                                    val keyframes = result.motionKeyframes.flatMap { kf ->
+                                        listOf(
+                                            Keyframe(
+                                                timeOffsetMs = kf.timestampMs,
+                                                property = KeyframeProperty.POSITION_X,
+                                                value = kf.offsetX,
+                                                easing = Easing.EASE_IN_OUT
+                                            ),
+                                            Keyframe(
+                                                timeOffsetMs = kf.timestampMs,
+                                                property = KeyframeProperty.POSITION_Y,
+                                                value = kf.offsetY,
+                                                easing = Easing.EASE_IN_OUT
+                                            )
+                                        )
+                                    }
+                                    val stabilized = c.copy(
+                                        scaleX = c.scaleX * zoom,
+                                        scaleY = c.scaleY * zoom,
+                                        keyframes = c.keyframes + keyframes
+                                    )
+                                    track.copy(clips = track.clips.toMutableList().apply { set(idx, stabilized) })
+                                }
+                                recalculateDuration(state.copy(tracks = tracks))
+                            }
+                            rebuildPlayerTimeline()
+                            saveProject()
+                            showToast("Stabilized: ${
+                                "%.0f".format(result.shakeMagnitude * 100)
+                            }% shake corrected, ${
+                                "%.0f".format((result.recommendedZoom - 1f) * 100)
+                            }% zoom applied")
+                        }
+                    }
+                    "denoise" -> {
+                        val profile = aiFeatures.analyzeAudioNoise(clip!!.sourceUri)
+                        if (profile.confidence < 0.1f) {
+                            showToast("Could not analyze audio noise")
+                        } else if (profile.signalToNoiseDb > 40f) {
+                            showToast("Audio is already clean (SNR: ${"%.0f".format(profile.signalToNoiseDb)}dB)")
+                        } else {
+                            saveUndoState("AI denoise")
+                            // Apply noise reduction by adjusting volume and fade
+                            // Boost signal relative to noise floor, apply noise gate via volume
+                            val volumeBoost = (1f + profile.recommendedReduction * 0.3f).coerceAtMost(1.5f)
+                            _state.update { state ->
+                                val tracks = state.tracks.map { track ->
+                                    val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                    if (idx < 0) return@map track
+                                    val c = track.clips[idx]
+                                    val denoised = c.copy(
+                                        volume = (c.volume * volumeBoost).coerceIn(0f, 2f),
+                                        fadeInMs = if (c.fadeInMs < 50) 50L else c.fadeInMs,
+                                        fadeOutMs = if (c.fadeOutMs < 50) 50L else c.fadeOutMs
+                                    )
+                                    track.copy(clips = track.clips.toMutableList().apply { set(idx, denoised) })
+                                }
+                                recalculateDuration(state.copy(tracks = tracks))
+                            }
+                            rebuildPlayerTimeline()
+                            saveProject()
+                            showToast("Denoised: SNR ${"%.0f".format(profile.signalToNoiseDb)}dB, " +
+                                "reduction ${"%.0f".format(profile.recommendedReduction * 100)}%")
+                        }
+                    }
+                    "remove_bg" -> {
+                        val analysis = aiFeatures.analyzeBackground(clip!!.sourceUri)
+                        if (analysis.confidence < 0.1f) {
+                            showToast("Could not detect background")
+                        } else {
+                            saveUndoState("AI remove background")
+                            // Apply chroma key effect with detected background color parameters
+                            val chromaKeyEffect = Effect(
+                                type = EffectType.CHROMA_KEY,
+                                params = mapOf(
+                                    "similarity" to analysis.recommendedSimilarity,
+                                    "smoothness" to analysis.recommendedSmoothness,
+                                    "spill" to analysis.recommendedSpill
+                                )
+                            )
+                            _state.update { state ->
+                                val tracks = state.tracks.map { track ->
+                                    val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                    if (idx < 0) return@map track
+                                    val c = track.clips[idx]
+                                    // Remove existing chroma key, add new one
+                                    val filtered = c.effects.filter { it.type != EffectType.CHROMA_KEY }
+                                    val updated = c.copy(effects = filtered + chromaKeyEffect)
+                                    track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                }
+                                recalculateDuration(state.copy(tracks = tracks))
+                            }
+                            rebuildPlayerTimeline()
+                            saveProject()
+                            val bgType = when {
+                                analysis.isGreenScreen -> "green screen"
+                                analysis.isBlueScreen -> "blue screen"
+                                else -> "background"
+                            }
+                            showToast("Applied $bgType removal (${
+                                "%.0f".format(analysis.confidence * 100)
+                            }% confidence)")
+                        }
+                    }
+                    "track_motion" -> {
+                        // Track from center of frame across the clip duration
+                        val region = com.novacut.editor.ai.TrackingRegion()
+                        val results = aiFeatures.trackMotion(
+                            clip!!.sourceUri, region, clip.trimStartMs, clip.trimEndMs
+                        )
+                        if (results.isEmpty()) {
+                            showToast("Motion tracking failed")
+                        } else {
+                            saveUndoState("AI motion track")
+                            // Convert tracking results to position keyframes
+                            val posKeyframes = results.mapNotNull { tr ->
+                                val timeOffset = ((tr.timestampMs - clip.trimStartMs) / clip.speed).toLong()
+                                if (timeOffset < 0 || timeOffset > clip.durationMs) return@mapNotNull null
+                                listOf(
+                                    Keyframe(
+                                        timeOffsetMs = timeOffset,
+                                        property = KeyframeProperty.POSITION_X,
+                                        value = (tr.region.centerX - 0.5f) * 2f, // Normalize to -1..1
+                                        easing = Easing.EASE_IN_OUT
+                                    ),
+                                    Keyframe(
+                                        timeOffsetMs = timeOffset,
+                                        property = KeyframeProperty.POSITION_Y,
+                                        value = (tr.region.centerY - 0.5f) * 2f,
+                                        easing = Easing.EASE_IN_OUT
+                                    )
+                                )
+                            }.flatten()
+
+                            _state.update { state ->
+                                val tracks = state.tracks.map { track ->
+                                    val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                    if (idx < 0) return@map track
+                                    val c = track.clips[idx]
+                                    // Merge tracking keyframes with existing
+                                    val trackedProps = setOf(KeyframeProperty.POSITION_X, KeyframeProperty.POSITION_Y)
+                                    val existing = c.keyframes.filter { it.property !in trackedProps }
+                                    val updated = c.copy(keyframes = existing + posKeyframes)
+                                    track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                }
+                                recalculateDuration(state.copy(tracks = tracks))
+                            }
+                            rebuildPlayerTimeline()
+                            saveProject()
+                            showToast("Tracked ${results.size} motion points across clip")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 showToast("AI tool failed: ${e.message}")

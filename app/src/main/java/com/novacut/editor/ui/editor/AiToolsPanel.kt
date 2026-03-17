@@ -34,7 +34,7 @@ val aiTools = listOf(
         Icons.Default.ClosedCaption, Mocha.Blue
     ),
     AiToolConfig(
-        "bg_removal", "Remove BG",
+        "remove_bg", "Remove BG",
         "Remove video background",
         Icons.Default.Wallpaper, Mocha.Green
     ),
@@ -44,7 +44,7 @@ val aiTools = listOf(
         Icons.Default.ContentCut, Mocha.Peach
     ),
     AiToolConfig(
-        "motion_track", "Track Motion",
+        "track_motion", "Track Motion",
         "Track objects across frames",
         Icons.Default.GpsFixed, Mocha.Mauve
     ),
@@ -65,7 +65,7 @@ val aiTools = listOf(
         Icons.Default.Straighten, Mocha.Sapphire
     ),
     AiToolConfig(
-        "noise_reduce", "Denoise Audio",
+        "denoise", "Denoise Audio",
         "Remove background noise",
         Icons.Default.VolumeOff, Mocha.Flamingo
     )

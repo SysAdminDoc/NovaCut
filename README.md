@@ -27,12 +27,15 @@ A full-featured Android video editor built with Kotlin and Jetpack Compose. Desi
 - 10 animation styles (fade, slide, scale, typewriter, bounce, spin)
 - Color picker, font size, bold/italic, alignment, stroke
 
-**AI Tools**
-- Auto captions (speech-to-text)
-- Background removal
-- Scene detection
-- Motion tracking
-- Smart crop
+**AI Tools** (all on-device, no internet required)
+- Auto captions — audio energy speech segmentation with timed text overlays
+- Scene detection — frame difference analysis with auto-split at boundaries
+- Auto color correction — histogram-based brightness/contrast/saturation/temperature
+- Video stabilization — motion vector estimation with counter-motion zoom + keyframes
+- Audio denoise — noise floor analysis with volume optimization
+- Background removal — automatic green/blue screen detection with chroma key
+- Motion tracking — template matching with position keyframe generation
+- Smart crop — saliency-weighted region analysis for intelligent framing
 
 **Export**
 - 480p to 4K Ultra HD

@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.8.0
+v0.9.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -48,7 +48,7 @@ v0.8.0
   - `engine/AppModule.kt` - Hilt DI module (Room DB + DAO)
   - `engine/db/ProjectDatabase.kt` - Room database (v3) + ProjectDao + converters
   - `effects/ShaderEffects.kt` - GLSL shader source (effects + transitions)
-  - `ai/AiFeatures.kt` - AI features (auto captions, bg removal, scene detect, motion track)
+  - `ai/AiFeatures.kt` - AI features (auto captions, bg removal, scene detect, motion track, auto color, stabilize, denoise)
   - `model/Project.kt` - All data models (Project, Track, Clip, Effect, Transition, Keyframe, etc.)
 
 ## Architecture Decisions
@@ -68,7 +68,7 @@ v0.8.0
 - **AudioEngine PCM decode** — ShortArray chunks collected then concatenated via `System.arraycopy` to avoid boxing millions of Shorts through `MutableList<Short>`
 - **Project thumbnails** — Stores first video clip's source URI in `Project.thumbnailUri`; Coil `VideoFrameDecoder` renders frame at display time (no file management needed)
 - **Camera capture** — `ActivityResultContracts.CaptureVideo()` + FileProvider URI from cache dir. No CAMERA permission needed — delegated to system camera app via intent.
-- **AI tools wiring** — `runAiTool(toolId)` dispatches to `AiFeatures` methods in viewModelScope. Scene detect auto-splits clips at boundaries (reverse-order to avoid position drift). Auto captions converted to TextOverlay list. Smart crop shows suggestion toast.
+- **AI tools wiring** — `runAiTool(toolId)` dispatches to `AiFeatures` methods in viewModelScope. All 8 tools fully wired: scene detect auto-splits clips at boundaries (reverse-order). Auto captions detect speech via audio energy analysis and create TextOverlay entries. Smart crop uses saliency-weighted region analysis. Auto color analyzes frame histograms and applies brightness/contrast/saturation/temperature effects. Stabilize estimates motion vectors via block matching and applies counter-motion zoom + position keyframes. Denoise analyzes audio noise floor and adjusts volume/fade. Remove BG detects background color from edge pixels and applies chroma key. Track motion uses template matching across frames to generate position keyframes.
 - **Audio fade persistence** — `fadeInMs`/`fadeOutMs` stored on Clip model (not local UI state). AudioPanel reads from clip data so values survive panel close/reopen. Serialized in ProjectAutoSave.
 - **Duplicate clip** — copies clip with fresh UUIDs for clip + effects, inserts after original, shifts subsequent clips forward. Transition nulled on copy to avoid doubled transitions.
 - **Copy/Paste effects** — `copiedEffects` in EditorState stores copied effect list. Paste creates fresh UUIDs to avoid ID collisions.
@@ -106,7 +106,7 @@ v0.8.0
 - Project search (filter by name)
 - Project sort (recent, oldest, A-Z, Z-A, longest)
 - Duplicate project (Room + auto-save copy)
-- AI tools: scene detection (auto-split at boundaries), auto captions (text overlays), smart crop (suggestion)
+- AI tools: scene detection (auto-split at boundaries), auto captions (audio energy speech segmentation), smart crop (saliency analysis), auto color correction (histogram-based), video stabilization (motion vector compensation), audio denoise (noise floor analysis), background removal (chroma key auto-detect), motion tracking (template matching keyframes)
 - Camera capture via system camera app (CaptureVideo intent)
 - Project thumbnails on gallery cards (Coil VideoFrameDecoder)
 - Export: resolution, codec, bitrate from config; aspect-ratio-aware output dimensions; foreground service with MEDIA_PROCESSING type
@@ -134,14 +134,19 @@ v0.8.0
 - Room DB v1→v2→v3 migration handled by `fallbackToDestructiveMigration()` — drops all data on schema change. Acceptable for dev; needs proper migration before release with user data.
 - FileProvider requires `res/xml/file_paths.xml` with `<cache-path>` entry matching the directory used for camera temp files
 - AI scene detection splits clips in reverse-order (sortedByDescending) to prevent timeline position shifts from invalidating subsequent split points
+- AI auto color replaces existing effects of same type (brightness/contrast/saturation/temperature) to prevent stacking
+- AI stabilize applies zoom + position keyframes — both stored on Clip model (scaleX/Y + keyframes list)
+- AI denoise uses volume boost + fade as proxy for noise gating (real spectral subtraction would require custom audio codec pipeline)
+- AI remove BG uses chroma key effect — works well for green/blue screen, moderate for general backgrounds
+- AI motion tracking generates POSITION_X/POSITION_Y keyframes, merges with existing keyframes (replaces position keyframes, preserves others)
 - TRIM and SPLIT tools must call `dismissAllPanels()` — they bypass the boolean-panel pattern since they don't have their own panels
 - Speed panel visibility driven by `currentTool == EditorTool.SPEED` (not a boolean flag like other panels), so it self-dismisses on tool change
 - BottomToolArea manages `activeTabId` internally — sub-menu visibility is derived from activeTabId + isClipMode, not stored in ViewModel. LaunchedEffect resets activeTabId when isClipMode changes.
 
 ## Next Steps
-- Integrate Whisper ONNX for real auto captions (currently placeholder frame-based detection)
-- Integrate MediaPipe SelfieSegmentation for background removal
-- Add video stabilization (EIS via OpenGL transform)
-- Template system
+- Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
+- Integrate MediaPipe SelfieSegmentation for pixel-accurate background removal (current version uses chroma key auto-detect)
+- Template system (save/load project templates)
 - Proper Room migration strategy (replace destructive migration before production)
 - Photo picker for Android 13+ (ACTION_PICK_IMAGES)
+- FFmpeg integration for broader codec support
