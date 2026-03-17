@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.25.0
+v0.26.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -302,6 +302,11 @@ v0.25.0
 - **clip.isReversed not exported** — Known limitation. Media3 Transformer has no reverse playback support. Would require FFmpeg or custom frame-reversal pipeline. `isReversed` works in preview but not in export.
 - **Back action dismisses panels** — "back" action in BottomToolArea now calls `dismissAllPanels()` before `selectClip(null)`. Prevents NPE from open panels referencing deselected clip.
 - **Export progress poll timeout** — Progress polling loop capped at 2400 iterations (10 minutes at 250ms intervals). On timeout, calls `transformer.cancel()`, sets ERROR state, and reports "Export timed out". Prevents infinite loop if Transformer hangs.
+
+- **Auto-scroll pixelsPerMs guard** — Playhead sync loop guards `pixelsPerMs >= 0.001f` before computing `visibleMs` to prevent division-by-zero at very low zoom levels.
+- **Text overlay time validation** — `addTextOverlay()` and `updateTextOverlay()` reject overlays where `startTimeMs >= endTimeMs` with toast feedback.
+- **Transition duration bounds on deserialization** — `deserializeTransition()` clamps `durationMs` to 100-2000ms range via `coerceIn()` to match UI slider bounds.
+- **Export state snapshot** — `startExport()` captures `tracks`, `textOverlays`, and `config` before launching coroutine, preventing race conditions where state changes between validation and export call.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

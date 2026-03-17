@@ -211,8 +211,8 @@ class EditorViewModel @Inject constructor(
                         var newScroll = s.scrollOffsetMs
                         // Auto-scroll when playhead approaches right edge (>80% of visible area)
                         val widthPx = timelineWidthPx
-                        if (widthPx > 0) {
-                            val pixelsPerMs = s.zoomLevel * 0.15f
+                        val pixelsPerMs = s.zoomLevel * 0.15f
+                        if (widthPx > 0 && pixelsPerMs >= 0.001f) {
                             val visibleMs = (widthPx / pixelsPerMs).toLong()
                             val playheadRelative = currentMs - newScroll
                             if (playheadRelative > visibleMs * 0.8f) {
@@ -681,11 +681,13 @@ class EditorViewModel @Inject constructor(
     }
 
     fun addTextOverlay(text: TextOverlay) {
+        if (text.startTimeMs >= text.endTimeMs) { showToast("Invalid text overlay duration"); return }
         saveUndoState("Add text")
         _state.update { it.copy(textOverlays = it.textOverlays + text) }
     }
 
     fun updateTextOverlay(textOverlay: TextOverlay) {
+        if (textOverlay.startTimeMs >= textOverlay.endTimeMs) { showToast("Invalid text overlay duration"); return }
         saveUndoState("Edit text")
         _state.update { state ->
             state.copy(
@@ -964,14 +966,17 @@ class EditorViewModel @Inject constructor(
     }
 
     fun startExport(outputDir: File) {
-        val currentTracks = _state.value.tracks
-        if (currentTracks.flatMap { it.clips }.isEmpty()) {
+        val currentState = _state.value
+        if (currentState.tracks.flatMap { it.clips }.isEmpty()) {
             showToast("No clips to export")
             return
         }
 
+        val config = currentState.exportConfig.copy(aspectRatio = currentState.project.aspectRatio)
+        val tracks = currentState.tracks
+        val textOverlays = currentState.textOverlays
+
         viewModelScope.launch {
-            val config = _state.value.exportConfig.copy(aspectRatio = _state.value.project.aspectRatio)
             val outputFile = File(outputDir, "NovaCut_${System.currentTimeMillis()}.mp4")
 
             // Ensure output directory exists (off main thread)
@@ -987,10 +992,10 @@ class EditorViewModel @Inject constructor(
 
             try {
                 videoEngine.export(
-                    tracks = _state.value.tracks,
+                    tracks = tracks,
                     config = config,
                     outputFile = outputFile,
-                    textOverlays = _state.value.textOverlays,
+                    textOverlays = textOverlays,
                     onProgress = { progress ->
                         _state.update { it.copy(exportProgress = progress) }
                     },

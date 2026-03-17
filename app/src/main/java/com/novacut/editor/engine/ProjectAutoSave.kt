@@ -362,7 +362,7 @@ data class AutoSaveState(
         private fun deserializeTransition(json: JSONObject): Transition {
             return Transition(
                 type = safeValueOf(json.optString("type", "DISSOLVE"), TransitionType.DISSOLVE),
-                durationMs = json.optLong("durationMs", 500L)
+                durationMs = json.optLong("durationMs", 500L).coerceIn(100L, 2000L)
             )
         }
 
