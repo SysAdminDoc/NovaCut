@@ -863,42 +863,123 @@ private class ExportTextOverlay(
     private val relEndMs: Long
 ) : androidx.media3.effect.TextOverlay() {
 
+    private val animDurationMs = 500L
+
     override fun getText(presentationTimeUs: Long): SpannableString {
         val timeMs = presentationTimeUs / 1000L
         if (timeMs < relStartMs || timeMs > relEndMs) {
             return SpannableString("")
         }
-        val text = SpannableString(overlay.text)
-        text.setSpan(
-            ForegroundColorSpan(overlay.color.toInt()),
-            0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        )
-        text.setSpan(
-            AbsoluteSizeSpan(overlay.fontSize.toInt(), true),
-            0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        )
-        val style = when {
-            overlay.bold && overlay.italic -> Typeface.BOLD_ITALIC
-            overlay.bold -> Typeface.BOLD
-            overlay.italic -> Typeface.ITALIC
-            else -> Typeface.NORMAL
+        val fullText = overlay.text
+        // Typewriter animation: reveal characters progressively
+        val displayText = if (overlay.animationIn == com.novacut.editor.model.TextAnimation.TYPEWRITER) {
+            val elapsed = timeMs - relStartMs
+            val charCount = ((elapsed.toFloat() / animDurationMs) * fullText.length)
+                .toInt().coerceIn(0, fullText.length)
+            fullText.substring(0, charCount)
+        } else {
+            fullText
         }
-        if (style != Typeface.NORMAL) {
-            text.setSpan(StyleSpan(style), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val text = SpannableString(displayText)
+        if (displayText.isNotEmpty()) {
+            text.setSpan(
+                ForegroundColorSpan(overlay.color.toInt()),
+                0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            text.setSpan(
+                AbsoluteSizeSpan(overlay.fontSize.toInt(), true),
+                0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            val style = when {
+                overlay.bold && overlay.italic -> Typeface.BOLD_ITALIC
+                overlay.bold -> Typeface.BOLD
+                overlay.italic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
+            if (style != Typeface.NORMAL) {
+                text.setSpan(StyleSpan(style), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
         }
         return text
     }
 
     override fun getOverlaySettings(presentationTimeUs: Long): OverlaySettings {
         val timeMs = presentationTimeUs / 1000L
-        val alpha = if (timeMs < relStartMs || timeMs > relEndMs) 0f else 1f
-        // Convert 0..1 position to -1..1 anchor (Y inverted: 0=top -> 1, 1=bottom -> -1)
-        val anchorX = overlay.positionX * 2f - 1f
-        val anchorY = -(overlay.positionY * 2f - 1f)
+        if (timeMs < relStartMs || timeMs > relEndMs) {
+            return OverlaySettings.Builder().setAlphaScale(0f).build()
+        }
+
+        val baseAnchorX = overlay.positionX * 2f - 1f
+        val baseAnchorY = -(overlay.positionY * 2f - 1f)
+
+        // Compute animation-in progress (0..1)
+        val inProgress = if (overlay.animationIn != com.novacut.editor.model.TextAnimation.NONE) {
+            ((timeMs - relStartMs).toFloat() / animDurationMs).coerceIn(0f, 1f)
+        } else 1f
+
+        // Compute animation-out progress (1..0)
+        val outProgress = if (overlay.animationOut != com.novacut.editor.model.TextAnimation.NONE) {
+            ((relEndMs - timeMs).toFloat() / animDurationMs).coerceIn(0f, 1f)
+        } else 1f
+
+        // Apply animation effects
+        var alpha = 1f
+        var offsetX = 0f
+        var offsetY = 0f
+        var scale = 1f
+        var rotation = 0f
+
+        // Animation in
+        when (overlay.animationIn) {
+            com.novacut.editor.model.TextAnimation.FADE -> alpha *= easeOut(inProgress)
+            com.novacut.editor.model.TextAnimation.SLIDE_UP -> offsetY -= (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_DOWN -> offsetY += (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_LEFT -> offsetX -= (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_RIGHT -> offsetX += (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SCALE -> scale *= easeOut(inProgress)
+            com.novacut.editor.model.TextAnimation.SPIN -> rotation += (1f - easeOut(inProgress)) * 360f
+            com.novacut.editor.model.TextAnimation.BOUNCE -> {
+                val t = easeOut(inProgress)
+                offsetY -= (1f - bounceEase(t)) * 0.3f
+            }
+            com.novacut.editor.model.TextAnimation.TYPEWRITER -> { /* handled in getText() */ }
+            com.novacut.editor.model.TextAnimation.NONE -> { }
+        }
+
+        // Animation out
+        when (overlay.animationOut) {
+            com.novacut.editor.model.TextAnimation.FADE -> alpha *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.SLIDE_UP -> offsetY += (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_DOWN -> offsetY -= (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_LEFT -> offsetX += (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_RIGHT -> offsetX -= (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SCALE -> scale *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.SPIN -> rotation -= (1f - easeOut(outProgress)) * 360f
+            com.novacut.editor.model.TextAnimation.BOUNCE -> {
+                val t = easeOut(outProgress)
+                offsetY += (1f - bounceEase(t)) * 0.3f
+            }
+            com.novacut.editor.model.TextAnimation.TYPEWRITER -> alpha *= outProgress
+            com.novacut.editor.model.TextAnimation.NONE -> { }
+        }
+
         return OverlaySettings.Builder()
-            .setOverlayFrameAnchor(anchorX, anchorY)
-            .setBackgroundFrameAnchor(anchorX, anchorY)
+            .setOverlayFrameAnchor(baseAnchorX + offsetX, baseAnchorY + offsetY)
+            .setBackgroundFrameAnchor(baseAnchorX + offsetX, baseAnchorY + offsetY)
             .setAlphaScale(alpha)
+            .setScale(scale, scale)
+            .setRotationDegrees(rotation)
             .build()
+    }
+
+    private fun easeOut(t: Float): Float = 1f - (1f - t) * (1f - t)
+
+    private fun bounceEase(t: Float): Float {
+        return when {
+            t < 0.3636f -> 7.5625f * t * t
+            t < 0.7273f -> 7.5625f * (t - 0.5455f) * (t - 0.5455f) + 0.75f
+            t < 0.9091f -> 7.5625f * (t - 0.8182f) * (t - 0.8182f) + 0.9375f
+            else -> 7.5625f * (t - 0.9545f) * (t - 0.9545f) + 0.984375f
+        }
     }
 }

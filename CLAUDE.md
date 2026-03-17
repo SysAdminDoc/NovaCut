@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.23.0
+v0.24.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -47,7 +47,7 @@ v0.23.0
   - `engine/ProjectAutoSave.kt` - Periodic auto-save with full JSON serialization/deserialization
   - `engine/AppModule.kt` - Hilt DI module (Room DB + DAO)
   - `engine/db/ProjectDatabase.kt` - Room database (v3) + ProjectDao + converters
-  - `effects/ShaderEffects.kt` - GLSL shader source (effects + transitions)
+  - `effects/` - Removed (ShaderEffects.kt was dead code, all effects use RgbMatrix in VideoEngine)
   - `ai/AiFeatures.kt` - AI features (auto captions, bg removal, scene detect, motion track, auto color, stabilize, denoise)
   - `model/Project.kt` - All data models (Project, Track, Clip, Effect, Transition, Keyframe, etc.)
 
@@ -139,6 +139,7 @@ v0.23.0
 - Export clip transforms (rotation, scale, position via MatrixTransformation — static + keyframe-animated)
 - Export keyframe-animated scale/rotation/position (per-frame MatrixTransformation with KeyframeEngine interpolation)
 - Export keyframe-animated volume (VolumeAudioProcessor evaluates KeyframeEngine per audio sample)
+- Export text overlay animations (10 types: fade, slide 4-way, scale, spin, bounce, typewriter — applied in/out)
 - Export static clip opacity (RgbMatrix when no keyframe opacity override)
 - Export audio track (background music, voiceovers mixed into output via second EditedMediaItemSequence)
 - Export text overlays (timed OverlayEffect with styled SpannableString, position anchoring, per-frame alpha gating)
@@ -294,6 +295,11 @@ v0.23.0
 - **Keyframe-animated transforms in export** — `MatrixTransformation` replaces static `ScaleAndRotateTransformation` when keyframes exist for SCALE_X/SCALE_Y/ROTATION/POSITION_X/POSITION_Y. Uses `android.graphics.Matrix` with `postScale`/`postRotate`/`postTranslate` (scale → rotate → translate order). Falls back to static keyframe values when no keyframe for a property.
 - **Static clip position in export** — `clip.positionX`/`positionY` now applied via `MatrixTransformation` (previously only rotation/scale were exported). Y axis inverted (`-py`) to match GL coordinate system.
 - **Keyframe volume in export** — `VolumeAudioProcessor` accepts optional `keyframes` list. When present, evaluates `KeyframeEngine.getValueAt(VOLUME)` per audio sample instead of using static `volume`. Fade envelopes still applied on top of keyframe volume.
+
+- **Dead ShaderEffects.kt removed** — 509 lines of unused GLSL shader code deleted. All effects use Media3 RgbMatrix/GlEffect in VideoEngine, not custom shader compilation.
+- **Waveform extraction on project recovery** — Auto-save restore now launches `extractWaveform()` for all recovered clips. Previously only new clips got waveforms; recovered projects showed placeholders.
+- **Text overlay animation export** — `ExportTextOverlay.getOverlaySettings()` now computes per-frame alpha, position offset, scale, and rotation based on `animationIn`/`animationOut` fields. 500ms animation duration. Typewriter handled in `getText()` via progressive character reveal. Bounce uses multi-segment ease-out. Animations compose: in + out can be different types.
+- **clip.isReversed not exported** — Known limitation. Media3 Transformer has no reverse playback support. Would require FFmpeg or custom frame-reversal pipeline. `isReversed` works in preview but not in export.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

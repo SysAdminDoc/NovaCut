@@ -161,6 +161,15 @@ class EditorViewModel @Inject constructor(
                 if (recovery.tracks.flatMap { it.clips }.isNotEmpty()) {
                     rebuildPlayerTimeline()
                 }
+                // Extract waveforms for all recovered clips
+                for (track in recovery.tracks) {
+                    for (clip in track.clips) {
+                        viewModelScope.launch {
+                            val waveform = audioEngine.extractWaveform(clip.sourceUri)
+                            _state.update { it.copy(waveforms = it.waveforms + (clip.id to waveform)) }
+                        }
+                    }
+                }
             }
         }
 
