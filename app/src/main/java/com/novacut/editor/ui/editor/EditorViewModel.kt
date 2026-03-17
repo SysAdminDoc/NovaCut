@@ -1061,6 +1061,9 @@ class EditorViewModel @Inject constructor(
                             values.clear()
                             values.put(MediaStore.Video.Media.IS_PENDING, 0)
                             resolver.update(contentUri, values, null, null)
+                        } else {
+                            withContext(Dispatchers.Main) { showToast("Failed to save to gallery") }
+                            return@withContext
                         }
                     } else {
                         @Suppress("DEPRECATION")
