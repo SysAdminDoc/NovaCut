@@ -945,7 +945,7 @@ class EditorViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val config = _state.value.exportConfig
+            val config = _state.value.exportConfig.copy(aspectRatio = _state.value.project.aspectRatio)
             val outputFile = File(outputDir, "NovaCut_${System.currentTimeMillis()}.mp4")
 
             // Ensure output directory exists (off main thread)
@@ -959,23 +959,28 @@ class EditorViewModel @Inject constructor(
                 appContext.startService(serviceIntent)
             }
 
-            videoEngine.export(
-                tracks = _state.value.tracks,
-                config = config,
-                outputFile = outputFile,
-                onProgress = { progress ->
-                    _state.update { it.copy(exportProgress = progress) }
-                },
-                onComplete = {
-                    _state.update { it.copy(lastExportedFilePath = outputFile.absolutePath) }
-                    showToast("Export complete: ${outputFile.name}")
-                    appContext.stopService(serviceIntent)
-                },
-                onError = { e ->
-                    _state.update { it.copy(exportErrorMessage = e.message ?: "Unknown error") }
-                    appContext.stopService(serviceIntent)
-                }
-            )
+            try {
+                videoEngine.export(
+                    tracks = _state.value.tracks,
+                    config = config,
+                    outputFile = outputFile,
+                    onProgress = { progress ->
+                        _state.update { it.copy(exportProgress = progress) }
+                    },
+                    onComplete = {
+                        _state.update { it.copy(lastExportedFilePath = outputFile.absolutePath) }
+                        showToast("Export complete: ${outputFile.name}")
+                        appContext.stopService(serviceIntent)
+                    },
+                    onError = { e ->
+                        _state.update { it.copy(exportErrorMessage = e.message ?: "Unknown error") }
+                        appContext.stopService(serviceIntent)
+                    }
+                )
+            } catch (e: Exception) {
+                _state.update { it.copy(exportErrorMessage = e.message ?: "Unknown error") }
+                appContext.stopService(serviceIntent)
+            }
         }
     }
 

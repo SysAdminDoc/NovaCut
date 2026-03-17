@@ -298,16 +298,18 @@ data class AutoSaveState(
             )
         }
 
-        private fun deserializeClip(json: JSONObject): Clip {
+        private fun deserializeClip(json: JSONObject): Clip? {
             val effectsArr = json.optJSONArray("effects") ?: JSONArray()
             val keyframesArr = json.optJSONArray("keyframes") ?: JSONArray()
+            val sourceUri = json.optString("sourceUri", "")
+            if (sourceUri.isEmpty()) return null
             return Clip(
-                id = json.getString("id"),
-                sourceUri = Uri.parse(json.getString("sourceUri")),
-                sourceDurationMs = json.getLong("sourceDurationMs"),
-                timelineStartMs = json.getLong("timelineStartMs"),
-                trimStartMs = json.getLong("trimStartMs"),
-                trimEndMs = json.getLong("trimEndMs"),
+                id = json.optString("id", java.util.UUID.randomUUID().toString()),
+                sourceUri = Uri.parse(sourceUri),
+                sourceDurationMs = json.optLong("sourceDurationMs", 0L),
+                timelineStartMs = json.optLong("timelineStartMs", 0L),
+                trimStartMs = json.optLong("trimStartMs", 0L),
+                trimEndMs = json.optLong("trimEndMs", 0L),
                 volume = json.optDouble("volume", 1.0).toFloat(),
                 speed = json.optDouble("speed", 1.0).toFloat(),
                 isReversed = json.optBoolean("isReversed", false),
@@ -329,7 +331,7 @@ data class AutoSaveState(
                         Log.w(TAG, "Failed to deserialize keyframe $i", e); null
                     }
                 },
-                transition = if (json.has("transition")) deserializeTransition(json.getJSONObject("transition")) else null
+                transition = json.optJSONObject("transition")?.let { deserializeTransition(it) }
             )
         }
 

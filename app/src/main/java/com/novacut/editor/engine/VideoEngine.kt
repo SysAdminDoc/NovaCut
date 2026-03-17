@@ -135,7 +135,6 @@ class VideoEngine @Inject constructor(
             retriever.setDataSource(context, uri)
             // Try CAPTURE_FRAMERATE first (camera recordings), fall back to parsing bitrate
             val rate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)
-                ?: retriever.extractMetadata(24) // METADATA_KEY_VIDEO_FRAME_COUNT not always available
             rate?.toFloatOrNull()?.toInt()?.coerceIn(1, 120) ?: 30
         } catch (e: Exception) {
             30
@@ -204,7 +203,7 @@ class VideoEngine @Inject constructor(
                 throw IllegalStateException("No video clips to export")
             }
 
-            val (targetW, targetH) = config.resolution.forAspect(AspectRatio.RATIO_16_9)
+            val (targetW, targetH) = config.resolution.forAspect(config.aspectRatio)
 
             val editedItems = videoTrack.clips.map { clip ->
                 val mediaItem = MediaItem.Builder()
@@ -418,7 +417,6 @@ class VideoEngine @Inject constructor(
 
     fun clearThumbnailCache() {
         synchronized(cacheLock) {
-            thumbnailCache.values.forEach { it.recycle() }
             thumbnailCache.clear()
         }
     }

@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.17.0
+v0.18.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -164,6 +164,12 @@ v0.17.0
 - Fade bounds coercion (fadeIn + fadeOut cannot exceed clip duration)
 - Share intent toast feedback (user-visible errors for missing export or deleted file)
 - Export progress reset on error (0f on both Transformer.Listener.onError and catch block)
+- Export uses project aspect ratio (not hardcoded 16:9)
+- Right trim handle upper bound coercion (UI-side, prevents visual glitch beyond source duration)
+- Thumbnail cache eviction on zoom change (prevents OOM from stale zoom-level entries)
+- Safe bitmap cache clearing (no recycle() on potentially in-use Compose Bitmaps)
+- ExportService stopped on setup-phase failures (try/catch around videoEngine.export)
+- Deserialization safe getters throughout (optString/optLong, nullable deserializeClip)
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -233,6 +239,13 @@ v0.17.0
 - **Fade bounds coercion** — `setClipFadeIn()` constrains fadeInMs to `0..(durationMs - fadeOutMs)`. `setClipFadeOut()` constrains fadeOutMs to `0..(durationMs - fadeInMs)`. Prevents fade overlap exceeding clip duration.
 - **Share intent toast feedback** — `getShareIntent()` now shows toast before returning null: "No exported video to share" for missing path, "Export file no longer available" for deleted file.
 - **Export progress reset on error** — Both error paths in VideoEngine (Transformer.Listener.onError and outer catch) now reset `_exportProgress.value = 0f` alongside setting ERROR state. Ensures retry shows fresh progress bar.
+- **Export aspect ratio from project** — `ExportConfig` now has `aspectRatio` field. `startExport()` copies project's aspect ratio into config. `VideoEngine.export()` uses `config.aspectRatio` instead of hardcoded `RATIO_16_9`. All 7 aspect ratios (16:9, 9:16, 1:1, 4:3, 3:4, 4:5, 21:9) correctly applied to export output dimensions.
+- **Right trim handle upper bound** — Timeline right trim handle now coerces to `clip.sourceDurationMs` on the UI side, preventing visual glitch where clip appears longer than source during drag.
+- **Thumbnail cache zoom eviction** — `LaunchedEffect` evicts thumbnail entries for non-current zoom levels before loading new ones. Prevents unbounded Bitmap memory growth across zoom sessions.
+- **Safe bitmap cache clearing** — `clearThumbnailCache()` no longer calls `recycle()` on cached Bitmaps since they may still be referenced by Compose Image composables. GC handles reclamation after references are dropped.
+- **ExportService setup-phase safety** — `startExport()` wraps `videoEngine.export()` in try/catch to stop the foreground service even if export setup throws before Transformer listener is registered.
+- **Deserialization safe getters** — `deserializeClip()` now uses `optString`/`optLong` for all fields (id, sourceUri, sourceDurationMs, timelineStartMs, trimStartMs, trimEndMs). Returns null for missing sourceUri. Transition uses `optJSONObject` instead of throwing `getJSONObject`. Consistent with `deserializeEffect`/`deserializeKeyframe` patterns.
+- **Dead metadata key removed** — `getVideoFrameRate()` no longer calls `extractMetadata(24)` (undocumented constant, always returned null). Falls back directly to 30fps default.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

@@ -268,7 +268,8 @@ data class ExportConfig(
     val codec: VideoCodec = VideoCodec.H264,
     val quality: ExportQuality = ExportQuality.HIGH,
     val audioCodec: AudioCodec = AudioCodec.AAC,
-    val audioBitrate: Int = 256_000
+    val audioBitrate: Int = 256_000,
+    val aspectRatio: AspectRatio = AspectRatio.RATIO_16_9
 ) {
     val videoBitrate: Int get() = when (resolution) {
         Resolution.SD_480P -> when (quality) {

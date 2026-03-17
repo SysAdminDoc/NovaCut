@@ -58,8 +58,10 @@ fun Timeline(
     val thumbnails = remember { mutableStateMapOf<String, List<Bitmap>>() }
     val quantizedZoom = (zoomLevel * 4).toInt() / 4f // quantize to 0.25 steps
 
-    // Load thumbnails for visible clips
+    // Load thumbnails for visible clips — evict stale zoom levels to prevent OOM
     LaunchedEffect(tracks, quantizedZoom) {
+        thumbnails.keys.filter { !it.endsWith("_$quantizedZoom") }
+            .forEach { thumbnails.remove(it) }
         tracks.forEach { track ->
             track.clips.forEach { clip ->
                 val key = "${clip.id}_${quantizedZoom}"
@@ -326,7 +328,7 @@ fun Timeline(
                                                                 if (currentPixelsPerMs < 0.001f) return@detectHorizontalDragGestures
                                                                 val deltaMs = (dragAmount / currentPixelsPerMs).toLong()
                                                                 val newEnd = (clip.trimEndMs + deltaMs)
-                                                                    .coerceAtLeast(clip.trimStartMs + 100L)
+                                                                    .coerceIn(clip.trimStartMs + 100L, clip.sourceDurationMs)
                                                                 onTrimChanged(clip.id, null, newEnd)
                                                             }
                                                         )
