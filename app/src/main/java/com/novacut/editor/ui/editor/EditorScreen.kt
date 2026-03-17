@@ -78,6 +78,7 @@ fun EditorScreen(
                 onScrollChanged = viewModel::setScrollOffset,
                 onTrimChanged = viewModel::trimClip,
                 onTrimDragStarted = viewModel::beginTrim,
+                onTimelineWidthChanged = viewModel::setTimelineWidth,
                 engine = viewModel.engine,
                 modifier = Modifier.weight(0.55f)
             )

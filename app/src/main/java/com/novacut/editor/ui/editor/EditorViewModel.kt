@@ -118,6 +118,14 @@ class EditorViewModel @Inject constructor(
 
     val engine get() = videoEngine
 
+    // Stored outside EditorState to avoid recomposition on every resize
+    @Volatile
+    private var timelineWidthPx: Float = 0f
+
+    fun setTimelineWidth(widthPx: Float) {
+        timelineWidthPx = widthPx
+    }
+
     init {
         val autoSaveId = projectId ?: _state.value.project.id
 
@@ -177,13 +185,29 @@ class EditorViewModel @Inject constructor(
             }
         })
 
-        // Periodic playhead sync (~30fps)
+        // Periodic playhead sync (~30fps) with auto-scroll
         viewModelScope.launch {
             while (isActive) {
                 delay(33)
                 val player = videoEngine.getPlayer()
                 if (player.isPlaying) {
-                    _state.update { it.copy(playheadMs = player.currentPosition) }
+                    val currentMs = player.currentPosition
+                    _state.update { s ->
+                        var newScroll = s.scrollOffsetMs
+                        // Auto-scroll when playhead approaches right edge (>80% of visible area)
+                        val widthPx = timelineWidthPx
+                        if (widthPx > 0) {
+                            val pixelsPerMs = s.zoomLevel * 0.15f
+                            val visibleMs = (widthPx / pixelsPerMs).toLong()
+                            val playheadRelative = currentMs - newScroll
+                            if (playheadRelative > visibleMs * 0.8f) {
+                                newScroll = (currentMs - visibleMs / 4).coerceAtLeast(0L)
+                            } else if (playheadRelative < 0) {
+                                newScroll = (currentMs - visibleMs / 4).coerceAtLeast(0L)
+                            }
+                        }
+                        s.copy(playheadMs = currentMs, scrollOffsetMs = newScroll)
+                    }
                 }
             }
         }
@@ -599,6 +623,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun updateTextOverlay(textOverlay: TextOverlay) {
+        saveUndoState("Edit text")
         _state.update { state ->
             state.copy(
                 textOverlays = state.textOverlays.map {

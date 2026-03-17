@@ -74,7 +74,7 @@ fun ExportSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "${(exportProgress * 100).toInt()}%",
+                    "${(exportProgress * 100).toInt().coerceIn(0, 99)}%",
                     color = Mocha.Subtext0,
                     fontSize = 14.sp
                 )
@@ -258,8 +258,14 @@ fun ExportSheet(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("${w}x${h} @ ${config.frameRate}fps", color = Mocha.Text, fontSize = 13.sp)
                 Text("${config.codec.label} / ${config.quality.label}", color = Mocha.Text, fontSize = 13.sp)
+                val bitrateDesc = when {
+                    config.videoBitrate >= 40_000_000 -> "Studio quality"
+                    config.videoBitrate >= 15_000_000 -> "Great for YouTube/social"
+                    config.videoBitrate >= 6_000_000 -> "Good for sharing"
+                    else -> "Compact file size"
+                }
                 Text(
-                    "Bitrate: ${config.videoBitrate / 1_000_000}Mbps",
+                    "${config.videoBitrate / 1_000_000}Mbps — $bitrateDesc",
                     color = Mocha.Subtext0,
                     fontSize = 12.sp
                 )

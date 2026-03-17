@@ -16,9 +16,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import android.util.Log
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "VideoEngine"
 
 @Singleton
 class VideoEngine @Inject constructor(
@@ -283,6 +286,7 @@ class VideoEngine @Inject constructor(
                         exportResult: ExportResult,
                         exportException: ExportException
                     ) {
+                        Log.e(TAG, "Export failed", exportException)
                         _exportState.value = ExportState.ERROR
                         onError(exportException)
                     }
@@ -302,6 +306,7 @@ class VideoEngine @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Export setup failed", e)
             _exportState.value = ExportState.ERROR
             onError(e)
         }
@@ -311,7 +316,7 @@ class VideoEngine @Inject constructor(
     private fun buildVideoEffect(effect: Effect): androidx.media3.common.Effect? {
         return when (effect.type) {
             EffectType.BRIGHTNESS -> {
-                val value = effect.params["value"] ?: 0f
+                val value = (effect.params["value"] ?: 0f).coerceIn(-1f, 1f)
                 RgbMatrix { _, _ ->
                     val b = value
                     floatArrayOf(
@@ -323,11 +328,11 @@ class VideoEngine @Inject constructor(
                 }
             }
             EffectType.CONTRAST -> {
-                val value = effect.params["value"] ?: 1f
+                val value = (effect.params["value"] ?: 1f).coerceIn(0f, 2f)
                 Contrast(value - 1f)
             }
             EffectType.SATURATION -> {
-                val value = effect.params["value"] ?: 1f
+                val value = (effect.params["value"] ?: 1f).coerceIn(0f, 3f)
                 RgbMatrix { presentationTimeUs, useHdr ->
                     val s = value
                     val sr = (1 - s) * 0.2126f
@@ -374,7 +379,7 @@ class VideoEngine @Inject constructor(
                 }
             }
             EffectType.TEMPERATURE -> {
-                val value = effect.params["value"] ?: 0f
+                val value = (effect.params["value"] ?: 0f).coerceIn(-5f, 5f)
                 RgbMatrix { _, _ ->
                     floatArrayOf(
                         1f + value * 0.1f, 0f, 0f, 0f,

@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.11.0
+v0.12.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -133,6 +133,11 @@ v0.11.0
 - Project auto-save every 30s with full state recovery (errors logged to logcat)
 - Project delete cleans up orphaned auto-save files
 - Timeline visual indicators: keyframe dots, effects badge, trim mode banner
+- Timeline auto-scroll during playback (keeps playhead visible)
+- Export progress with clamped percentage and human-readable bitrate descriptions
+- Text overlay undo/redo support (add, edit, delete all undoable)
+- Effect parameter bounds validation (brightness, contrast, saturation, temperature)
+- Export error logging to logcat for debugging
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -169,6 +174,13 @@ v0.11.0
 - ExportSheet error state includes `exportErrorMessage` — reset in `showExportSheet()` to prevent stale errors on reopen
 - AiToolsPanel disabled tools use always-clickable Card (not Material3 `enabled=false`) to allow tap feedback dispatch
 - AudioPanel fade envelope `drawFadeEnvelope()` uses Compose Path — needs `import androidx.compose.ui.graphics.Path` (already imported via wildcard)
+- **NovaCutApp.VERSION** — must match build.gradle.kts versionName. Used for notification channel or display; was stale at "v0.3.0" until v0.12.0 fix.
+- **VideoEngine export logging** — `Log.e(TAG, ...)` in both Transformer.Listener.onError and catch block. `TAG = "VideoEngine"` for logcat filtering.
+- **Effect parameter bounds** — `coerceIn()` on all effect params in `buildVideoEffect()`: brightness ±1, contrast 0-2, saturation 0-3, temperature ±5. Prevents garbled output from unbounded values.
+- **Text overlay undo** — `updateTextOverlay()` now calls `saveUndoState("Edit text")`. `addTextOverlay` and `removeTextOverlay` already had undo.
+- **Timeline auto-scroll** — During playback, if playhead crosses 80% of visible timeline width, scrollOffsetMs jumps to place playhead at 25% position. Uses `@Volatile var timelineWidthPx` in ViewModel (outside EditorState to avoid recomposition). Timeline reports width via `onTimelineWidthChanged` callback.
+- **Export progress clamped** — `coerceIn(0, 99)` while exporting to avoid premature "100%" display (COMPLETE state shows final confirmation instead).
+- **Export bitrate descriptions** — Output details card shows human-readable quality hint ("Studio quality", "Great for YouTube/social", "Good for sharing", "Compact file size") alongside Mbps number.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

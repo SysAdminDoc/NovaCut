@@ -44,6 +44,7 @@ fun Timeline(
     onScrollChanged: (Long) -> Unit,
     onTrimChanged: (clipId: String, newTrimStartMs: Long?, newTrimEndMs: Long?) -> Unit = { _, _, _ -> },
     onTrimDragStarted: () -> Unit = {},
+    onTimelineWidthChanged: (Float) -> Unit = {},
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -145,7 +146,10 @@ fun Timeline(
                 modifier = Modifier
                     .weight(1f)
                     .clipToBounds()
-                    .onSizeChanged { timelineWidthPx = it.width.toFloat() }
+                    .onSizeChanged {
+                        timelineWidthPx = it.width.toFloat()
+                        onTimelineWidthChanged(timelineWidthPx)
+                    }
                     .pointerInput(zoomLevel, scrollOffsetMs) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             val currentPixelsPerMs = zoomLevel * 0.15f
