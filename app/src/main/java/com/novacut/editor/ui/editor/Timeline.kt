@@ -470,6 +470,7 @@ private fun DrawScope.drawTimeRuler(
 }
 
 private fun DrawScope.drawWaveform(samples: FloatArray, color: Color) {
+    if (samples.isEmpty()) return
     val steps = (size.width / 3f).toInt().coerceAtLeast(1)
     val samplesPerStep = samples.size.toFloat() / steps
     val centerY = size.height / 2f

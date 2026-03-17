@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.27.0
+v0.28.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -303,6 +303,7 @@ v0.27.0
 - **Back action dismisses panels** — "back" action in BottomToolArea now calls `dismissAllPanels()` before `selectClip(null)`. Prevents NPE from open panels referencing deselected clip.
 - **Export progress poll timeout** — Progress polling loop capped at 2400 iterations (10 minutes at 250ms intervals). On timeout, calls `transformer.cancel()`, sets ERROR state, and reports "Export timed out". Prevents infinite loop if Transformer hangs.
 
+- **Timeline waveform empty array guard** — `drawWaveform()` now returns early if `samples.isEmpty()` to prevent `coerceIn(0, -1)` IllegalArgumentException when AudioEngine returns empty FloatArray on decode failure.
 - **Gallery save null URI handling** — `saveToGallery()` now shows error toast and returns early when `ContentResolver.insert()` returns null (e.g., scoped storage rejection on API 30+). Previously silently fell through to "Saved to gallery" success toast.
 - **Auto-scroll pixelsPerMs guard** — Playhead sync loop guards `pixelsPerMs >= 0.001f` before computing `visibleMs` to prevent division-by-zero at very low zoom levels.
 - **Text overlay time validation** — `addTextOverlay()` and `updateTextOverlay()` reject overlays where `startTimeMs >= endTimeMs` with toast feedback.
