@@ -18,6 +18,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import com.novacut.editor.engine.VideoEngine
+import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.ui.theme.Mocha
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -28,6 +29,7 @@ fun PreviewPanel(
     totalDurationMs: Long,
     isPlaying: Boolean,
     isLooping: Boolean = false,
+    aspectRatio: AspectRatio = AspectRatio.RATIO_16_9,
     onTogglePlayback: () -> Unit,
     onToggleLoop: () -> Unit = {},
     onSeek: (Long) -> Unit,
@@ -43,7 +45,7 @@ fun PreviewPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .aspectRatio(aspectRatio.toFloat())
                 .clip(RoundedCornerShape(8.dp))
                 .background(Mocha.Mantle),
             contentAlignment = Alignment.Center
@@ -98,7 +100,7 @@ fun PreviewPanel(
                 text = formatTimestamp(playheadMs),
                 color = Mocha.Subtext0,
                 fontSize = 12.sp,
-                modifier = Modifier.width(70.dp)
+                modifier = Modifier.width(if (totalDurationMs >= 3_600_000) 85.dp else 70.dp)
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -192,7 +194,7 @@ fun PreviewPanel(
                 text = formatTimestamp(totalDurationMs),
                 color = Mocha.Subtext0,
                 fontSize = 12.sp,
-                modifier = Modifier.width(70.dp)
+                modifier = Modifier.width(if (totalDurationMs >= 3_600_000) 85.dp else 70.dp)
             )
         }
     }

@@ -106,7 +106,15 @@ fun MediaPickerSheet(
                 )
             } catch (_: SecurityException) { }
             val mimeType = context.contentResolver.getType(uri) ?: ""
-            val type = if (mimeType.startsWith("image")) "image" else "video"
+            val uriStr = uri.toString().lowercase()
+            val type = when {
+                mimeType.startsWith("image") -> "image"
+                mimeType.startsWith("audio") -> "audio"
+                mimeType.startsWith("video") -> "video"
+                uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") || uriStr.endsWith(".png") || uriStr.endsWith(".webp") -> "image"
+                uriStr.endsWith(".mp3") || uriStr.endsWith(".wav") || uriStr.endsWith(".aac") || uriStr.endsWith(".ogg") -> "audio"
+                else -> "video"
+            }
             onMediaSelected(uri, type)
         }
     }

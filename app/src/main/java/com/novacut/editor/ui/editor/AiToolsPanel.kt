@@ -76,6 +76,7 @@ fun AiToolsPanel(
     hasSelectedClip: Boolean,
     onToolSelected: (String) -> Unit,
     onDisabledToolTapped: (String) -> Unit = {},
+    onCancelProcessing: () -> Unit = {},
     onClose: () -> Unit,
     processingTool: String? = null,
     modifier: Modifier = Modifier
@@ -122,7 +123,9 @@ fun AiToolsPanel(
                 colors = CardDefaults.cardColors(containerColor = Mocha.Surface0)
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier
+                        .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp)
+                        .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CircularProgressIndicator(
@@ -134,8 +137,12 @@ fun AiToolsPanel(
                     Text(
                         "Processing: ${aiTools.find { it.id == processingTool }?.name}...",
                         color = Mocha.Text,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(1f)
                     )
+                    TextButton(onClick = onCancelProcessing) {
+                        Text("Cancel", color = Mocha.Red, fontSize = 12.sp)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

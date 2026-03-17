@@ -135,7 +135,39 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
 
     // Speed
     SPEED("Speed", EffectCategory.SPEED),
-    REVERSE("Reverse", EffectCategory.SPEED)
+    REVERSE("Reverse", EffectCategory.SPEED);
+
+    companion object {
+        fun defaultParams(type: EffectType): Map<String, Float> = when (type) {
+            BRIGHTNESS -> mapOf("value" to 0f)
+            CONTRAST -> mapOf("value" to 1f)
+            SATURATION -> mapOf("value" to 1f)
+            TEMPERATURE -> mapOf("value" to 0f)
+            TINT -> mapOf("value" to 0f)
+            EXPOSURE -> mapOf("value" to 0f)
+            GAMMA -> mapOf("value" to 1f)
+            HIGHLIGHTS -> mapOf("value" to 0f)
+            SHADOWS -> mapOf("value" to 0f)
+            VIBRANCE -> mapOf("value" to 0f)
+            VIGNETTE -> mapOf("intensity" to 0.5f, "radius" to 0.7f)
+            GAUSSIAN_BLUR -> mapOf("radius" to 5f)
+            SHARPEN -> mapOf("strength" to 0.5f)
+            FILM_GRAIN -> mapOf("intensity" to 0.1f)
+            GLITCH -> mapOf("intensity" to 0.5f)
+            PIXELATE -> mapOf("size" to 10f)
+            CHROMATIC_ABERRATION -> mapOf("intensity" to 0.5f)
+            CHROMA_KEY -> mapOf("similarity" to 0.4f, "smoothness" to 0.1f, "spill" to 0.1f)
+            TILT_SHIFT -> mapOf("blur" to 0.01f, "focusY" to 0.5f, "width" to 0.1f)
+            CYBERPUNK, NOIR, VINTAGE -> mapOf("intensity" to 0.7f)
+            COOL_TONE, WARM_TONE -> mapOf("intensity" to 0.5f)
+            SPEED -> mapOf("value" to 1f)
+            MOSAIC -> mapOf("size" to 15f)
+            RADIAL_BLUR, MOTION_BLUR, FISHEYE -> mapOf("intensity" to 0.5f)
+            WAVE -> mapOf("amplitude" to 0.02f, "frequency" to 10f)
+            POSTERIZE -> mapOf("levels" to 6f)
+            GRAYSCALE, SEPIA, INVERT, MIRROR, REVERSE -> emptyMap()
+        }
+    }
 }
 
 enum class EffectCategory(val displayName: String) {

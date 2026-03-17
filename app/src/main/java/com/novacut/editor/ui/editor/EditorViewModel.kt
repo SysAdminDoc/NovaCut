@@ -122,6 +122,8 @@ class EditorViewModel @Inject constructor(
     @Volatile
     private var timelineWidthPx: Float = 0f
 
+    private var aiJob: kotlinx.coroutines.Job? = null
+
     fun setTimelineWidth(widthPx: Float) {
         timelineWidthPx = widthPx
     }
@@ -1110,7 +1112,8 @@ class EditorViewModel @Inject constructor(
 
         _state.update { it.copy(aiProcessingTool = toolId) }
 
-        viewModelScope.launch {
+        aiJob?.cancel()
+        aiJob = viewModelScope.launch {
             try {
                 when (toolId) {
                     "scene_detect" -> {
@@ -1390,12 +1393,20 @@ class EditorViewModel @Inject constructor(
                         showToast("Unknown AI tool: $toolId")
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                showToast("AI tool cancelled")
+                throw e
             } catch (e: Exception) {
                 showToast("AI tool failed: ${e.message}")
             } finally {
                 _state.update { it.copy(aiProcessingTool = null) }
+                aiJob = null
             }
         }
+    }
+
+    fun cancelAiTool() {
+        aiJob?.cancel()
     }
 
     fun insertFreezeFrame() {

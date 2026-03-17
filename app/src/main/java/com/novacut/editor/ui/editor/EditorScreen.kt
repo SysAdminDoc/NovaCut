@@ -56,6 +56,7 @@ fun EditorScreen(
                 totalDurationMs = state.totalDurationMs,
                 isPlaying = state.isPlaying,
                 isLooping = state.isLooping,
+                aspectRatio = state.project.aspectRatio,
                 onTogglePlayback = viewModel::togglePlayback,
                 onToggleLoop = viewModel::toggleLoop,
                 onSeek = viewModel::seekTo,
@@ -150,7 +151,7 @@ fun EditorScreen(
                 selectedClip = selectedClip,
                 onAddEffect = { effectType ->
                     val clipId = state.selectedClipId ?: return@EffectsPanel
-                    val effect = Effect(type = effectType, params = getDefaultParams(effectType))
+                    val effect = Effect(type = effectType, params = EffectType.defaultParams(effectType))
                     viewModel.addEffect(clipId, effect)
                     viewModel.selectEffect(effect.id)
                     viewModel.hideEffectsPanel()
@@ -346,6 +347,7 @@ fun EditorScreen(
                 hasSelectedClip = state.selectedClipId != null,
                 onToolSelected = { toolId -> viewModel.runAiTool(toolId) },
                 onDisabledToolTapped = { toolName -> viewModel.showToast("Select a clip to use $toolName") },
+                onCancelProcessing = viewModel::cancelAiTool,
                 onClose = viewModel::hideAiToolsPanel,
                 processingTool = state.aiProcessingTool
             )
@@ -495,7 +497,7 @@ private fun EditorTopBar(
                             onAddMedia()
                         },
                         leadingIcon = {
-                            Icon(Icons.Default.Add, contentDescription = null)
+                            Icon(Icons.Default.Add, contentDescription = "Add media")
                         }
                     )
                 }
@@ -517,40 +519,3 @@ private fun EditorTopBar(
     }
 }
 
-private fun getDefaultParams(type: EffectType): Map<String, Float> {
-    return when (type) {
-        EffectType.BRIGHTNESS -> mapOf("value" to 0f)
-        EffectType.CONTRAST -> mapOf("value" to 1f)
-        EffectType.SATURATION -> mapOf("value" to 1f)
-        EffectType.TEMPERATURE -> mapOf("value" to 0f)
-        EffectType.TINT -> mapOf("value" to 0f)
-        EffectType.EXPOSURE -> mapOf("value" to 0f)
-        EffectType.GAMMA -> mapOf("value" to 1f)
-        EffectType.HIGHLIGHTS -> mapOf("value" to 0f)
-        EffectType.SHADOWS -> mapOf("value" to 0f)
-        EffectType.VIBRANCE -> mapOf("value" to 0f)
-        EffectType.VIGNETTE -> mapOf("intensity" to 0.5f, "radius" to 0.7f)
-        EffectType.GAUSSIAN_BLUR -> mapOf("radius" to 5f)
-        EffectType.SHARPEN -> mapOf("strength" to 0.5f)
-        EffectType.FILM_GRAIN -> mapOf("intensity" to 0.1f)
-        EffectType.GLITCH -> mapOf("intensity" to 0.5f)
-        EffectType.PIXELATE -> mapOf("size" to 10f)
-        EffectType.CHROMATIC_ABERRATION -> mapOf("intensity" to 0.5f)
-        EffectType.CHROMA_KEY -> mapOf("similarity" to 0.4f, "smoothness" to 0.1f, "spill" to 0.1f)
-        EffectType.TILT_SHIFT -> mapOf("blur" to 0.01f, "focusY" to 0.5f, "width" to 0.1f)
-        EffectType.CYBERPUNK -> mapOf("intensity" to 0.7f)
-        EffectType.NOIR -> mapOf("intensity" to 0.7f)
-        EffectType.VINTAGE -> mapOf("intensity" to 0.7f)
-        EffectType.COOL_TONE -> mapOf("intensity" to 0.5f)
-        EffectType.WARM_TONE -> mapOf("intensity" to 0.5f)
-        EffectType.SPEED -> mapOf("value" to 1f)
-        EffectType.MOSAIC -> mapOf("size" to 15f)
-        EffectType.RADIAL_BLUR -> mapOf("intensity" to 0.5f)
-        EffectType.MOTION_BLUR -> mapOf("intensity" to 0.5f)
-        EffectType.FISHEYE -> mapOf("intensity" to 0.5f)
-        EffectType.MIRROR -> emptyMap()
-        EffectType.WAVE -> mapOf("amplitude" to 0.02f, "frequency" to 10f)
-        EffectType.POSTERIZE -> mapOf("levels" to 6f)
-        else -> emptyMap()
-    }
-}

@@ -15,6 +15,8 @@ class ExportService : Service() {
         const val ACTION_CANCEL = "com.novacut.editor.CANCEL_EXPORT"
     }
 
+    private var lastNotifiedProgress = -1
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -38,6 +40,9 @@ class ExportService : Service() {
     }
 
     fun updateProgress(progress: Int) {
+        // Throttle notification updates to 2% increments to reduce system load
+        if (progress - lastNotifiedProgress < 2 && progress < 100) return
+        lastNotifiedProgress = progress
         val nm = getSystemService(NotificationManager::class.java)
         nm.notify(NOTIFICATION_ID, buildNotification(progress))
     }

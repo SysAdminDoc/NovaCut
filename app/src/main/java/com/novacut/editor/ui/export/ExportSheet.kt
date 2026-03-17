@@ -103,7 +103,7 @@ fun ExportSheet(
                         onClick = onShare,
                         colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Share", color = Mocha.Crust)
                     }
@@ -111,7 +111,7 @@ fun ExportSheet(
                         onClick = onSaveToGallery,
                         colors = ButtonDefaults.buttonColors(containerColor = Mocha.Green)
                     ) {
-                        Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.SaveAlt, contentDescription = "Save to gallery", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Save to Gallery", color = Mocha.Crust)
                     }
@@ -152,7 +152,7 @@ fun ExportSheet(
                         onClick = onStartExport,
                         colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = "Retry", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Retry", color = Mocha.Crust)
                     }
@@ -286,7 +286,7 @@ fun ExportSheet(
             ),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.FileUpload, contentDescription = "Export video", modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Export Video", fontSize = 15.sp)
         }

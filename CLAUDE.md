@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.12.0
+v0.13.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -138,6 +138,11 @@ v0.12.0
 - Text overlay undo/redo support (add, edit, delete all undoable)
 - Effect parameter bounds validation (brightness, contrast, saturation, temperature)
 - Export error logging to logcat for debugging
+- AI tool cancellation (cancel button on processing indicator)
+- Keyframe deduplication (prevents division-by-zero on duplicate timestamps)
+- Centralized effect default parameters (EffectType.defaultParams companion)
+- SubMenuGrid scroll support for small screens
+- Accessibility content descriptions on interactive icons
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -181,6 +186,11 @@ v0.12.0
 - **Timeline auto-scroll** — During playback, if playhead crosses 80% of visible timeline width, scrollOffsetMs jumps to place playhead at 25% position. Uses `@Volatile var timelineWidthPx` in ViewModel (outside EditorState to avoid recomposition). Timeline reports width via `onTimelineWidthChanged` callback.
 - **Export progress clamped** — `coerceIn(0, 99)` while exporting to avoid premature "100%" display (COMPLETE state shows final confirmation instead).
 - **Export bitrate descriptions** — Output details card shows human-readable quality hint ("Studio quality", "Great for YouTube/social", "Good for sharing", "Compact file size") alongside Mbps number.
+- **Keyframe deduplication** — `KeyframeEngine.getValueAt()` applies `distinctBy { it.timeOffsetMs }` after sorting to prevent division-by-zero when duplicate keyframes exist at same timestamp.
+- **SubMenuGrid scroll** — Grid now uses `verticalScroll(rememberScrollState())` with `heightIn(max = 200.dp)` to handle overflow on small screens.
+- **Centralized effect defaults** — `EffectType.defaultParams(type)` companion method in `Project.kt` replaces duplicate default maps in `EditorScreen.kt` and `ToolPanel.kt`. Single source of truth for all 40+ effect default parameters.
+- **AI tool cancellation** — `runAiTool()` stores `Job` reference in `aiJob` field. `cancelAiTool()` cancels the coroutine. `CancellationException` re-thrown after toast. AiToolsPanel processing indicator shows "Cancel" button.
+- **Accessibility content descriptions** — Added to ExportSheet (Share, Save to gallery, Retry, Export video), AudioPanel (Record voiceover), EditorScreen (Add media) icons.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

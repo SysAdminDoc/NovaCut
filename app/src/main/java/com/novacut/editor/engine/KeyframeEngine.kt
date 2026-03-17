@@ -21,6 +21,7 @@ object KeyframeEngine {
         val relevant = keyframes
             .filter { it.property == property }
             .sortedBy { it.timeOffsetMs }
+            .distinctBy { it.timeOffsetMs }
 
         if (relevant.isEmpty()) return null
         if (relevant.size == 1) return relevant[0].value

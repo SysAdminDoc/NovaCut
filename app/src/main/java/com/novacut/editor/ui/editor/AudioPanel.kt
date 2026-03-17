@@ -121,7 +121,7 @@ fun AudioPanel(
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Red),
             border = BorderStroke(1.dp, Mocha.Red.copy(alpha = 0.5f))
         ) {
-            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Mic, contentDescription = "Record voiceover", modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Record Voiceover")
         }
