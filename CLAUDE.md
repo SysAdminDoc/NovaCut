@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.15.0
+v0.16.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -155,6 +155,11 @@ v0.15.0
 - Waveform extraction error logging (Log.e on codec failure)
 - Atomic auto-save copy for project duplication
 - Fade envelope bounds guard for tiny clip durations
+- AI tool null safety (all `clip!!` replaced with safe non-null val after unified guard)
+- Trim bounds coerced to sourceDurationMs (prevents trimEndMs exceeding source)
+- Split minimum duration validation (100ms minimum per half, toast feedback)
+- Delete/duplicate undo pre-validation (confirm clip exists before saving undo state)
+- Deserialization failure logging (Log.w on corrupt clips/effects/keyframes/overlays)
 - Project persistence to Room DB
 - Catppuccin Mocha dark theme
 - Permission handling (media, audio, notifications)
@@ -215,6 +220,11 @@ v0.15.0
 - **AudioEngine error logging** — `extractWaveform()` catch block now logs `Log.e(TAG, ...)` with exception details instead of silently returning empty array. TAG = "AudioEngine".
 - **Fade envelope bounds guard** — `drawFadeEnvelope()` now returns early for `durationMs <= 10` (previously `<= 0`), preventing extreme path coordinates from tiny clip durations.
 - **Atomic copyAutoSave** — `copyAutoSave()` now uses the same temp-file + rename pattern as `saveState()` to prevent partial writes on failure.
+- **AI tool null safety** — `runAiTool()` now requires clip for ALL tools (removed `auto_color` exception). All `clip!!` replaced with safe `clip` val that's guaranteed non-null after the unified null guard. Prevents NPE when AI tool dispatched without clip selection.
+- **Trim bounds coercion** — `trimClip()` now coerces `trimStartMs` to `0..sourceDurationMs-100` and `trimEndMs` to `trimStartMs+100..sourceDurationMs`. Prevents trim ranges exceeding source file bounds.
+- **Split minimum duration** — `splitClipAtPlayhead()` validates both resulting halves are >= 100ms in source time before proceeding. Shows "Clip too short to split here" toast on failure.
+- **Delete/duplicate undo pre-validation** — Both `deleteSelectedClip()` and `duplicateSelectedClip()` now verify clip existence in tracks before calling `saveUndoState()`. Same pattern as merge/split validation.
+- **Deserialization failure logging** — All `mapNotNull` catch blocks in `ProjectAutoSave` deserialization now log `Log.w(TAG, ...)` with index and exception. Covers clips, effects, keyframes, and text overlays.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

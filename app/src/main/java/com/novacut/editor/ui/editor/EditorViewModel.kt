@@ -297,6 +297,9 @@ class EditorViewModel @Inject constructor(
 
     fun deleteSelectedClip() {
         val clipId = _state.value.selectedClipId ?: return
+        // Validate clip exists before saving undo state
+        val exists = _state.value.tracks.any { it.clips.any { c -> c.id == clipId } }
+        if (!exists) return
         saveUndoState("Delete clip")
 
         _state.update { state ->
@@ -335,6 +338,9 @@ class EditorViewModel @Inject constructor(
 
     fun duplicateSelectedClip() {
         val clipId = _state.value.selectedClipId ?: return
+        // Validate clip exists before saving undo state
+        val exists = _state.value.tracks.any { it.clips.any { c -> c.id == clipId } }
+        if (!exists) return
         saveUndoState("Duplicate clip")
 
         _state.update { s ->
@@ -432,11 +438,15 @@ class EditorViewModel @Inject constructor(
         val playhead = state.playheadMs
 
         // Validate split is possible before saving undo state
-        val canSplit = state.tracks.any { track ->
-            val clip = track.clips.firstOrNull { it.id == clipId }
-            clip != null && playhead > clip.timelineStartMs && playhead < clip.timelineEndMs
+        val splitClip = state.tracks.flatMap { it.clips }.firstOrNull { it.id == clipId }
+        if (splitClip == null || playhead <= splitClip.timelineStartMs || playhead >= splitClip.timelineEndMs) return
+        // Ensure both halves meet minimum duration (100ms)
+        val relPos = playhead - splitClip.timelineStartMs
+        val srcSplit = splitClip.trimStartMs + (relPos * splitClip.speed).toLong()
+        if (srcSplit - splitClip.trimStartMs < 100L || splitClip.trimEndMs - srcSplit < 100L) {
+            showToast("Clip too short to split here")
+            return
         }
-        if (!canSplit) return
 
         saveUndoState("Split clip")
 
@@ -483,8 +493,8 @@ class EditorViewModel @Inject constructor(
             val tracks = state.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
                     if (clip.id == clipId) {
-                        val start = (newTrimStartMs ?: clip.trimStartMs).coerceAtLeast(0L)
-                        val end = (newTrimEndMs ?: clip.trimEndMs).coerceAtLeast(start + 100L)
+                        val start = (newTrimStartMs ?: clip.trimStartMs).coerceIn(0L, clip.sourceDurationMs - 100L)
+                        val end = (newTrimEndMs ?: clip.trimEndMs).coerceIn(start + 100L, clip.sourceDurationMs)
                         clip.copy(trimStartMs = start, trimEndMs = end)
                     } else clip
                 })
@@ -1132,7 +1142,7 @@ class EditorViewModel @Inject constructor(
     // AI Tools
     fun runAiTool(toolId: String) {
         val clip = getSelectedClip()
-        if (clip == null && toolId != "auto_color") {
+        if (clip == null) {
             showToast("Select a clip first")
             return
         }
@@ -1144,7 +1154,7 @@ class EditorViewModel @Inject constructor(
             try {
                 when (toolId) {
                     "scene_detect" -> {
-                        val scenes = aiFeatures.detectScenes(clip!!.sourceUri)
+                        val scenes = aiFeatures.detectScenes(clip.sourceUri)
                         if (scenes.isEmpty()) {
                             showToast("No scene changes detected")
                         } else {
@@ -1187,7 +1197,7 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "auto_captions" -> {
-                        val captions = aiFeatures.generateAutoCaptions(clip!!.sourceUri)
+                        val captions = aiFeatures.generateAutoCaptions(clip.sourceUri)
                         if (captions.isEmpty()) {
                             showToast("No speech detected")
                         } else {
@@ -1200,7 +1210,7 @@ class EditorViewModel @Inject constructor(
                     }
                     "smart_crop" -> {
                         val suggestion = aiFeatures.suggestCrop(
-                            clip!!.sourceUri,
+                            clip.sourceUri,
                             _state.value.project.aspectRatio.toFloat()
                         )
                         showToast("Smart crop: center(${
@@ -1210,7 +1220,7 @@ class EditorViewModel @Inject constructor(
                         }%")
                     }
                     "auto_color" -> {
-                        val correction = aiFeatures.autoColorCorrect(clip!!.sourceUri)
+                        val correction = aiFeatures.autoColorCorrect(clip.sourceUri)
                         if (correction.confidence < 0.1f) {
                             showToast("Could not analyze color")
                         } else {
@@ -1252,7 +1262,7 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "stabilize" -> {
-                        val result = aiFeatures.stabilizeVideo(clip!!.sourceUri)
+                        val result = aiFeatures.stabilizeVideo(clip.sourceUri)
                         if (result.confidence < 0.1f || result.shakeMagnitude < 0.001f) {
                             showToast("Video is already stable")
                         } else {
@@ -1299,7 +1309,7 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "denoise" -> {
-                        val profile = aiFeatures.analyzeAudioNoise(clip!!.sourceUri)
+                        val profile = aiFeatures.analyzeAudioNoise(clip.sourceUri)
                         if (profile.confidence < 0.1f) {
                             showToast("Could not analyze audio noise")
                         } else if (profile.signalToNoiseDb > 40f) {
@@ -1330,7 +1340,7 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "remove_bg" -> {
-                        val analysis = aiFeatures.analyzeBackground(clip!!.sourceUri)
+                        val analysis = aiFeatures.analyzeBackground(clip.sourceUri)
                         if (analysis.confidence < 0.1f) {
                             showToast("Could not detect background")
                         } else {
@@ -1372,7 +1382,7 @@ class EditorViewModel @Inject constructor(
                         // Track from center of frame across the clip duration
                         val region = com.novacut.editor.ai.TrackingRegion()
                         val results = aiFeatures.trackMotion(
-                            clip!!.sourceUri, region, clip.trimStartMs, clip.trimEndMs
+                            clip.sourceUri, region, clip.trimStartMs, clip.trimEndMs
                         )
                         if (results.isEmpty()) {
                             showToast("Motion tracking failed")

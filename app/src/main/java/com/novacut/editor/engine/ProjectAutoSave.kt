@@ -290,8 +290,10 @@ data class AutoSaveState(
                 isLocked = json.optBoolean("isLocked", false),
                 isVisible = json.optBoolean("isVisible", true),
                 isMuted = json.optBoolean("isMuted", false),
-                clips = (0 until clipsArr.length()).mapNotNull {
-                    try { deserializeClip(clipsArr.getJSONObject(it)) } catch (_: Exception) { null }
+                clips = (0 until clipsArr.length()).mapNotNull { i ->
+                    try { deserializeClip(clipsArr.getJSONObject(i)) } catch (e: Exception) {
+                        Log.w(TAG, "Failed to deserialize clip $i", e); null
+                    }
                 }
             )
         }
@@ -317,11 +319,15 @@ data class AutoSaveState(
                 positionY = json.optDouble("positionY", 0.0).toFloat(),
                 fadeInMs = json.optLong("fadeInMs", 0L),
                 fadeOutMs = json.optLong("fadeOutMs", 0L),
-                effects = (0 until effectsArr.length()).mapNotNull {
-                    try { deserializeEffect(effectsArr.getJSONObject(it)) } catch (_: Exception) { null }
+                effects = (0 until effectsArr.length()).mapNotNull { i ->
+                    try { deserializeEffect(effectsArr.getJSONObject(i)) } catch (e: Exception) {
+                        Log.w(TAG, "Failed to deserialize effect $i", e); null
+                    }
                 },
-                keyframes = (0 until keyframesArr.length()).mapNotNull {
-                    try { deserializeKeyframe(keyframesArr.getJSONObject(it)) } catch (_: Exception) { null }
+                keyframes = (0 until keyframesArr.length()).mapNotNull { i ->
+                    try { deserializeKeyframe(keyframesArr.getJSONObject(i)) } catch (e: Exception) {
+                        Log.w(TAG, "Failed to deserialize keyframe $i", e); null
+                    }
                 },
                 transition = if (json.has("transition")) deserializeTransition(json.getJSONObject("transition")) else null
             )
@@ -359,8 +365,10 @@ data class AutoSaveState(
         }
 
         private fun deserializeTextOverlays(arr: JSONArray): List<TextOverlay> {
-            return (0 until arr.length()).mapNotNull {
-                try { deserializeTextOverlay(arr.getJSONObject(it)) } catch (_: Exception) { null }
+            return (0 until arr.length()).mapNotNull { i ->
+                try { deserializeTextOverlay(arr.getJSONObject(i)) } catch (e: Exception) {
+                    Log.w(TAG, "Failed to deserialize text overlay $i", e); null
+                }
             }
         }
 
