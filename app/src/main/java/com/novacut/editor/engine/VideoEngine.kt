@@ -261,7 +261,7 @@ class VideoEngine @Inject constructor(
                     .build()
 
                 val videoEffects = buildList<androidx.media3.common.Effect> {
-                    for (effect in clip.effects) {
+                    for (effect in clip.effects.filter { it.enabled }) {
                         if (!effect.enabled) continue
                         buildVideoEffect(effect)?.let { add(it) }
                     }

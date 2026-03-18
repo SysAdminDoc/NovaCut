@@ -383,6 +383,7 @@ class EditorViewModel @Inject constructor(
         }
         rebuildPlayerTimeline()
         saveProject()
+        showToast("Clip duplicated")
     }
 
     fun mergeWithNextClip() {
@@ -447,6 +448,7 @@ class EditorViewModel @Inject constructor(
         }
         rebuildPlayerTimeline()
         saveProject()
+        showToast("Clips merged")
     }
 
     fun splitClipAtPlayhead() {
@@ -499,6 +501,7 @@ class EditorViewModel @Inject constructor(
         }
         rebuildPlayerTimeline()
         saveProject()
+        showToast("Clip split")
     }
 
     fun beginTrim() {
@@ -593,6 +596,24 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+    }
+
+    fun toggleEffectEnabled(clipId: String, effectId: String) {
+        saveUndoState("Toggle effect")
+        _state.update { state ->
+            val tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(effects = clip.effects.map { e ->
+                            if (e.id == effectId) e.copy(enabled = !e.enabled)
+                            else e
+                        })
+                    } else clip
+                })
+            }
+            state.copy(tracks = tracks)
+        }
+        saveProject()
     }
 
     fun removeEffect(clipId: String, effectId: String) {
@@ -782,6 +803,13 @@ class EditorViewModel @Inject constructor(
     }
 
     // Panel mutual exclusion — atomic dismiss-and-show in single state update
+    private fun pauseIfPlaying() {
+        if (videoEngine.isPlaying()) {
+            videoEngine.pause()
+            _state.update { it.copy(isPlaying = false) }
+        }
+    }
+
     private fun dismissedPanelState(state: EditorState) = state.copy(
         showMediaPicker = false,
         showExportSheet = false,
@@ -800,32 +828,33 @@ class EditorViewModel @Inject constructor(
     fun dismissAllPanels() { _state.update { dismissedPanelState(it) } }
 
     // Sheet toggles — each atomically dismisses other panels and shows the target
-    fun showMediaPicker() { _state.update { dismissedPanelState(it).copy(showMediaPicker = true) } }
+    // All show methods pause playback so users can adjust settings without video moving
+    fun showMediaPicker() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showMediaPicker = true) } }
     fun hideMediaPicker() { _state.update { it.copy(showMediaPicker = false) } }
     fun showExportSheet() {
-        // Reset export state so stale COMPLETE/ERROR doesn't show on reopen
+        pauseIfPlaying()
         videoEngine.resetExportState()
         _state.update { dismissedPanelState(it).copy(showExportSheet = true, exportState = ExportState.IDLE, exportProgress = 0f, exportErrorMessage = null) }
     }
     fun hideExportSheet() { _state.update { it.copy(showExportSheet = false) } }
-    fun showEffectsPanel() { _state.update { dismissedPanelState(it).copy(showEffectsPanel = true) } }
+    fun showEffectsPanel() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showEffectsPanel = true) } }
     fun hideEffectsPanel() { _state.update { it.copy(showEffectsPanel = false) } }
-    fun showTextEditor() { _state.update { dismissedPanelState(it).copy(showTextEditor = true, editingTextOverlayId = null) } }
-    fun editTextOverlay(id: String) { _state.update { dismissedPanelState(it).copy(showTextEditor = true, editingTextOverlayId = id) } }
+    fun showTextEditor() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showTextEditor = true, editingTextOverlayId = null) } }
+    fun editTextOverlay(id: String) { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showTextEditor = true, editingTextOverlayId = id) } }
     fun hideTextEditor() { _state.update { it.copy(showTextEditor = false, editingTextOverlayId = null) } }
-    fun showTransitionPicker() { _state.update { dismissedPanelState(it).copy(showTransitionPicker = true) } }
+    fun showTransitionPicker() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showTransitionPicker = true) } }
     fun hideTransitionPicker() { _state.update { it.copy(showTransitionPicker = false) } }
-    fun showAudioPanel() { _state.update { dismissedPanelState(it).copy(showAudioPanel = true) } }
+    fun showAudioPanel() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showAudioPanel = true) } }
     fun hideAudioPanel() { _state.update { it.copy(showAudioPanel = false) } }
-    fun showAiToolsPanel() { _state.update { dismissedPanelState(it).copy(showAiToolsPanel = true) } }
+    fun showAiToolsPanel() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showAiToolsPanel = true) } }
     fun hideAiToolsPanel() { _state.update { it.copy(showAiToolsPanel = false) } }
-    fun showTransformPanel() { _state.update { dismissedPanelState(it).copy(showTransformPanel = true) } }
+    fun showTransformPanel() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showTransformPanel = true) } }
     fun hideTransformPanel() { _state.update { it.copy(showTransformPanel = false) } }
-    fun showCropPanel() { _state.update { dismissedPanelState(it).copy(showCropPanel = true) } }
+    fun showCropPanel() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showCropPanel = true) } }
     fun hideCropPanel() { _state.update { it.copy(showCropPanel = false) } }
     fun selectEffect(effectId: String?) { _state.update { it.copy(selectedEffectId = effectId) } }
     fun clearSelectedEffect() { _state.update { it.copy(selectedEffectId = null) } }
-    fun showVoiceoverPanel() { _state.update { dismissedPanelState(it).copy(showVoiceoverRecorder = true) } }
+    fun showVoiceoverPanel() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showVoiceoverRecorder = true) } }
     fun hideVoiceoverPanel() {
         if (_state.value.isRecordingVoiceover) stopVoiceover()
         voiceoverDurationJob?.cancel()

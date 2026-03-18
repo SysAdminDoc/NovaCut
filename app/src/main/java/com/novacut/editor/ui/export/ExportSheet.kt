@@ -26,6 +26,7 @@ fun ExportSheet(
     onStartExport: () -> Unit,
     onShare: () -> Unit = {},
     onSaveToGallery: () -> Unit = {},
+    onCancel: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -78,6 +79,10 @@ fun ExportSheet(
                     color = Mocha.Subtext0,
                     fontSize = 14.sp
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                TextButton(onClick = onCancel) {
+                    Text("Cancel Export", color = Mocha.Red)
+                }
             }
             return
         }

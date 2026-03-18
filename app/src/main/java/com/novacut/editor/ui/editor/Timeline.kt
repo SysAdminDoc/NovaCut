@@ -6,6 +6,8 @@ import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +23,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.engine.VideoEngine
@@ -45,6 +48,9 @@ fun Timeline(
     onTrimChanged: (clipId: String, newTrimStartMs: Long?, newTrimEndMs: Long?) -> Unit = { _, _, _ -> },
     onTrimDragStarted: () -> Unit = {},
     onTimelineWidthChanged: (Float) -> Unit = {},
+    onToggleTrackMute: (String) -> Unit = {},
+    onToggleTrackVisible: (String) -> Unit = {},
+    onToggleTrackLock: (String) -> Unit = {},
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -104,24 +110,27 @@ fun Timeline(
             // Track headers
             Column(
                 modifier = Modifier
-                    .width(40.dp)
+                    .width(44.dp)
                     .background(Mocha.Crust)
             ) {
                 // Ruler spacer
                 Spacer(modifier = Modifier.height(rulerHeight))
 
                 tracks.forEach { track ->
-                    Box(
+                    val trackColor = when (track.type) {
+                        TrackType.VIDEO -> Mocha.Blue
+                        TrackType.AUDIO -> Mocha.Green
+                        TrackType.OVERLAY -> Mocha.Peach
+                        TrackType.TEXT -> Mocha.Mauve
+                    }
+                    Column(
                         modifier = Modifier
                             .height(trackHeight)
                             .fillMaxWidth()
                             .background(Mocha.Crust)
-                            .border(
-                                width = 0.5.dp,
-                                color = Mocha.Surface0,
-                                shape = RoundedCornerShape(0.dp)
-                            ),
-                        contentAlignment = Alignment.Center
+                            .border(0.5.dp, Mocha.Surface0),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = when (track.type) {
@@ -131,14 +140,32 @@ fun Timeline(
                                 TrackType.TEXT -> Icons.Default.Title
                             },
                             contentDescription = track.type.name,
-                            tint = when (track.type) {
-                                TrackType.VIDEO -> Mocha.Blue
-                                TrackType.AUDIO -> Mocha.Green
-                                TrackType.OVERLAY -> Mocha.Peach
-                                TrackType.TEXT -> Mocha.Mauve
-                            },
-                            modifier = Modifier.size(18.dp)
+                            tint = if (track.isVisible) trackColor else Mocha.Surface2,
+                            modifier = Modifier.size(14.dp)
                         )
+                        Row(
+                            modifier = Modifier.padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            Icon(
+                                if (track.isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = if (track.isMuted) "Unmute" else "Mute",
+                                tint = if (track.isMuted) Mocha.Red.copy(alpha = 0.7f) else Mocha.Surface2,
+                                modifier = Modifier.size(11.dp).clickable { onToggleTrackMute(track.id) }
+                            )
+                            Icon(
+                                if (track.isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (track.isVisible) "Hide" else "Show",
+                                tint = if (!track.isVisible) Mocha.Red.copy(alpha = 0.7f) else Mocha.Surface2,
+                                modifier = Modifier.size(11.dp).clickable { onToggleTrackVisible(track.id) }
+                            )
+                            Icon(
+                                if (track.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                contentDescription = if (track.isLocked) "Unlock" else "Lock",
+                                tint = if (track.isLocked) Mocha.Peach.copy(alpha = 0.7f) else Mocha.Surface2,
+                                modifier = Modifier.size(11.dp).clickable { onToggleTrackLock(track.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -370,6 +397,30 @@ fun Timeline(
                                                         RoundedCornerShape(2.dp)
                                                     )
                                             )
+                                        }
+
+                                        // Clip filename label
+                                        if (clipWidthPx > 60) {
+                                            val fileName = clip.sourceUri.lastPathSegment
+                                                ?.substringAfterLast('/')
+                                                ?.substringBeforeLast('.') ?: ""
+                                            if (fileName.isNotEmpty()) {
+                                                Text(
+                                                    text = fileName,
+                                                    color = Mocha.Text.copy(alpha = 0.7f),
+                                                    fontSize = 8.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomStart)
+                                                        .padding(start = 4.dp, bottom = 2.dp)
+                                                        .background(
+                                                            Mocha.Crust.copy(alpha = 0.6f),
+                                                            RoundedCornerShape(2.dp)
+                                                        )
+                                                        .padding(horizontal = 2.dp)
+                                                )
+                                            }
                                         }
 
                                         // Effects count badge

@@ -2,6 +2,7 @@ package com.novacut.editor.ui.editor
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,6 +27,7 @@ import com.novacut.editor.model.*
 import com.novacut.editor.ui.export.ExportSheet
 import com.novacut.editor.ui.mediapicker.MediaPickerSheet
 import com.novacut.editor.ui.theme.Mocha
+import androidx.activity.compose.BackHandler
 import java.io.File
 
 @Composable
@@ -36,10 +39,25 @@ fun EditorScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    val hasOpenPanel = state.showMediaPicker || state.showExportSheet || state.showEffectsPanel ||
+        state.showTextEditor || state.showTransitionPicker || state.showAudioPanel ||
+        state.showAiToolsPanel || state.showTransformPanel || state.showCropPanel ||
+        state.showVoiceoverRecorder || state.selectedEffectId != null || state.editingTextOverlayId != null
+
+    BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
+        when {
+            hasOpenPanel -> viewModel.dismissAllPanels()
+            state.currentTool != EditorTool.NONE -> viewModel.setTool(EditorTool.NONE)
+            state.selectedClipId != null -> viewModel.selectClip(null)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Mocha.Base)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top bar (Home / Undo / Redo / Delete / More / Export)
             EditorTopBar(
+                projectName = state.project.name,
+                onRename = viewModel::renameProject,
                 onBack = onBack,
                 onUndo = viewModel::undo,
                 onRedo = viewModel::redo,
@@ -48,6 +66,7 @@ fun EditorScreen(
                 selectedClipId = state.selectedClipId,
                 onDelete = viewModel::deleteSelectedClip,
                 onAddMedia = viewModel::showMediaPicker,
+                onAddTrack = viewModel::addTrack,
                 onExport = viewModel::showExportSheet
             )
 
@@ -82,6 +101,9 @@ fun EditorScreen(
                 onTrimChanged = viewModel::trimClip,
                 onTrimDragStarted = viewModel::beginTrim,
                 onTimelineWidthChanged = viewModel::setTimelineWidth,
+                onToggleTrackMute = viewModel::toggleTrackMute,
+                onToggleTrackVisible = viewModel::toggleTrackVisibility,
+                onToggleTrackLock = viewModel::toggleTrackLock,
                 engine = viewModel.engine,
                 modifier = Modifier.weight(0.55f)
             )
@@ -266,6 +288,7 @@ fun EditorScreen(
                     }
                 },
                 onSaveToGallery = viewModel::saveToGallery,
+                onCancel = { viewModel.engine.cancelExport() },
                 onClose = viewModel::hideExportSheet
             )
         }
@@ -388,6 +411,10 @@ fun EditorScreen(
                         viewModel.updateEffect(clipId, effect.id, params)
                     },
                     onEffectDragStarted = viewModel::beginEffectAdjust,
+                    onToggleEnabled = {
+                        val clipId = state.selectedClipId ?: return@EffectAdjustmentPanel
+                        viewModel.toggleEffectEnabled(clipId, effect.id)
+                    },
                     onRemove = {
                         val clipId = state.selectedClipId ?: return@EffectAdjustmentPanel
                         viewModel.removeEffect(clipId, effect.id)
@@ -417,6 +444,8 @@ fun EditorScreen(
 
 @Composable
 private fun EditorTopBar(
+    projectName: String,
+    onRename: (String) -> Unit,
     onBack: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
@@ -425,10 +454,47 @@ private fun EditorTopBar(
     selectedClipId: String?,
     onDelete: () -> Unit,
     onAddMedia: () -> Unit,
+    onAddTrack: (TrackType) -> Unit,
     onExport: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showOverflow by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var showAddTrackMenu by remember { mutableStateOf(false) }
+
+    if (showRenameDialog) {
+        var nameText by remember { mutableStateOf(projectName) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Project", color = Mocha.Text) },
+            text = {
+                OutlinedTextField(
+                    value = nameText,
+                    onValueChange = { nameText = it },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Mocha.Text,
+                        unfocusedTextColor = Mocha.Text,
+                        cursorColor = Mocha.Mauve,
+                        focusedBorderColor = Mocha.Mauve,
+                        unfocusedBorderColor = Mocha.Surface1
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (nameText.isNotBlank()) onRename(nameText.trim())
+                    showRenameDialog = false
+                }) { Text("Save", color = Mocha.Mauve) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("Cancel", color = Mocha.Subtext0)
+                }
+            },
+            containerColor = Mocha.Mantle
+        )
+    }
 
     Surface(
         color = Mocha.Crust,
@@ -478,7 +544,18 @@ private fun EditorTopBar(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            // Project name (tap to rename)
+            Text(
+                text = projectName,
+                color = Mocha.Subtext1,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+                    .clickable { showRenameDialog = true }
+            )
 
             if (selectedClipId != null) {
                 IconButton(
@@ -517,8 +594,53 @@ private fun EditorTopBar(
                             onAddMedia()
                         },
                         leadingIcon = {
-                            Icon(Icons.Default.Add, contentDescription = "Add media")
+                            Icon(Icons.Default.Add, contentDescription = null)
                         }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add Track") },
+                        onClick = {
+                            showOverflow = false
+                            showAddTrackMenu = true
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.VideoLibrary, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Rename Project") },
+                        onClick = {
+                            showOverflow = false
+                            showRenameDialog = true
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Edit, contentDescription = null)
+                        }
+                    )
+                }
+                DropdownMenu(
+                    expanded = showAddTrackMenu,
+                    onDismissRequest = { showAddTrackMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Video Track") },
+                        onClick = { showAddTrackMenu = false; onAddTrack(TrackType.VIDEO) },
+                        leadingIcon = { Icon(Icons.Default.Videocam, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Audio Track") },
+                        onClick = { showAddTrackMenu = false; onAddTrack(TrackType.AUDIO) },
+                        leadingIcon = { Icon(Icons.Default.MusicNote, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Overlay Track") },
+                        onClick = { showAddTrackMenu = false; onAddTrack(TrackType.OVERLAY) },
+                        leadingIcon = { Icon(Icons.Default.Layers, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Text Track") },
+                        onClick = { showAddTrackMenu = false; onAddTrack(TrackType.TEXT) },
+                        leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null) }
                     )
                 }
             }

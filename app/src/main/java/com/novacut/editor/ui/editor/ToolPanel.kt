@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -123,6 +124,9 @@ fun BottomToolArea(
                         onItemSelected = { itemId ->
                             onAction(itemId)
                             activeTabId = null
+                        },
+                        disabledIds = buildSet {
+                            if (!hasCopiedEffects) add("paste_fx")
                         }
                     )
                     // Text overlay list when text tab active
@@ -255,6 +259,7 @@ private fun BottomTabBar(
 private fun SubMenuGrid(
     items: List<SubMenuItem>,
     onItemSelected: (String) -> Unit,
+    disabledIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val itemsPerRow = 5
@@ -277,12 +282,14 @@ private fun SubMenuGrid(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     rowItems.forEach { item ->
+                        val isDisabled = item.id in disabledIds
                         Column(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { onItemSelected(item.id) }
+                                .then(if (!isDisabled) Modifier.clickable { onItemSelected(item.id) } else Modifier)
                                 .padding(8.dp)
-                                .width(56.dp),
+                                .width(56.dp)
+                                .then(if (isDisabled) Modifier.alpha(0.35f) else Modifier),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
@@ -428,6 +435,7 @@ fun EffectAdjustmentPanel(
     effect: Effect,
     onUpdateParams: (Map<String, Float>) -> Unit,
     onEffectDragStarted: () -> Unit = {},
+    onToggleEnabled: () -> Unit = {},
     onRemove: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -443,8 +451,20 @@ fun EffectAdjustmentPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(effect.type.displayName, color = Mocha.Text, fontSize = 16.sp)
+            Text(
+                effect.type.displayName,
+                color = if (effect.enabled) Mocha.Text else Mocha.Subtext0,
+                fontSize = 16.sp
+            )
             Row {
+                IconButton(onClick = onToggleEnabled, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        if (effect.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (effect.enabled) "Disable" else "Enable",
+                        tint = if (effect.enabled) Mocha.Green else Mocha.Surface2,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Delete, "Remove", tint = Mocha.Red, modifier = Modifier.size(18.dp))
                 }
@@ -661,44 +681,6 @@ fun EffectSlider(
 }
 
 @Composable
-fun SpeedSlider(
-    label: String,
-    value: Float,
-    min: Float,
-    max: Float,
-    onDragStarted: () -> Unit,
-    onValueChange: (Float) -> Unit
-) {
-    var isDragging by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(label, color = Mocha.Subtext1, fontSize = 12.sp)
-            Text("%.2f".format(value), color = Mocha.Subtext0, fontSize = 12.sp)
-        }
-        Slider(
-            value = value,
-            onValueChange = {
-                if (!isDragging) {
-                    isDragging = true
-                    onDragStarted()
-                }
-                onValueChange(it)
-            },
-            onValueChangeFinished = { isDragging = false },
-            valueRange = min..max,
-            colors = SliderDefaults.colors(
-                thumbColor = Mocha.Mauve,
-                activeTrackColor = Mocha.Mauve,
-                inactiveTrackColor = Mocha.Surface1
-            )
-        )
-    }
-}
-
-@Composable
 fun SpeedPanel(
     currentSpeed: Float,
     isReversed: Boolean,
@@ -752,7 +734,7 @@ fun SpeedPanel(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Custom speed slider with drag start for undo debounce
-        SpeedSlider("Custom Speed", currentSpeed, 0.1f, 16f, onSpeedDragStarted) { onSpeedChanged(it) }
+        EffectSlider("Custom Speed", currentSpeed, 0.1f, 16f, onSpeedDragStarted) { onSpeedChanged(it) }
 
         // Reverse toggle
         Row(
@@ -807,22 +789,22 @@ fun TransformPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        SpeedSlider("Position X", clip.positionX, -1f, 1f, onTransformDragStarted) {
+        EffectSlider("Position X", clip.positionX, -1f, 1f, onTransformDragStarted) {
             onTransformChanged(it, null, null, null, null)
         }
-        SpeedSlider("Position Y", clip.positionY, -1f, 1f, onTransformDragStarted) {
+        EffectSlider("Position Y", clip.positionY, -1f, 1f, onTransformDragStarted) {
             onTransformChanged(null, it, null, null, null)
         }
-        SpeedSlider("Scale X", clip.scaleX, 0.1f, 5f, onTransformDragStarted) {
+        EffectSlider("Scale X", clip.scaleX, 0.1f, 5f, onTransformDragStarted) {
             onTransformChanged(null, null, it, null, null)
         }
-        SpeedSlider("Scale Y", clip.scaleY, 0.1f, 5f, onTransformDragStarted) {
+        EffectSlider("Scale Y", clip.scaleY, 0.1f, 5f, onTransformDragStarted) {
             onTransformChanged(null, null, null, it, null)
         }
-        SpeedSlider("Rotation", clip.rotation, -360f, 360f, onTransformDragStarted) {
+        EffectSlider("Rotation", clip.rotation, -360f, 360f, onTransformDragStarted) {
             onTransformChanged(null, null, null, null, it)
         }
-        SpeedSlider("Opacity", clip.opacity, 0f, 1f, onTransformDragStarted) {
+        EffectSlider("Opacity", clip.opacity, 0f, 1f, onTransformDragStarted) {
             onOpacityChanged(it)
         }
     }

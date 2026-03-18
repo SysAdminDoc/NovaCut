@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.34.0
+v0.35.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -200,6 +200,17 @@ v0.34.0
 - Export applies frame rate from config via FrameDropEffect (24/30/60fps frame dropping)
 - Export applies audio bitrate from config via AudioEncoderSettings (256kbps default)
 - Export text overlay fontFamily (TypefaceSpan), backgroundColor (BackgroundColorSpan), alignment (AlignmentSpan)
+- Export cancel button in ExportSheet (TextButton in EXPORTING state, wires to VideoEngine.cancelExport)
+- Android back button handling (BackHandler: dismiss panel > clear tool > deselect clip)
+- Success toasts for split/duplicate/merge operations
+- Auto-pause playback when opening any panel (pauseIfPlaying in all show* methods)
+- Paste effects dim hint (SubMenuGrid disabledIds with alpha 0.35f when no copied effects)
+- Clip filename labels on timeline clips (8sp, semi-transparent, hidden on narrow clips)
+- Track mute/visible/lock toggle icons in timeline track headers (11dp color-coded icons)
+- Effect enable/disable toggle (eye icon in EffectAdjustmentPanel header, disabled effects skipped in export)
+- Project name display in EditorTopBar center (tap to rename via AlertDialog)
+- Overflow menu: Add Media, Add Track (Video/Audio/Overlay/Text submenu), Rename Project
+- Add Track from overflow menu (creates new track of selected type)
 
 ## Gotchas
 - Media3 Transformer effects use `@UnstableApi` annotation - suppress with `@OptIn`
@@ -343,6 +354,14 @@ v0.34.0
 - **Text overlay fontFamily export** — `TypefaceSpan(overlay.fontFamily)` applied to SpannableString. Android resolves "sans-serif", "serif", "monospace", "cursive" to system fonts. Custom font files would require loading Typeface from assets.
 - **Text overlay backgroundColor skip** — `BackgroundColorSpan` only added when alpha channel is non-zero (`color and 0xFF000000 != 0`). Fully transparent (0x00000000) default means no background rendered.
 - **Text overlay strokeColor/strokeWidth** — NOT exported. SpannableString has no native stroke support. Would require custom Canvas drawing in a Bitmap-based overlay (not TextOverlay). Documented as known limitation.
+- **VolumeOff/VolumeUp AutoMirrored** — `Icons.Default.VolumeOff`/`VolumeUp` are deprecated. Use `Icons.AutoMirrored.Filled.VolumeOff`/`VolumeUp` with explicit import.
+- **Effect.enabled already in model** — `Effect` data class has `enabled: Boolean = true` field. `toggleEffectEnabled()` in ViewModel copies effect with `!enabled`. Export filters `clip.effects.filter { it.enabled }`.
+- **Track header toggle click targets** — 11dp icons with `clickable` modifier. Small hit target but acceptable for track headers. No `minimumInteractiveComponentSize` override.
+- **EditorTopBar project name** — Shown as `Text` with `Modifier.weight(1f)` center-aligned between undo/redo and delete/overflow buttons. Taps open `AlertDialog` for rename. `TextOverflow.Ellipsis` for long names.
+- **Add Track overflow submenu** — Separate `DropdownMenu` (not nested). First menu dismisses, then second opens via `showAddTrackMenu` state. Each track type (VIDEO, AUDIO, OVERLAY, TEXT) creates new track via `viewModel.addTrack(type)`.
+- **BackHandler priority** — `hasOpenPanel` checks 12 boolean panel states. Priority: dismiss panels > clear tool > deselect clip. `enabled` parameter gates the handler to avoid intercepting when nothing to dismiss.
+- **pauseIfPlaying pattern** — Checks `videoEngine.isPlaying()`, calls `videoEngine.pause()`, updates `isPlaying = false` in state. Called at start of every `show*()` method to prevent playback during panel interaction.
+- **SubMenuGrid disabledIds** — `Set<String>` parameter. Disabled items get `Modifier.alpha(0.35f)` and no `clickable` modifier. Used for paste_fx when `hasCopiedEffects = false`.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
