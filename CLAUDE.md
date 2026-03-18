@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.32.0
+v0.33.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -196,6 +196,10 @@ v0.32.0
 - Permission handling (media, audio, notifications)
 - Export 14 GLSL shader effects (vignette, sharpen, film grain, gaussian/radial/motion blur, tilt shift, mosaic, fisheye, glitch, pixelate, wave, chromatic aberration, chroma key)
 - Export 25 transition types via GLSL shaders (dissolve, fade black/white, wipe 4-way, slide 2-way, zoom in/out, spin, flip, cube, ripple, pixelate, directional warp, wind, morph, glitch, circle open, cross zoom, dreamy, heart, swirl)
+- Export respects track mute/visible (hidden video tracks excluded, muted tracks silenced, muted audio tracks omitted)
+- Export applies frame rate from config via FrameDropEffect (24/30/60fps frame dropping)
+- Export applies audio bitrate from config via AudioEncoderSettings (256kbps default)
+- Export text overlay fontFamily (TypefaceSpan), backgroundColor (BackgroundColorSpan), alignment (AlignmentSpan)
 
 ## Gotchas
 - Media3 Transformer effects use `@UnstableApi` annotation - suppress with `@OptIn`
@@ -325,6 +329,12 @@ v0.32.0
 - **Transition rendering order** — Transitions inserted after regular effects but before opacity/transform/speed/text/Presentation in the videoEffects chain. This means the transition reveals the fully-effected video.
 - **GLSL `float a, b` declaration** — Valid in GLSL ES 3.0. Used for `float cs = cos(angle), sn = sin(angle);` in spin/swirl shaders.
 - **Heart shape parametric formula** — Uses implicit equation `(x^2 + y^2 - 1)^3 - x^2*y^3 = 0` for clean heart mask in GLSL. Center offset at (0.5, 0.6) for aesthetic framing.
+- **Track mute/visible in export** — Video track filtered by `isVisible`, audio from muted video tracks silenced via `VolumeAudioProcessor(volume=0f)`. Audio track filtered by both `isVisible` and `isMuted`. `transmuxAudio` flag derived from filtered audio track state.
+- **FrameDropEffect for frame rate** — `FrameDropEffect.createDefaultFrameDropEffect(fps)` added before Presentation in video effects chain. Can only reduce fps (drop frames), not increase. Source fps preserved if target is higher than source.
+- **AudioEncoderSettings in Media3 1.5.1** — `DefaultEncoderFactory.Builder.setRequestedAudioEncoderSettings(AudioEncoderSettings)` exists alongside video settings. `AudioEncoderSettings.Builder().setBitrate(int)` controls output audio bitrate.
+- **Text overlay fontFamily export** — `TypefaceSpan(overlay.fontFamily)` applied to SpannableString. Android resolves "sans-serif", "serif", "monospace", "cursive" to system fonts. Custom font files would require loading Typeface from assets.
+- **Text overlay backgroundColor skip** — `BackgroundColorSpan` only added when alpha channel is non-zero (`color and 0xFF000000 != 0`). Fully transparent (0x00000000) default means no background rendered.
+- **Text overlay strokeColor/strokeWidth** — NOT exported. SpannableString has no native stroke support. Would require custom Canvas drawing in a Bitmap-based overlay (not TextOverlay). Documented as known limitation.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

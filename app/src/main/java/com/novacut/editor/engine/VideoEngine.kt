@@ -7,9 +7,13 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.Layout
 import android.text.style.AbsoluteSizeSpan
+import android.text.style.AlignmentSpan
+import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.text.style.TypefaceSpan
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
@@ -237,10 +241,11 @@ class VideoEngine @Inject constructor(
         _exportProgress.value = 0f
 
         try {
-            val videoTrack = tracks.firstOrNull { it.type == TrackType.VIDEO }
+            val videoTrack = tracks.firstOrNull { it.type == TrackType.VIDEO && it.isVisible }
             if (videoTrack == null || videoTrack.clips.isEmpty()) {
                 throw IllegalStateException("No video clips to export")
             }
+            val videoMuted = videoTrack.isMuted
 
             val (targetW, targetH) = config.resolution.forAspect(config.aspectRatio)
 
@@ -396,23 +401,36 @@ class VideoEngine @Inject constructor(
                         val typed = overlayList as List<TextureOverlay>
                         add(OverlayEffect(com.google.common.collect.ImmutableList.copyOf(typed)))
                     }
+                    // Frame rate control (drops frames to target fps)
+                    add(FrameDropEffect.createDefaultFrameDropEffect(config.frameRate.toFloat()))
                     add(Presentation.createForWidthAndHeight(
                         targetW, targetH, Presentation.LAYOUT_SCALE_TO_FIT
                     ))
                 }
 
                 val audioProcessors = buildList<AudioProcessor> {
-                    val hasKfVolume = clip.keyframes.any { it.property == KeyframeProperty.VOLUME }
-                    val needsVolume = clip.volume != 1.0f
-                    val needsFade = clip.fadeInMs > 0L || clip.fadeOutMs > 0L
-                    if (hasKfVolume || needsVolume || needsFade) {
+                    if (videoMuted) {
+                        // Track is muted — silence all audio from video clips
                         add(VolumeAudioProcessor(
-                            volume = clip.volume,
-                            fadeInMs = clip.fadeInMs,
-                            fadeOutMs = clip.fadeOutMs,
+                            volume = 0f,
+                            fadeInMs = 0L,
+                            fadeOutMs = 0L,
                             clipDurationMs = clip.durationMs,
-                            keyframes = if (hasKfVolume) clip.keyframes else emptyList()
+                            keyframes = emptyList()
                         ))
+                    } else {
+                        val hasKfVolume = clip.keyframes.any { it.property == KeyframeProperty.VOLUME }
+                        val needsVolume = clip.volume != 1.0f
+                        val needsFade = clip.fadeInMs > 0L || clip.fadeOutMs > 0L
+                        if (hasKfVolume || needsVolume || needsFade) {
+                            add(VolumeAudioProcessor(
+                                volume = clip.volume,
+                                fadeInMs = clip.fadeInMs,
+                                fadeOutMs = clip.fadeOutMs,
+                                clipDurationMs = clip.durationMs,
+                                keyframes = if (hasKfVolume) clip.keyframes else emptyList()
+                            ))
+                        }
                     }
                 }
 
@@ -424,10 +442,10 @@ class VideoEngine @Inject constructor(
             val videoSequence = EditedMediaItemSequence.Builder(editedItems).build()
 
             // Build audio track sequence (background music, voiceovers, etc.)
-            val audioTrack = tracks.firstOrNull { it.type == TrackType.AUDIO }
+            val audioTrack = tracks.firstOrNull { it.type == TrackType.AUDIO && it.isVisible }
             val sequences = buildList {
                 add(videoSequence)
-                if (audioTrack != null && audioTrack.clips.isNotEmpty()) {
+                if (audioTrack != null && !audioTrack.isMuted && audioTrack.clips.isNotEmpty()) {
                     val audioItems = audioTrack.clips.map { clip ->
                         val mediaItem = MediaItem.Builder()
                             .setUri(clip.sourceUri)
@@ -461,8 +479,9 @@ class VideoEngine @Inject constructor(
                 }
             }
 
+            val hasAudioTrack = audioTrack != null && !audioTrack.isMuted && audioTrack.clips.isNotEmpty()
             val composition = Composition.Builder(sequences)
-                .setTransmuxAudio(audioTrack == null || audioTrack.clips.isEmpty())
+                .setTransmuxAudio(!hasAudioTrack)
                 .build()
 
             val mimeType = when (config.codec) {
@@ -480,6 +499,11 @@ class VideoEngine @Inject constructor(
                             .setRequestedVideoEncoderSettings(
                                 VideoEncoderSettings.Builder()
                                     .setBitrate(config.videoBitrate)
+                                    .build()
+                            )
+                            .setRequestedAudioEncoderSettings(
+                                AudioEncoderSettings.Builder()
+                                    .setBitrate(config.audioBitrate)
                                     .build()
                             )
                             .build()
@@ -1023,6 +1047,28 @@ private class ExportTextOverlay(
             if (style != Typeface.NORMAL) {
                 text.setSpan(StyleSpan(style), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
+            // Font family
+            text.setSpan(
+                TypefaceSpan(overlay.fontFamily),
+                0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            // Background color (skip if fully transparent)
+            if (overlay.backgroundColor.toInt() and 0xFF000000.toInt() != 0) {
+                text.setSpan(
+                    BackgroundColorSpan(overlay.backgroundColor.toInt()),
+                    0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            // Text alignment
+            val alignment = when (overlay.alignment) {
+                com.novacut.editor.model.TextAlignment.LEFT -> Layout.Alignment.ALIGN_NORMAL
+                com.novacut.editor.model.TextAlignment.CENTER -> Layout.Alignment.ALIGN_CENTER
+                com.novacut.editor.model.TextAlignment.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+            }
+            text.setSpan(
+                AlignmentSpan.Standard(alignment),
+                0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
         }
         return text
     }
