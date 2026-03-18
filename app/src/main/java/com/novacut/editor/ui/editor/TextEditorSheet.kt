@@ -40,6 +40,8 @@ fun TextEditorSheet(
     var animOut by remember { mutableStateOf(existingOverlay?.animationOut ?: TextAnimation.FADE) }
     var fontFamily by remember { mutableStateOf(existingOverlay?.fontFamily ?: "sans-serif") }
     var duration by remember { mutableFloatStateOf((existingOverlay?.let { it.endTimeMs - it.startTimeMs } ?: 3000L).toFloat()) }
+    var positionX by remember { mutableFloatStateOf(existingOverlay?.positionX ?: 0.5f) }
+    var positionY by remember { mutableFloatStateOf(existingOverlay?.positionY ?: 0.5f) }
 
     val fontFamilies = listOf(
         "sans-serif" to "Sans Serif",
@@ -85,7 +87,9 @@ fun TextEditorSheet(
                             startTimeMs = existingOverlay?.startTimeMs ?: playheadMs,
                             endTimeMs = (existingOverlay?.startTimeMs ?: playheadMs) + duration.toLong(),
                             animationIn = animIn,
-                            animationOut = animOut
+                            animationOut = animOut,
+                            positionX = positionX,
+                            positionY = positionY
                         )
                         onSave(overlay)
                     },
@@ -215,11 +219,13 @@ fun TextEditorSheet(
             }
         }
 
-        // Stroke
-        EffectSlider("Outline Width", strokeWidth, 0f, 5f) { strokeWidth = it }
+        // Position
+        Text("Position", color = Mocha.Subtext1, fontSize = 12.sp)
+        EffectSlider("Horizontal", positionX, 0f, 1f) { positionX = it }
+        EffectSlider("Vertical", positionY, 0f, 1f) { positionY = it }
 
-        // Duration
-        EffectSlider("Duration (ms)", duration, 500f, 10000f) { duration = it }
+        // Duration (display as seconds for readability)
+        EffectSlider("Duration (sec)", duration / 1000f, 0.5f, 10f) { duration = it * 1000f }
 
         // Animation In
         Text("Enter Animation", color = Mocha.Subtext1, fontSize = 12.sp)

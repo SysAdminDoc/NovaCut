@@ -1094,12 +1094,18 @@ class EditorViewModel @Inject constructor(
         )
 
         _state.update {
-            recalculateDuration(it.copy(
+            val restored = recalculateDuration(it.copy(
                 tracks = action.tracks,
                 textOverlays = action.textOverlays,
                 undoStack = undoStack.dropLast(1),
                 redoStack = it.redoStack + currentAction
             ))
+            val clipExists = it.selectedClipId != null &&
+                restored.tracks.any { t -> t.clips.any { c -> c.id == it.selectedClipId } }
+            dismissedPanelState(restored).copy(
+                selectedClipId = if (clipExists) it.selectedClipId else null,
+                currentTool = EditorTool.NONE
+            )
         }
         rebuildPlayerTimeline()
     }
@@ -1116,12 +1122,18 @@ class EditorViewModel @Inject constructor(
         )
 
         _state.update {
-            recalculateDuration(it.copy(
+            val restored = recalculateDuration(it.copy(
                 tracks = action.tracks,
                 textOverlays = action.textOverlays,
                 redoStack = redoStack.dropLast(1),
                 undoStack = it.undoStack + currentAction
             ))
+            val clipExists = it.selectedClipId != null &&
+                restored.tracks.any { t -> t.clips.any { c -> c.id == it.selectedClipId } }
+            dismissedPanelState(restored).copy(
+                selectedClipId = if (clipExists) it.selectedClipId else null,
+                currentTool = EditorTool.NONE
+            )
         }
         rebuildPlayerTimeline()
     }
@@ -1264,11 +1276,17 @@ class EditorViewModel @Inject constructor(
                             clip.sourceUri,
                             _state.value.project.aspectRatio.toFloat()
                         )
-                        showToast("Smart crop: center(${
-                            "%.0f".format(suggestion.centerX * 100)
-                        }%, ${"%.0f".format(suggestion.centerY * 100)}%) confidence: ${
-                            "%.0f".format(suggestion.confidence * 100)
-                        }%")
+                        if (suggestion.confidence < 0.1f) {
+                            showToast("Could not analyze frame for crop")
+                        } else {
+                            saveUndoState("AI smart crop")
+                            setClipTransform(
+                                clip.id,
+                                positionX = suggestion.centerX - 0.5f,
+                                positionY = suggestion.centerY - 0.5f
+                            )
+                            showToast("Smart crop applied (${"%.0f".format(suggestion.confidence * 100)}% confidence)")
+                        }
                     }
                     "auto_color" -> {
                         val correction = aiFeatures.autoColorCorrect(clip.sourceUri)

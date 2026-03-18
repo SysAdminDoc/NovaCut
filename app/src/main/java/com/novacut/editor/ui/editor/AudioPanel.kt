@@ -104,12 +104,13 @@ fun AudioPanel(
         }
 
         // Fade In
-        EffectSlider("Fade In (ms)", (clip?.fadeInMs ?: 0L).toFloat(), 0f, 5000f, onFadeDragStarted) {
+        val fadeMax = (clip?.durationMs ?: 5000L).toFloat().coerceAtLeast(100f)
+        EffectSlider("Fade In (ms)", (clip?.fadeInMs ?: 0L).toFloat(), 0f, fadeMax, onFadeDragStarted) {
             onFadeInChanged(it.toLong())
         }
 
         // Fade Out
-        EffectSlider("Fade Out (ms)", (clip?.fadeOutMs ?: 0L).toFloat(), 0f, 5000f, onFadeDragStarted) {
+        EffectSlider("Fade Out (ms)", (clip?.fadeOutMs ?: 0L).toFloat(), 0f, fadeMax, onFadeDragStarted) {
             onFadeOutChanged(it.toLong())
         }
 

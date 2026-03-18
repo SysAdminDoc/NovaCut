@@ -50,9 +50,10 @@ fun Timeline(
 ) {
     val density = LocalDensity.current
     val trackHeight = 60.dp
-    val rulerHeight = 24.dp
+    val rulerHeight = 28.dp
     val pixelsPerMs = zoomLevel * 0.15f // base scale
     val coroutineScope = rememberCoroutineScope()
+    val textMeasurer = rememberTextMeasurer()
 
     // Thumbnail cache — quantize zoom to prevent unbounded cache growth
     val thumbnails = remember { mutableStateMapOf<String, List<Bitmap>>() }
@@ -163,18 +164,39 @@ fun Timeline(
                     }
             ) {
                 Column {
-                    // Time ruler
+                    // Time ruler — tap and drag to position playhead
+                    var rulerDragX by remember { mutableFloatStateOf(0f) }
                     Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(rulerHeight)
                             .background(Mocha.Crust)
+                            .pointerInput(scrollOffsetMs, zoomLevel, totalDurationMs) {
+                                detectTapGestures { offset ->
+                                    val currentPixelsPerMs = zoomLevel * 0.15f
+                                    val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
+                                    onPlayheadMoved(tappedMs.coerceIn(0L, totalDurationMs))
+                                }
+                            }
+                            .pointerInput(scrollOffsetMs, zoomLevel, totalDurationMs) {
+                                detectDragGestures(
+                                    onDragStart = { offset -> rulerDragX = offset.x },
+                                    onDrag = { _, dragAmount ->
+                                        rulerDragX += dragAmount.x
+                                        val currentPixelsPerMs = zoomLevel * 0.15f
+                                        if (currentPixelsPerMs < 0.001f) return@detectDragGestures
+                                        val posMs = scrollOffsetMs + (rulerDragX / currentPixelsPerMs).toLong()
+                                        onPlayheadMoved(posMs.coerceIn(0L, totalDurationMs))
+                                    }
+                                )
+                            }
                     ) {
                         drawTimeRuler(
                             scrollOffsetMs = scrollOffsetMs,
                             pixelsPerMs = pixelsPerMs,
                             width = size.width,
-                            height = size.height
+                            height = size.height,
+                            textMeasurer = textMeasurer
                         )
                     }
 
@@ -438,7 +460,8 @@ private fun DrawScope.drawTimeRuler(
     scrollOffsetMs: Long,
     pixelsPerMs: Float,
     width: Float,
-    height: Float
+    height: Float,
+    textMeasurer: TextMeasurer
 ) {
     val intervalMs = when {
         pixelsPerMs > 0.5f -> 1000L
@@ -449,6 +472,10 @@ private fun DrawScope.drawTimeRuler(
 
     val startMs = (scrollOffsetMs / intervalMs) * intervalMs
     var currentMs = startMs
+    val labelStyle = TextStyle(
+        color = Color(0xFFA6ADC8), // Mocha.Subtext0
+        fontSize = 9.sp
+    )
 
     while (true) {
         val x = (currentMs - scrollOffsetMs) * pixelsPerMs
@@ -456,7 +483,7 @@ private fun DrawScope.drawTimeRuler(
 
         if (x >= 0) {
             val isMajor = currentMs % (intervalMs * 5) == 0L
-            val tickHeight = if (isMajor) height * 0.6f else height * 0.3f
+            val tickHeight = if (isMajor) height * 0.4f else height * 0.25f
 
             drawLine(
                 color = if (isMajor) Color(0xFF7F849C) else Color(0xFF45475A),
@@ -464,6 +491,19 @@ private fun DrawScope.drawTimeRuler(
                 end = Offset(x, height),
                 strokeWidth = if (isMajor) 1.5f else 0.5f
             )
+
+            // Time labels at major ticks
+            if (isMajor) {
+                val totalSeconds = (currentMs / 1000).toInt()
+                val min = totalSeconds / 60
+                val sec = totalSeconds % 60
+                val label = if (min > 0) "$min:${"%02d".format(sec)}" else "${sec}s"
+                val measured = textMeasurer.measure(label, labelStyle)
+                drawText(
+                    textLayoutResult = measured,
+                    topLeft = Offset(x - measured.size.width / 2f, 1f)
+                )
+            }
         }
         currentMs += intervalMs
     }

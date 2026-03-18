@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.33.0
+v0.34.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -322,6 +322,14 @@ v0.33.0
 - **Text overlay time validation** — `addTextOverlay()` and `updateTextOverlay()` reject overlays where `startTimeMs >= endTimeMs` with toast feedback.
 - **Transition duration bounds on deserialization** — `deserializeTransition()` clamps `durationMs` to 100-2000ms range via `coerceIn()` to match UI slider bounds.
 - **Export state snapshot** — `startExport()` captures `tracks`, `textOverlays`, and `config` before launching coroutine, preventing race conditions where state changes between validation and export call.
+- **Timeline time labels** — `drawTimeRuler()` now draws time labels at major tick marks using `TextMeasurer`. Format: "0s", "5s", "1:00", etc. Ruler height increased from 24dp to 28dp.
+- **Timeline playhead drag** — Ruler Canvas has tap + drag gesture handlers (`detectTapGestures` + `detectDragGestures`) for positioning playhead by tapping/dragging on the ruler.
+- **Undo/redo stale state fix** — `undo()` and `redo()` now validate `selectedClipId` exists in restored tracks, call `dismissedPanelState()`, and set `currentTool = EditorTool.NONE`.
+- **Smart crop applies transform** — AI smart crop now uses `setClipTransform()` to apply positionX/positionY instead of just showing a toast.
+- **Fade slider dynamic max** — AudioPanel fade sliders now use `clip.durationMs` as max instead of hardcoded 5000ms.
+- **Text overlay position controls** — TextEditorSheet has Horizontal/Vertical position sliders (0-1 range), wired into TextOverlay save callback.
+- **Duration slider in seconds** — TextEditorSheet duration slider displays/operates in seconds (0.5-10s) instead of milliseconds.
+- **Stroke slider removed** — Non-functional strokeWidth slider removed from TextEditorSheet (SpannableString has no native stroke support).
 - **ShaderEffect.kt GLSL framework** — `ShaderEffect` implements `GlEffect`, wraps GLES 3.0 fragment shader + uniforms map. `ShaderProgram` extends `BaseGlShaderProgram`, creates VAO/VBO once in `configure()`, draws fullscreen quad per frame. Uses `androidx.media3.common.util.Size` (NOT `android.util.Size`).
 - **Media3 presentationTimeUs is 0-based** — In Transformer export with ClippingConfiguration, `presentationTimeUs` in effects starts from 0 for each clip (not the original media timestamp). Verified by working keyframe opacity and text overlay timing.
 - **Transition shaders use uTime for progress** — `uTime = presentationTimeUs / 1_000_000f` (seconds). Progress computed as `uTime * 1000000.0 / uDurationUs`. `uDurationUs = transition.durationMs * 1000f`. After transition duration, progress clamps to 1.0 (fully revealed, no visual change).

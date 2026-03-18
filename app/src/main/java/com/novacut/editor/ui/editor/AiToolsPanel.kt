@@ -56,8 +56,7 @@ val aiTools = listOf(
     AiToolConfig(
         "auto_color", "Auto Color",
         "AI color correction",
-        Icons.Default.Palette, Mocha.Yellow,
-        requiresClip = false
+        Icons.Default.Palette, Mocha.Yellow
     ),
     AiToolConfig(
         "stabilize", "Stabilize",
