@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.novacut.editor.NovaCutApp
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
@@ -19,14 +21,10 @@ import com.novacut.editor.ui.theme.Mocha
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    var defaultResolution by remember { mutableStateOf(Resolution.FHD_1080P) }
-    var defaultFrameRate by remember { mutableIntStateOf(30) }
-    var defaultAspectRatio by remember { mutableStateOf(AspectRatio.RATIO_16_9) }
-    var autoSaveEnabled by remember { mutableStateOf(true) }
-    var autoSaveIntervalSec by remember { mutableFloatStateOf(60f) }
-    var proxyResolution: ProxyResolution by remember { mutableStateOf(ProxyResolution.QUARTER) }
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -55,21 +53,21 @@ fun SettingsScreen(
         SettingsSection("Export Defaults") {
             SettingsDropdown(
                 label = "Default Resolution",
-                value = defaultResolution.label,
+                value = settings.defaultResolution.label,
                 options = Resolution.entries.map { it.label },
-                onSelected = { idx -> defaultResolution = Resolution.entries[idx] }
+                onSelected = { idx -> viewModel.setResolution(Resolution.entries[idx]) }
             )
             SettingsDropdown(
                 label = "Default Frame Rate",
-                value = "${defaultFrameRate}fps",
+                value = "${settings.defaultFrameRate}fps",
                 options = listOf("24fps", "30fps", "60fps"),
-                onSelected = { idx -> defaultFrameRate = listOf(24, 30, 60)[idx] }
+                onSelected = { idx -> viewModel.setFrameRate(listOf(24, 30, 60)[idx]) }
             )
             SettingsDropdown(
                 label = "Default Aspect Ratio",
-                value = defaultAspectRatio.label,
+                value = settings.defaultAspectRatio.label,
                 options = AspectRatio.entries.map { it.label },
-                onSelected = { idx -> defaultAspectRatio = AspectRatio.entries[idx] }
+                onSelected = { idx -> viewModel.setAspectRatio(AspectRatio.entries[idx]) }
             )
         }
 
@@ -78,23 +76,23 @@ fun SettingsScreen(
             SettingsToggle(
                 label = "Auto-save",
                 description = "Periodically save project state",
-                checked = autoSaveEnabled,
-                onChanged = { autoSaveEnabled = it }
+                checked = settings.autoSaveEnabled,
+                onChanged = { viewModel.setAutoSave(it) }
             )
-            if (autoSaveEnabled) {
+            if (settings.autoSaveEnabled) {
                 SettingsSlider(
                     label = "Auto-save interval",
-                    value = autoSaveIntervalSec,
+                    value = settings.autoSaveIntervalSec.toFloat(),
                     range = 15f..300f,
-                    valueLabel = "${autoSaveIntervalSec.toInt()}s",
-                    onChanged = { autoSaveIntervalSec = it }
+                    valueLabel = "${settings.autoSaveIntervalSec}s",
+                    onChanged = { viewModel.setAutoSaveInterval(it.toInt()) }
                 )
             }
             SettingsDropdown(
                 label = "Proxy Resolution",
-                value = proxyResolution.label,
+                value = settings.proxyResolution.label,
                 options = ProxyResolution.entries.map { it.label },
-                onSelected = { idx -> proxyResolution = ProxyResolution.entries[idx] }
+                onSelected = { idx -> viewModel.setProxyResolution(ProxyResolution.entries[idx]) }
             )
         }
 

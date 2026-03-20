@@ -135,6 +135,32 @@ fun EditorScreen(
                 modifier = Modifier.weight(0.45f)
             )
 
+            // Multi-select action bar
+            if (state.selectedClipIds.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Mocha.Peach.copy(alpha = 0.15f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${state.selectedClipIds.size} selected",
+                        color = Mocha.Peach,
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = viewModel::deleteMultiSelectedClips) {
+                        Icon(Icons.Default.Delete, null, tint = Mocha.Red, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Delete", color = Mocha.Red, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = viewModel::clearMultiSelect) {
+                        Text("Cancel", color = Mocha.Subtext0, fontSize = 12.sp)
+                    }
+                }
+            }
+
             // Timeline
             Timeline(
                 tracks = state.tracks,
@@ -156,6 +182,8 @@ fun EditorScreen(
                 onToggleTrackVisible = viewModel::toggleTrackVisibility,
                 onToggleTrackLock = viewModel::toggleTrackLock,
                 beatMarkers = state.beatMarkers,
+                selectedClipIds = state.selectedClipIds,
+                onClipLongPress = viewModel::toggleClipMultiSelect,
                 engine = viewModel.engine,
                 modifier = Modifier.weight(0.55f)
             )
@@ -808,8 +836,8 @@ fun EditorScreen(
             MediaManagerPanel(
                 tracks = state.tracks,
                 onJumpToClip = viewModel::jumpToClip,
-                onRelinkMedia = { _, _ -> },
-                onRemoveUnused = { viewModel.showToast("Remove unused: not yet implemented") },
+                onRelinkMedia = { _, _ -> viewModel.showToast("Media relink not available") },
+                onRemoveUnused = { viewModel.removeUnusedMedia() },
                 onClose = viewModel::hideMediaManager
             )
         }

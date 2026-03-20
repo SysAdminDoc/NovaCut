@@ -53,6 +53,8 @@ fun Timeline(
     onToggleTrackVisible: (String) -> Unit = {},
     onToggleTrackLock: (String) -> Unit = {},
     beatMarkers: List<Long> = emptyList(),
+    selectedClipIds: Set<String> = emptySet(),
+    onClipLongPress: (String) -> Unit = {},
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -278,19 +280,29 @@ fun Timeline(
                                     shape = RoundedCornerShape(0.dp)
                                 )
                                 .pointerInput(scrollOffsetMs, zoomLevel) {
-                                    detectTapGestures { offset ->
-                                        // Convert tap to timeline position
-                                        val currentPixelsPerMs = zoomLevel * 0.15f
-                                        val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
-                                        // Find clip at this position
-                                        val clip = track.clips.firstOrNull {
-                                            tappedMs in it.timelineStartMs..it.timelineEndMs
+                                    detectTapGestures(
+                                        onTap = { offset ->
+                                            val currentPixelsPerMs = zoomLevel * 0.15f
+                                            val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
+                                            val clip = track.clips.firstOrNull {
+                                                tappedMs in it.timelineStartMs..it.timelineEndMs
+                                            }
+                                            if (clip != null) {
+                                                onClipSelected(clip.id, track.id)
+                                            }
+                                            onPlayheadMoved(tappedMs.coerceIn(0L, totalDurationMs))
+                                        },
+                                        onLongPress = { offset ->
+                                            val currentPixelsPerMs = zoomLevel * 0.15f
+                                            val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
+                                            val clip = track.clips.firstOrNull {
+                                                tappedMs in it.timelineStartMs..it.timelineEndMs
+                                            }
+                                            if (clip != null) {
+                                                onClipLongPress(clip.id)
+                                            }
                                         }
-                                        if (clip != null) {
-                                            onClipSelected(clip.id, track.id)
-                                        }
-                                        onPlayheadMoved(tappedMs.coerceIn(0L, totalDurationMs))
-                                    }
+                                    )
                                 }
                         ) {
                             // Draw clips
@@ -300,6 +312,7 @@ fun Timeline(
 
                                 if (clipStartPx + clipWidthPx > 0 && clipStartPx < timelineWidthPx) {
                                     val isSelected = clip.id == selectedClipId
+                                    val isMultiSelected = clip.id in selectedClipIds
                                     val clipColor = when (track.type) {
                                         TrackType.VIDEO -> Mocha.Blue
                                         TrackType.AUDIO -> Mocha.Green
@@ -316,8 +329,11 @@ fun Timeline(
                                             .padding(vertical = 2.dp)
                                             .clip(RoundedCornerShape(6.dp))
                                             .background(
-                                                if (isSelected) clipColor.copy(alpha = 0.5f)
-                                                else clipColor.copy(alpha = 0.3f)
+                                                when {
+                                                    isSelected -> clipColor.copy(alpha = 0.5f)
+                                                    isMultiSelected -> Mocha.Peach.copy(alpha = 0.4f)
+                                                    else -> clipColor.copy(alpha = 0.3f)
+                                                }
                                             )
                                             .then(
                                                 if (isSelected) Modifier.border(

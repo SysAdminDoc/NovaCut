@@ -1570,6 +1570,25 @@ class EditorViewModel @Inject constructor(
         hideMediaManager()
     }
 
+    fun removeUnusedMedia() {
+        val usedUris = _state.value.tracks.flatMap { it.clips }.map { it.sourceUri.toString() }.toSet()
+        // In NovaCut, all media is referenced by clips — there's no separate media pool.
+        // "Unused" means tracks with zero clips. Remove empty non-default tracks.
+        val defaultTrackCount = 2 // VIDEO + AUDIO
+        val currentTracks = _state.value.tracks
+        if (currentTracks.size <= defaultTrackCount) {
+            showToast("No unused tracks to remove")
+            return
+        }
+        saveUndoState("Remove unused tracks")
+        val kept = currentTracks.filter { it.clips.isNotEmpty() || it.index < defaultTrackCount }
+            .mapIndexed { i, t -> t.copy(index = i) }
+        _state.update { recalculateDuration(it.copy(tracks = kept)) }
+        val removed = currentTracks.size - kept.size
+        showToast("Removed $removed empty track${if (removed != 1) "s" else ""}")
+        saveProject()
+    }
+
     // --- Audio Normalization ---
     fun showAudioNorm() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showAudioNorm = true) } }
     fun hideAudioNorm() { _state.update { it.copy(showAudioNorm = false) } }

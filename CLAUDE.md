@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v2.1.0
+v2.2.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -412,6 +412,11 @@ v2.1.0
 - **Export platform presets** — `PlatformPreset` quick-select chips (YouTube, TikTok, Instagram Feed/Reels/Story, Twitter, LinkedIn) added to ExportSheet. Auto-populates resolution/fps/codec. Audio-only toggle switch added.
 - **Editor onboarding** — Empty project shows centered hint card ("No clips yet — Tap the + button to add media") with VideoLibrary icon. Hides when clips exist or panel is open. Preview panel hidden until clips added.
 - **Timeline zoom controls** — Zoom out (-), fit (reset to 1x), zoom in (+) buttons with percentage label. Added above track headers. Uses 0.75x/1.33x multipliers, clamped to 0.1x-10x range.
+
+- **Settings persistence** — `SettingsRepository` backed by DataStore (`preferencesDataStore`). `SettingsViewModel` with `StateFlow<AppSettings>`. All settings (resolution, fps, aspect ratio, auto-save, proxy) persist across rotation and app restarts. `AppSettings` data class with safe enum deserialization.
+- **Timeline multi-select** — Long-press on clip toggles multi-select via `toggleClipMultiSelect()`. Orange highlight for multi-selected clips. Action bar shows "N selected" with Delete and Cancel buttons. `selectedClipIds: Set<String>` in EditorState wired to Timeline. `deleteMultiSelectedClips()` with undo support.
+- **MediaManager remove unused** — `removeUnusedMedia()` removes empty non-default tracks with undo. Wired to MediaManagerPanel's "Remove Unused" button (was a toast stub).
+- **Key files added**: `engine/SettingsRepository.kt`, `ui/settings/SettingsViewModel.kt`
 
 ## Next Steps
 - FFmpeg integration for broader codec support
