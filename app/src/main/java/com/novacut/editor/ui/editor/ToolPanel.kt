@@ -126,7 +126,8 @@ private val projectToolsSubMenu = listOf(
     SubMenuItem("render_preview", Icons.Default.Preview, "Render\nAnalysis"),
     SubMenuItem("cloud_backup", Icons.Default.Cloud, "Cloud\nBackup"),
     SubMenuItem("archive", Icons.Default.Archive, "Project\nArchive"),
-    SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
+    SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport"),
+    SubMenuItem("proxy_toggle", Icons.Default.Speed, "Proxy\nEdit")
 )
 
 // --- Bottom tool area (tab bar + contextual sub-menu grids) ---

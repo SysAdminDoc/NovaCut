@@ -13,6 +13,7 @@ import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.ProjectAutoSave
+import com.novacut.editor.engine.ProxyEngine
 import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.SubtitleExporter
 import com.novacut.editor.engine.VideoEngine
@@ -157,6 +158,7 @@ class EditorViewModel @Inject constructor(
     private val aiFeatures: AiFeatures,
     private val voiceoverEngine: VoiceoverRecorderEngine,
     private val templateManager: TemplateManager,
+    private val proxyEngine: ProxyEngine,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -871,6 +873,7 @@ class EditorViewModel @Inject constructor(
     fun seekTo(positionMs: Long) {
         videoEngine.seekTo(positionMs)
         _state.update { it.copy(playheadMs = positionMs) }
+        if (_state.value.showScopes) updateScopeFrame()
     }
 
     /** Enable scrubbing mode during timeline drag for smoother seeking. */
@@ -1302,6 +1305,27 @@ class EditorViewModel @Inject constructor(
         _state.update { it.copy(batchExportQueue = it.batchExportQueue.filter { it.id != id }) }
     }
 
+    fun startBatchExport() {
+        val queue = _state.value.batchExportQueue
+        if (queue.isEmpty()) {
+            showToast("Add export items first")
+            return
+        }
+        hideBatchExport()
+        // Export sequentially: take first item, export, then continue
+        viewModelScope.launch {
+            for ((index, item) in queue.withIndex()) {
+                showToast("Exporting ${index + 1}/${queue.size}: ${item.outputName}")
+                _state.update { it.copy(exportConfig = item.config) }
+                startExport(appContext.cacheDir)
+                // Wait for export to complete
+                videoEngine.exportState.first { it != ExportState.EXPORTING }
+            }
+            showToast("Batch export complete (${queue.size} items)")
+            _state.update { it.copy(batchExportQueue = emptyList()) }
+        }
+    }
+
     // --- Effect Keyframes ---
     fun addEffectKeyframe(effectId: String, paramName: String, timeOffsetMs: Long, value: Float) {
         val clipId = _state.value.selectedClipId ?: return
@@ -1407,6 +1431,36 @@ class EditorViewModel @Inject constructor(
     // --- Proxy ---
     fun setProxyEnabled(enabled: Boolean) {
         _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
+        if (enabled) {
+            generateProxiesForAllClips()
+        } else {
+            proxyEngine.clearProxies()
+            rebuildPlayerTimeline()
+            showToast("Proxy editing disabled")
+        }
+    }
+
+    private fun generateProxiesForAllClips() {
+        val clips = _state.value.tracks.flatMap { it.clips }
+        if (clips.isEmpty()) {
+            showToast("No clips to generate proxies for")
+            return
+        }
+        showToast("Generating proxies for ${clips.size} clips...")
+        viewModelScope.launch {
+            var generated = 0
+            for (clip in clips) {
+                if (!proxyEngine.hasProxy(clip.sourceUri)) {
+                    proxyEngine.generateProxy(
+                        clip.sourceUri,
+                        _state.value.proxySettings.resolution
+                    )
+                    generated++
+                }
+            }
+            rebuildPlayerTimeline()
+            showToast("Proxy editing enabled ($generated proxies generated)")
+        }
     }
 
     // --- Render Preview + Smart Render ---
@@ -1794,8 +1848,26 @@ class EditorViewModel @Inject constructor(
     fun hideChromaKey() { _state.update { it.copy(showChromaKey = false) } }
 
     // --- Video Scopes ---
+    private val _scopeFrame = MutableStateFlow<android.graphics.Bitmap?>(null)
+    val scopeFrame: StateFlow<android.graphics.Bitmap?> = _scopeFrame.asStateFlow()
+
     fun toggleScopes() {
-        _state.update { it.copy(showScopes = !it.showScopes) }
+        val willShow = !_state.value.showScopes
+        _state.update { it.copy(showScopes = willShow) }
+        if (willShow) updateScopeFrame()
+    }
+
+    fun updateScopeFrame() {
+        val clip = getSelectedClip() ?: _state.value.tracks
+            .flatMap { it.clips }.firstOrNull() ?: return
+        val playheadInClip = (_state.value.playheadMs - clip.timelineStartMs)
+            .coerceIn(clip.trimStartMs, clip.trimEndMs)
+        viewModelScope.launch(Dispatchers.IO) {
+            val frame = videoEngine.extractThumbnail(
+                clip.sourceUri, playheadInClip * 1000, 256, 144
+            )
+            _scopeFrame.value = frame
+        }
     }
 
     fun setScopeType(type: com.novacut.editor.ui.editor.ScopeType) {

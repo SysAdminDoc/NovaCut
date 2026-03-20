@@ -24,6 +24,7 @@ import android.content.Intent
 import android.util.Log
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.*
+import com.novacut.editor.ui.export.BatchExportPanel
 import com.novacut.editor.ui.export.ExportSheet
 import com.novacut.editor.ui.mediapicker.MediaPickerSheet
 import com.novacut.editor.ui.theme.Mocha
@@ -41,6 +42,7 @@ fun EditorScreen(
     val whisperProgress by viewModel.whisperDownloadProgress.collectAsStateWithLifecycle()
     val segmentationState by viewModel.segmentationModelState.collectAsStateWithLifecycle()
     val segmentationProgress by viewModel.segmentationDownloadProgress.collectAsStateWithLifecycle()
+    val scopeFrame by viewModel.scopeFrame.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val hasOpenPanel = state.showMediaPicker || state.showExportSheet || state.showEffectsPanel ||
@@ -187,6 +189,7 @@ fun EditorScreen(
                         "unlink_av" -> viewModel.unlinkAudioVideo()
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
                         "batch_export" -> viewModel.showBatchExport()
+                        "proxy_toggle" -> viewModel.setProxyEnabled(!state.proxySettings.enabled)
                         // AI tools
                         "auto_captions" -> viewModel.runAiTool("auto_captions")
                         "scene_detect" -> viewModel.runAiTool("scene_detect")
@@ -831,6 +834,22 @@ fun EditorScreen(
             )
         }
 
+        // Batch Export
+        AnimatedVisibility(
+            visible = state.showBatchExport,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            BatchExportPanel(
+                queue = state.batchExportQueue,
+                onAddItem = viewModel::addBatchExportItem,
+                onRemoveItem = viewModel::removeBatchExportItem,
+                onStartBatch = viewModel::startBatchExport,
+                onClose = viewModel::hideBatchExport
+            )
+        }
+
         // Export progress floating overlay
         ExportProgressOverlay(
             exportState = state.exportState,
@@ -891,7 +910,7 @@ fun EditorScreen(
         // Video scopes overlay
         if (state.showScopes) {
             VideoScopesOverlay(
-                frameBitmap = null, // TODO: capture current frame from ExoPlayer
+                frameBitmap = scopeFrame,
                 activeScope = state.activeScopeType,
                 onScopeChanged = viewModel::setScopeType,
                 onClose = viewModel::toggleScopes,

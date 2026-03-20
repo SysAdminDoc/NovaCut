@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.9.1
+v1.9.2
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -402,6 +402,10 @@ v1.9.1
 - **Proper Room migrations** — Replaced `fallbackToDestructiveMigration()` with explicit `MIGRATION_1_2` (templateId, proxyEnabled), `MIGRATION_2_3` (version), `MIGRATION_3_4` (baseline freeze). DB version bumped to 4 with `exportSchema = true`. Schema exported to `app/schemas/`. `fallbackToDestructiveMigrationFrom(1)` only destroys from ancient v1 installs.
 - **Style transfer AI tool** — `analyzeAndApplyStyle()` samples 3 frames, analyzes luminance/saturation/temperature distribution, applies cinematic color grade (contrast boost, temperature shift, slight desaturation, vignette, film grain). Names the detected style (Noir, Warm Cinematic, Moody, Vibrant Film, Cinematic).
 - **Neural upscale AI tool** — `analyzeForUpscale()` detects source resolution, recommends next tier (480p->720p, 720p->1080p, 1080p->1440p, 1440p->4K). Updates project resolution + applies sharpening (strength inversely proportional to source resolution).
+
+- **BatchExportPanel wired** — `AnimatedVisibility` block added for `state.showBatchExport` in EditorScreen. `startBatchExport()` exports queue items sequentially via `startExport(cacheDir)` loop.
+- **VideoScopes frame capture** — `scopeFrame: StateFlow<Bitmap?>` in ViewModel. `updateScopeFrame()` extracts 256x144 thumbnail from selected clip at playhead via `extractThumbnail()`. Updated on seek and scope toggle. Scopes now display real histogram/waveform/vectorscope data.
+- **ProxyEngine wired** — Injected into EditorViewModel. `setProxyEnabled()` triggers `generateProxiesForAllClips()` which iterates all clips and calls `ProxyEngine.generateProxy()`. Clears proxies on disable. "Proxy Edit" menu item added to `projectToolsSubMenu`.
 
 ## Next Steps
 - FFmpeg integration for broader codec support
