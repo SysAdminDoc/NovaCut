@@ -15,6 +15,9 @@
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
 -keep,allowobfuscation,allowshrinking class dagger.hilt.android.internal.** { *; }
+-keep class * extends androidx.lifecycle.ViewModel { *; }
+-keep class com.novacut.editor.engine.** { *; }
+-keep class com.novacut.editor.ai.** { *; }
 -dontwarn dagger.hilt.internal.**
 
 # Compose — keep runtime + reflection needs

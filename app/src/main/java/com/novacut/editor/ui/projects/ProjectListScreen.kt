@@ -27,11 +27,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
-import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.SortMode
-import com.novacut.editor.model.Track
-import com.novacut.editor.model.TrackType
 import com.novacut.editor.ui.theme.Mocha
 
 @Composable
@@ -226,9 +223,6 @@ fun ProjectListScreen(
             ProjectTemplateSheet(
                 onTemplateSelected = { template ->
                     showTemplateSheet = false
-                    val tracks = template.tracks.mapIndexed { i, type ->
-                        Track(type = type, index = i)
-                    }
                     viewModel.createProject(
                         name = if (template.id == "blank") "Untitled" else template.name
                     ) { id -> onProjectSelected(id) }
