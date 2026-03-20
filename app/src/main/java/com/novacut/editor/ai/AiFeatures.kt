@@ -1029,6 +1029,179 @@ class AiFeatures @Inject constructor(
         return (Color.red(pixel) * 0.299f + Color.green(pixel) * 0.587f + Color.blue(pixel) * 0.114f) / 255f
     }
 
+    // ---- Style Transfer ----
+
+    /**
+     * Analyzes a video frame and generates a cinematic color grade based on
+     * the frame's existing color characteristics. Returns a set of effects
+     * that transform the look into a professional color-graded style.
+     */
+    suspend fun analyzeAndApplyStyle(
+        videoUri: Uri
+    ): StyleTransferResult = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, videoUri)
+            val durationMs = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_DURATION
+            )?.toLongOrNull() ?: return@withContext StyleTransferResult()
+
+            // Sample 3 frames across the clip for stable analysis
+            val frames = listOf(durationMs / 4, durationMs / 2, durationMs * 3 / 4)
+            var avgLum = 0f; var avgSat = 0f; var avgTemp = 0f; var frameCount = 0
+
+            for (ms in frames) {
+                val frame = retriever.getFrameAtTime(
+                    ms * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                ) ?: continue
+                val scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
+                if (scaled !== frame) frame.recycle()
+
+                var lumSum = 0f; var satSum = 0f; var tempSum = 0f
+                val n = scaled.width * scaled.height
+                for (y in 0 until scaled.height) {
+                    for (x in 0 until scaled.width) {
+                        val p = scaled.getPixel(x, y)
+                        val r = Color.red(p) / 255f
+                        val g = Color.green(p) / 255f
+                        val b = Color.blue(p) / 255f
+                        lumSum += r * 0.299f + g * 0.587f + b * 0.114f
+                        val cMax = max(r, max(g, b))
+                        val cMin = min(r, min(g, b))
+                        satSum += if (cMax > 0f) (cMax - cMin) / cMax else 0f
+                        tempSum += (r - b) // positive = warm, negative = cool
+                    }
+                }
+                scaled.recycle()
+                avgLum += lumSum / n
+                avgSat += satSum / n
+                avgTemp += tempSum / n
+                frameCount++
+            }
+
+            if (frameCount == 0) return@withContext StyleTransferResult()
+            avgLum /= frameCount
+            avgSat /= frameCount
+            avgTemp /= frameCount
+
+            // Determine cinematic adjustments based on analysis
+            val effects = mutableListOf<Pair<String, Float>>()
+
+            // Contrast: boost if flat, reduce if too harsh
+            val contrastAdj = when {
+                avgLum in 0.35f..0.65f -> 1.15f // mid-tone: slight boost
+                avgLum < 0.35f -> 1.10f // dark: gentle boost
+                else -> 0.95f // bright: slight reduce
+            }
+            effects.add("contrast" to contrastAdj)
+
+            // Temperature: push toward cinematic teal/orange split
+            val tempAdj = when {
+                avgTemp > 0.1f -> -0.08f // already warm: cool shadows slightly
+                avgTemp < -0.1f -> 0.05f // already cool: warm highlights slightly
+                else -> -0.03f // neutral: slight cool shift (cinematic)
+            }
+            effects.add("temperature" to tempAdj)
+
+            // Saturation: cinematic = slightly desaturated
+            val satAdj = when {
+                avgSat > 0.4f -> 0.82f // over-saturated: pull back
+                avgSat < 0.15f -> 1.1f // too flat: slight boost
+                else -> 0.92f // normal: slight desat for cinema look
+            }
+            effects.add("saturation" to satAdj)
+
+            // Exposure: normalize mid-tones
+            val exposureAdj = when {
+                avgLum < 0.3f -> 0.15f // dark: lift slightly
+                avgLum > 0.7f -> -0.1f // bright: pull down
+                else -> 0f
+            }
+            if (abs(exposureAdj) > 0.01f) effects.add("exposure" to exposureAdj)
+
+            // Vignette for cinematic framing
+            effects.add("vignette_intensity" to 0.3f)
+            effects.add("vignette_radius" to 0.8f)
+
+            // Film grain for organic texture
+            effects.add("film_grain" to 0.04f)
+
+            val styleName = when {
+                avgTemp < -0.1f && avgSat < 0.25f -> "Noir"
+                avgTemp > 0.15f && avgSat > 0.35f -> "Warm Cinematic"
+                avgLum < 0.35f -> "Moody"
+                avgSat > 0.4f -> "Vibrant Film"
+                else -> "Cinematic"
+            }
+
+            StyleTransferResult(
+                styleName = styleName,
+                contrast = contrastAdj,
+                temperature = tempAdj,
+                saturation = satAdj,
+                exposure = exposureAdj,
+                vignetteIntensity = 0.3f,
+                vignetteRadius = 0.8f,
+                filmGrain = 0.04f,
+                confidence = 0.85f
+            )
+        } catch (_: Exception) {
+            StyleTransferResult()
+        } finally {
+            retriever.release()
+        }
+    }
+
+    // ---- Neural Upscale ----
+
+    /**
+     * Analyzes source video resolution and returns recommended upscale settings.
+     * Applies sharpening to compensate for upscaling artifacts.
+     */
+    suspend fun analyzeForUpscale(
+        videoUri: Uri
+    ): UpscaleResult = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, videoUri)
+            val width = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH
+            )?.toIntOrNull() ?: return@withContext UpscaleResult()
+            val height = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT
+            )?.toIntOrNull() ?: return@withContext UpscaleResult()
+
+            val sourcePixels = width * height
+            val targetResolution = when {
+                sourcePixels <= 480 * 360 -> com.novacut.editor.model.Resolution.HD_720P
+                sourcePixels <= 1280 * 720 -> com.novacut.editor.model.Resolution.FHD_1080P
+                sourcePixels <= 1920 * 1080 -> com.novacut.editor.model.Resolution.QHD_1440P
+                sourcePixels <= 2560 * 1440 -> com.novacut.editor.model.Resolution.UHD_4K
+                else -> null // Already 4K+
+            }
+
+            // Sharpen strength inversely proportional to source resolution
+            val sharpenStrength = when {
+                sourcePixels <= 480 * 360 -> 0.8f
+                sourcePixels <= 1280 * 720 -> 0.6f
+                sourcePixels <= 1920 * 1080 -> 0.4f
+                else -> 0.3f
+            }
+
+            UpscaleResult(
+                sourceWidth = width,
+                sourceHeight = height,
+                targetResolution = targetResolution,
+                sharpenStrength = sharpenStrength,
+                confidence = if (targetResolution != null) 0.9f else 0f
+            )
+        } catch (_: Exception) {
+            UpscaleResult()
+        } finally {
+            retriever.release()
+        }
+    }
+
     // ---- Shared Utilities ----
 
     /**
@@ -1140,6 +1313,26 @@ data class NoiseProfile(
     val signalToNoiseDb: Float = 60f,
     val recommendedReduction: Float = 0f,
     val noiseGateThreshold: Float = 0f,
+    val confidence: Float = 0f
+)
+
+data class StyleTransferResult(
+    val styleName: String = "Unknown",
+    val contrast: Float = 1f,
+    val temperature: Float = 0f,
+    val saturation: Float = 1f,
+    val exposure: Float = 0f,
+    val vignetteIntensity: Float = 0f,
+    val vignetteRadius: Float = 0.8f,
+    val filmGrain: Float = 0f,
+    val confidence: Float = 0f
+)
+
+data class UpscaleResult(
+    val sourceWidth: Int = 0,
+    val sourceHeight: Int = 0,
+    val targetResolution: com.novacut.editor.model.Resolution? = null,
+    val sharpenStrength: Float = 0.5f,
     val confidence: Float = 0f
 )
 

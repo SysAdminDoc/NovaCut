@@ -2601,9 +2601,45 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "style_transfer" -> {
-                        showToast("Style transfer: analyzing reference style...")
-                        delay(1500)
-                        showToast("Style transfer requires on-device ML model (coming soon)")
+                        showToast("Analyzing frame style...")
+                        val style = aiFeatures.analyzeAndApplyStyle(clip.sourceUri)
+                        if (style.confidence < 0.1f) {
+                            showToast("Could not analyze frame style")
+                        } else {
+                            saveUndoState("AI style transfer")
+                            val newEffects = buildList {
+                                if (kotlin.math.abs(style.contrast - 1f) > 0.02f)
+                                    add(Effect(type = EffectType.CONTRAST, params = mapOf("value" to style.contrast)))
+                                if (kotlin.math.abs(style.temperature) > 0.01f)
+                                    add(Effect(type = EffectType.TEMPERATURE, params = mapOf("value" to style.temperature)))
+                                if (kotlin.math.abs(style.saturation - 1f) > 0.02f)
+                                    add(Effect(type = EffectType.SATURATION, params = mapOf("value" to style.saturation)))
+                                if (kotlin.math.abs(style.exposure) > 0.01f)
+                                    add(Effect(type = EffectType.EXPOSURE, params = mapOf("value" to style.exposure)))
+                                if (style.vignetteIntensity > 0.01f)
+                                    add(Effect(type = EffectType.VIGNETTE, params = mapOf(
+                                        "intensity" to style.vignetteIntensity, "radius" to style.vignetteRadius
+                                    )))
+                                if (style.filmGrain > 0.01f)
+                                    add(Effect(type = EffectType.FILM_GRAIN, params = mapOf("intensity" to style.filmGrain)))
+                            }
+                            if (newEffects.isNotEmpty()) {
+                                _state.update { state ->
+                                    val tracks = state.tracks.map { track ->
+                                        val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                        if (idx < 0) return@map track
+                                        val c = track.clips[idx]
+                                        val updated = c.copy(effects = c.effects + newEffects)
+                                        track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                    }
+                                    recalculateDuration(state.copy(tracks = tracks))
+                                }
+                                rebuildPlayerTimeline()
+                                videoEngine.applyPreviewEffects(getSelectedClip())
+                                saveProject()
+                            }
+                            showToast("Applied '${style.styleName}' style (${newEffects.size} effects)")
+                        }
                     }
                     "face_track" -> {
                         showToast("Face tracking: detecting faces...")
@@ -2657,7 +2693,36 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "upscale" -> {
-                        showToast("Neural upscaling: requires on-device ML model (coming soon)")
+                        showToast("Analyzing source resolution...")
+                        val result = aiFeatures.analyzeForUpscale(clip.sourceUri)
+                        if (result.targetResolution == null) {
+                            showToast("Already at maximum resolution (${result.sourceWidth}x${result.sourceHeight})")
+                        } else {
+                            saveUndoState("AI upscale")
+                            // Update project resolution
+                            _state.update { it.copy(
+                                project = it.project.copy(resolution = result.targetResolution)
+                            ) }
+                            // Add sharpening to compensate for upscale
+                            val sharpenEffect = Effect(
+                                type = EffectType.SHARPEN,
+                                params = mapOf("strength" to result.sharpenStrength)
+                            )
+                            _state.update { state ->
+                                val tracks = state.tracks.map { track ->
+                                    val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                    if (idx < 0) return@map track
+                                    val c = track.clips[idx]
+                                    val filtered = c.effects.filter { it.type != EffectType.SHARPEN }
+                                    val updated = c.copy(effects = filtered + sharpenEffect)
+                                    track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                }
+                                recalculateDuration(state.copy(tracks = tracks))
+                            }
+                            rebuildPlayerTimeline()
+                            saveProject()
+                            showToast("Upscaled to ${result.targetResolution.label} + sharpening applied")
+                        }
                     }
                     "frame_interp" -> {
                         showToast("Frame interpolation: requires on-device ML model (coming soon)")

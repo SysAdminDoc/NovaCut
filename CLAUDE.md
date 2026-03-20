@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.9.0
+v1.9.1
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -399,7 +399,11 @@ v1.9.0
 
 - **User template system** — `TemplateManager` saves/loads/deletes user templates as JSON in `filesDir/templates/`. "Save as Template" in editor overflow menu with name dialog. FAB on project list now opens `ProjectTemplateSheet` (preset grid + "My Templates" section). `createFromTemplate()` creates project with template's track layout + text overlays (clips cleared since source URIs won't exist). `UserTemplate` data class with stateJson from `AutoSaveState.serialize()`.
 
+- **Proper Room migrations** — Replaced `fallbackToDestructiveMigration()` with explicit `MIGRATION_1_2` (templateId, proxyEnabled), `MIGRATION_2_3` (version), `MIGRATION_3_4` (baseline freeze). DB version bumped to 4 with `exportSchema = true`. Schema exported to `app/schemas/`. `fallbackToDestructiveMigrationFrom(1)` only destroys from ancient v1 installs.
+- **Style transfer AI tool** — `analyzeAndApplyStyle()` samples 3 frames, analyzes luminance/saturation/temperature distribution, applies cinematic color grade (contrast boost, temperature shift, slight desaturation, vignette, film grain). Names the detected style (Noir, Warm Cinematic, Moody, Vibrant Film, Cinematic).
+- **Neural upscale AI tool** — `analyzeForUpscale()` detects source resolution, recommends next tier (480p->720p, 720p->1080p, 1080p->1440p, 1440p->4K). Updates project resolution + applies sharpening (strength inversely proportional to source resolution).
+
 ## Next Steps
-- Proper Room migration strategy (replace destructive migration before production)
 - FFmpeg integration for broader codec support
-- Undo/redo for template operations
+- Frame interpolation AI tool (requires optical flow model)
+- Object removal AI tool (requires inpainting model)
