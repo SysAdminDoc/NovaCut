@@ -123,6 +123,8 @@ private val projectToolsSubMenu = listOf(
     SubMenuItem("history", Icons.Default.History, "Version\nHistory"),
     SubMenuItem("export_srt", Icons.Default.Subtitles, "Export\nSRT"),
     SubMenuItem("media_manager", Icons.Default.FolderOpen, "Media\nManager"),
+    SubMenuItem("render_preview", Icons.Default.Preview, "Render\nAnalysis"),
+    SubMenuItem("cloud_backup", Icons.Default.Cloud, "Cloud\nBackup"),
     SubMenuItem("archive", Icons.Default.Archive, "Project\nArchive"),
     SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
 )

@@ -47,7 +47,8 @@ fun EditorScreen(
         state.showSpeedCurveEditor || state.showMaskEditor || state.showBlendModeSelector ||
         state.showBatchExport || state.showPipPresets || state.showChromaKey ||
         state.showCaptionEditor || state.showChapterMarkers || state.showSnapshotHistory ||
-        state.showTextTemplates || state.showMediaManager || state.showAudioNorm
+        state.showTextTemplates || state.showMediaManager || state.showAudioNorm ||
+        state.showRenderPreview || state.showCloudBackup
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -86,6 +87,8 @@ fun EditorScreen(
                 onTogglePlayback = viewModel::togglePlayback,
                 onToggleLoop = viewModel::toggleLoop,
                 onSeek = viewModel::seekTo,
+                showScopesButton = true,
+                onToggleScopes = viewModel::toggleScopes,
                 modifier = Modifier.weight(0.45f)
             )
 
@@ -173,6 +176,8 @@ fun EditorScreen(
                         "audio_norm" -> viewModel.showAudioNorm()
                         "audio_norm_disabled" -> viewModel.showToast("Select a clip to normalize")
                         "compound" -> viewModel.createCompoundClip()
+                        "render_preview" -> viewModel.showRenderPreview()
+                        "cloud_backup" -> viewModel.showCloudBackup()
                         "archive" -> viewModel.exportProjectArchive()
                         "unlink_av" -> viewModel.unlinkAudioVideo()
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
@@ -769,6 +774,47 @@ fun EditorScreen(
                 currentVolume = clip?.volume ?: 1f,
                 onNormalize = viewModel::normalizeAudio,
                 onClose = viewModel::hideAudioNorm
+            )
+        }
+
+        // Render Preview / Smart Render
+        AnimatedVisibility(
+            visible = state.showRenderPreview,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            state.renderSummary?.let { summary ->
+                RenderPreviewSheet(
+                    segments = state.renderSegments,
+                    summary = summary,
+                    onRenderPreview = viewModel::renderQuickPreview,
+                    onRenderFull = {
+                        viewModel.hideRenderPreview()
+                        viewModel.showExportSheet()
+                    },
+                    onClose = viewModel::hideRenderPreview
+                )
+            }
+        }
+
+        // Cloud Backup
+        AnimatedVisibility(
+            visible = state.showCloudBackup,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            CloudBackupPanel(
+                isSignedIn = false,
+                lastBackupTime = null,
+                backupProgress = null,
+                onSignIn = { viewModel.showToast("Google Sign-In required") },
+                onBackupNow = { viewModel.showToast("Sign in first") },
+                onRestore = { viewModel.showToast("Sign in first") },
+                onAutoBackupToggled = { },
+                autoBackupEnabled = false,
+                onClose = viewModel::hideCloudBackup
             )
         }
 

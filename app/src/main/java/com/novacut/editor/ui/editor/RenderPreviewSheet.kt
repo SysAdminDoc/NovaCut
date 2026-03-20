@@ -1,0 +1,219 @@
+package com.novacut.editor.ui.editor
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.novacut.editor.engine.SmartRenderEngine
+
+private val Surface0 = Color(0xFF313244)
+private val TextColor = Color(0xFFCDD6F4)
+private val Subtext = Color(0xFFA6ADC8)
+private val Mauve = Color(0xFFCBA6F7)
+private val Red = Color(0xFFF38BA8)
+private val Green = Color(0xFFA6E3A1)
+private val Yellow = Color(0xFFF9E2AF)
+private val Peach = Color(0xFFFAB387)
+private val Crust = Color(0xFF11111B)
+
+@Composable
+fun RenderPreviewSheet(
+    segments: List<SmartRenderEngine.RenderSegment>,
+    summary: SmartRenderEngine.SmartRenderSummary,
+    onRenderPreview: () -> Unit,
+    onRenderFull: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Render Analysis", color = TextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, "Close", tint = Subtext, modifier = Modifier.size(18.dp))
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Smart render summary
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Surface0, RoundedCornerShape(8.dp))
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            SummaryChip(
+                label = "Pass-through",
+                value = "${summary.passThroughSegments}",
+                color = Green
+            )
+            SummaryChip(
+                label = "Re-encode",
+                value = "${summary.reEncodeSegments}",
+                color = if (summary.reEncodeSegments > 0) Yellow else Green
+            )
+            SummaryChip(
+                label = "Speedup",
+                value = if (summary.estimatedSpeedup < 100f) "%.1fx".format(summary.estimatedSpeedup) else "Max",
+                color = Mauve
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        // Duration breakdown
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Re-encode: ${formatMs(summary.reEncodeDurationMs)}",
+                color = Yellow,
+                fontSize = 10.sp
+            )
+            Text(
+                "Pass-through: ${formatMs(summary.passThroughDurationMs)}",
+                color = Green,
+                fontSize = 10.sp
+            )
+        }
+
+        // Progress bar showing re-encode vs pass-through ratio
+        if (summary.totalDurationMs > 0) {
+            Spacer(Modifier.height(4.dp))
+            val reEncodeRatio = summary.reEncodeDurationMs.toFloat() / summary.totalDurationMs
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Green.copy(alpha = 0.3f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(reEncodeRatio)
+                        .background(Yellow.copy(alpha = 0.6f))
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Segment list
+        Text("Segments", color = Subtext, fontSize = 11.sp)
+        Spacer(Modifier.height(4.dp))
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 180.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            items(segments) { segment ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Surface0)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (segment.needsReEncode) Yellow else Green,
+                                    RoundedCornerShape(4.dp)
+                                )
+                        )
+                        Text(
+                            "${formatMs(segment.startMs)} - ${formatMs(segment.endMs)}",
+                            color = Subtext,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Text(
+                        segment.reason,
+                        color = if (segment.needsReEncode) Yellow else Green,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Quick preview (low-res)
+            OutlinedButton(
+                onClick = onRenderPreview,
+                modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, Peach.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Preview, null, tint = Peach, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Preview", color = Peach, fontSize = 12.sp)
+            }
+
+            // Full quality export
+            Button(
+                onClick = onRenderFull,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Mauve),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.RocketLaunch, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Export", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryChip(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = Subtext, fontSize = 9.sp)
+    }
+}
+
+private fun formatMs(ms: Long): String {
+    val s = ms / 1000
+    val m = s / 60
+    return if (m > 0) "%d:%02d".format(m, s % 60) else "${s}s"
+}

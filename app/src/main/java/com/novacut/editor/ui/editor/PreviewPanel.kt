@@ -33,6 +33,9 @@ fun PreviewPanel(
     onTogglePlayback: () -> Unit,
     onToggleLoop: () -> Unit = {},
     onSeek: (Long) -> Unit,
+    onPlayerViewReady: (PlayerView) -> Unit = {},
+    showScopesButton: Boolean = false,
+    onToggleScopes: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -59,11 +62,28 @@ fun PreviewPanel(
                 },
                 update = { playerView ->
                     playerView.player = engine.getPlayer()
+                    onPlayerViewReady(playerView)
                 },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // No-op: PlayerView lifecycle is managed by AndroidView factory/update
+            // Scopes toggle button (top-right corner of preview)
+            if (showScopesButton && totalDurationMs > 0) {
+                androidx.compose.material3.IconButton(
+                    onClick = onToggleScopes,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Insights,
+                        "Scopes",
+                        tint = Mocha.Subtext0.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
 
             // Overlay play button when paused and no content
             if (!isPlaying && totalDurationMs == 0L) {

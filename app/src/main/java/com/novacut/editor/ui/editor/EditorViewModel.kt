@@ -13,6 +13,7 @@ import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.ProjectAutoSave
+import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.SubtitleExporter
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.engine.VoiceoverRecorderEngine
@@ -95,7 +96,11 @@ data class EditorState(
     val showTextTemplates: Boolean = false,
     val showMediaManager: Boolean = false,
     val showAudioNorm: Boolean = false,
+    val showRenderPreview: Boolean = false,
+    val showCloudBackup: Boolean = false,
     val exportStartTime: Long = 0L,
+    val renderSegments: List<com.novacut.editor.engine.SmartRenderEngine.RenderSegment> = emptyList(),
+    val renderSummary: com.novacut.editor.engine.SmartRenderEngine.SmartRenderSummary? = null,
     // Chapter markers
     val chapterMarkers: List<ChapterMarker> = emptyList(),
     // Multi-select
@@ -878,6 +883,8 @@ class EditorViewModel @Inject constructor(
         showTextTemplates = false,
         showMediaManager = false,
         showAudioNorm = false,
+        showRenderPreview = false,
+        showCloudBackup = false,
         selectedEffectId = null,
         editingTextOverlayId = null,
         selectedMaskId = null
@@ -1348,6 +1355,96 @@ class EditorViewModel @Inject constructor(
     // --- Proxy ---
     fun setProxyEnabled(enabled: Boolean) {
         _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
+    }
+
+    // --- Render Preview + Smart Render ---
+    fun showRenderPreview() {
+        pauseIfPlaying()
+        val s = _state.value
+        val segments = SmartRenderEngine.analyzeTimeline(s.tracks, s.exportConfig, s.textOverlays)
+        val summary = SmartRenderEngine.getSummary(segments)
+        _state.update { dismissedPanelState(it).copy(
+            showRenderPreview = true,
+            renderSegments = segments,
+            renderSummary = summary
+        ) }
+    }
+    fun hideRenderPreview() { _state.update { it.copy(showRenderPreview = false) } }
+
+    fun renderQuickPreview() {
+        // Export at 480p for quick review
+        val previewConfig = _state.value.exportConfig.copy(
+            resolution = com.novacut.editor.model.Resolution.SD_480P,
+            quality = com.novacut.editor.model.ExportQuality.LOW
+        )
+        _state.update { it.copy(exportConfig = previewConfig) }
+        hideRenderPreview()
+        showExportSheet()
+        showToast("Rendering preview at 480p...")
+    }
+
+    // --- Cloud Backup ---
+    fun showCloudBackup() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showCloudBackup = true) } }
+    fun hideCloudBackup() { _state.update { it.copy(showCloudBackup = false) } }
+
+    // --- Slip/Slide Edit ---
+    fun slipClip(clipId: String, slipAmountMs: Long) {
+        saveUndoState("Slip edit")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        val newTrimStart = (clip.trimStartMs + slipAmountMs).coerceIn(0L, clip.sourceDurationMs - 100)
+                        val duration = clip.trimEndMs - clip.trimStartMs
+                        val newTrimEnd = (newTrimStart + duration).coerceAtMost(clip.sourceDurationMs)
+                        clip.copy(trimStartMs = newTrimStart, trimEndMs = newTrimEnd)
+                    } else clip
+                })
+            })
+        }
+        rebuildPlayerTimeline()
+    }
+
+    fun slideClip(clipId: String, slideAmountMs: Long) {
+        saveUndoState("Slide edit")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+                if (clipIndex < 0) return@map track
+
+                val clip = track.clips[clipIndex]
+                val newStart = (clip.timelineStartMs + slideAmountMs).coerceAtLeast(0L)
+
+                // Adjust neighbors
+                val updatedClips = track.clips.toMutableList()
+                updatedClips[clipIndex] = clip.copy(timelineStartMs = newStart)
+
+                // Ensure no overlap with adjacent clips
+                if (clipIndex > 0) {
+                    val prevClip = updatedClips[clipIndex - 1]
+                    if (newStart < prevClip.timelineEndMs) {
+                        val trimAmount = prevClip.timelineEndMs - newStart
+                        updatedClips[clipIndex - 1] = prevClip.copy(
+                            trimEndMs = (prevClip.trimEndMs - (trimAmount * prevClip.speed).toLong()).coerceAtLeast(prevClip.trimStartMs + 100)
+                        )
+                    }
+                }
+                if (clipIndex < updatedClips.size - 1) {
+                    val nextClip = updatedClips[clipIndex + 1]
+                    val newEnd = newStart + clip.durationMs
+                    if (newEnd > nextClip.timelineStartMs) {
+                        val overlap = newEnd - nextClip.timelineStartMs
+                        updatedClips[clipIndex + 1] = nextClip.copy(
+                            timelineStartMs = newEnd,
+                            trimStartMs = (nextClip.trimStartMs + (overlap * nextClip.speed).toLong()).coerceAtMost(nextClip.trimEndMs - 100)
+                        )
+                    }
+                }
+
+                track.copy(clips = updatedClips)
+            })
+        }
+        rebuildPlayerTimeline()
     }
 
     // --- Export ---
