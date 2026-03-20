@@ -36,12 +36,22 @@ fun TextEditorSheet(
     var alignment by remember { mutableStateOf(existingOverlay?.alignment ?: TextAlignment.CENTER) }
     var selectedColor by remember { mutableLongStateOf(existingOverlay?.color ?: 0xFFFFFFFF) }
     var strokeWidth by remember { mutableFloatStateOf(existingOverlay?.strokeWidth ?: 0f) }
+    var strokeColor by remember { mutableLongStateOf(existingOverlay?.strokeColor ?: 0xFF000000) }
     var animIn by remember { mutableStateOf(existingOverlay?.animationIn ?: TextAnimation.FADE) }
     var animOut by remember { mutableStateOf(existingOverlay?.animationOut ?: TextAnimation.FADE) }
     var fontFamily by remember { mutableStateOf(existingOverlay?.fontFamily ?: "sans-serif") }
     var duration by remember { mutableFloatStateOf((existingOverlay?.let { it.endTimeMs - it.startTimeMs } ?: 3000L).toFloat()) }
     var positionX by remember { mutableFloatStateOf(existingOverlay?.positionX ?: 0.5f) }
     var positionY by remember { mutableFloatStateOf(existingOverlay?.positionY ?: 0.5f) }
+    var shadowOffsetX by remember { mutableFloatStateOf(existingOverlay?.shadowOffsetX ?: 0f) }
+    var shadowOffsetY by remember { mutableFloatStateOf(existingOverlay?.shadowOffsetY ?: 0f) }
+    var shadowBlur by remember { mutableFloatStateOf(existingOverlay?.shadowBlur ?: 0f) }
+    var shadowColor by remember { mutableLongStateOf(existingOverlay?.shadowColor ?: 0x80000000) }
+    var glowColor by remember { mutableLongStateOf(existingOverlay?.glowColor ?: 0x00000000) }
+    var glowRadius by remember { mutableFloatStateOf(existingOverlay?.glowRadius ?: 0f) }
+    var letterSpacing by remember { mutableFloatStateOf(existingOverlay?.letterSpacing ?: 0f) }
+    var lineHeight by remember { mutableFloatStateOf(existingOverlay?.lineHeight ?: 1.2f) }
+    var textRotation by remember { mutableFloatStateOf(existingOverlay?.rotation ?: 0f) }
 
     val fontFamilies = listOf(
         "sans-serif" to "Sans Serif",
@@ -84,12 +94,22 @@ fun TextEditorSheet(
                             italic = italic,
                             alignment = alignment,
                             strokeWidth = strokeWidth,
+                            strokeColor = strokeColor,
                             startTimeMs = existingOverlay?.startTimeMs ?: playheadMs,
                             endTimeMs = (existingOverlay?.startTimeMs ?: playheadMs) + duration.toLong(),
                             animationIn = animIn,
                             animationOut = animOut,
                             positionX = positionX,
-                            positionY = positionY
+                            positionY = positionY,
+                            rotation = textRotation,
+                            shadowColor = shadowColor,
+                            shadowOffsetX = shadowOffsetX,
+                            shadowOffsetY = shadowOffsetY,
+                            shadowBlur = shadowBlur,
+                            glowColor = glowColor,
+                            glowRadius = glowRadius,
+                            letterSpacing = letterSpacing,
+                            lineHeight = lineHeight
                         )
                         onSave(overlay)
                     },
@@ -266,5 +286,78 @@ fun TextEditorSheet(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // --- Stroke ---
+        Text("Stroke", color = Mocha.Subtext1, fontSize = 12.sp)
+        EffectSlider("Stroke Width", strokeWidth, 0f, 10f) { strokeWidth = it }
+        Text("Stroke Color", color = Mocha.Subtext1, fontSize = 12.sp)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            items(colorOptions) { color ->
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(Color(color))
+                        .then(
+                            if (strokeColor == color) Modifier.border(2.dp, Mocha.Mauve, CircleShape)
+                            else Modifier.border(1.dp, Mocha.Surface1, CircleShape)
+                        )
+                        .clickable { strokeColor = color }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // --- Shadow ---
+        Text("Shadow", color = Mocha.Subtext1, fontSize = 12.sp)
+        EffectSlider("Offset X", shadowOffsetX, -10f, 10f) { shadowOffsetX = it }
+        EffectSlider("Offset Y", shadowOffsetY, -10f, 10f) { shadowOffsetY = it }
+        EffectSlider("Blur", shadowBlur, 0f, 20f) { shadowBlur = it }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // --- Glow ---
+        Text("Glow", color = Mocha.Subtext1, fontSize = 12.sp)
+        EffectSlider("Radius", glowRadius, 0f, 30f) { glowRadius = it }
+        Text("Glow Color", color = Mocha.Subtext1, fontSize = 12.sp)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            items(listOf(
+                0x00000000L, 0xFFFFFFFF, 0xFFF38BA8, 0xFFFAB387,
+                0xFFF9E2AF, 0xFFA6E3A1, 0xFF89B4FA, 0xFFCBA6F7
+            )) { color ->
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(if (color == 0x00000000L) Mocha.Surface0 else Color(color))
+                        .then(
+                            if (glowColor == color) Modifier.border(2.dp, Mocha.Mauve, CircleShape)
+                            else Modifier.border(1.dp, Mocha.Surface1, CircleShape)
+                        )
+                        .clickable { glowColor = color }
+                ) {
+                    if (color == 0x00000000L) {
+                        Text("Off", color = Mocha.Subtext0, fontSize = 7.sp, modifier = Modifier.align(Alignment.Center))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // --- Typography ---
+        Text("Typography", color = Mocha.Subtext1, fontSize = 12.sp)
+        EffectSlider("Letter Spacing", letterSpacing, -5f, 20f) { letterSpacing = it }
+        EffectSlider("Line Height", lineHeight, 0.8f, 3f) { lineHeight = it }
+        EffectSlider("Rotation", textRotation, -180f, 180f) { textRotation = it }
     }
 }

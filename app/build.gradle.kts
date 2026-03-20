@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 38
-        versionName = "1.0.0"
+        versionCode = 39
+        versionName = "1.1.0"
     }
 
     signingConfigs {

@@ -84,6 +84,10 @@ data class EditorState(
     val showMaskEditor: Boolean = false,
     val showBlendModeSelector: Boolean = false,
     val showBatchExport: Boolean = false,
+    val showPipPresets: Boolean = false,
+    val showChromaKey: Boolean = false,
+    val showScopes: Boolean = false,
+    val activeScopeType: com.novacut.editor.ui.editor.ScopeType = com.novacut.editor.ui.editor.ScopeType.HISTOGRAM,
     // Mask state
     val selectedMaskId: String? = null,
     // Keyframe state
@@ -854,6 +858,8 @@ class EditorViewModel @Inject constructor(
         showMaskEditor = false,
         showBlendModeSelector = false,
         showBatchExport = false,
+        showPipPresets = false,
+        showChromaKey = false,
         selectedEffectId = null,
         editingTextOverlayId = null,
         selectedMaskId = null
@@ -1324,6 +1330,99 @@ class EditorViewModel @Inject constructor(
     // --- Proxy ---
     fun setProxyEnabled(enabled: Boolean) {
         _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
+    }
+
+    // --- PiP ---
+    fun applyPipPreset(preset: com.novacut.editor.ui.editor.PipPreset) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("PiP preset")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(
+                        positionX = preset.posX,
+                        positionY = preset.posY,
+                        scaleX = preset.scaleX,
+                        scaleY = preset.scaleY
+                    ) else clip
+                })
+            })
+        }
+    }
+
+    fun showPipPresets() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showPipPresets = true) } }
+    fun hidePipPresets() { _state.update { it.copy(showPipPresets = false) } }
+
+    fun showChromaKey() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showChromaKey = true) } }
+    fun hideChromaKey() { _state.update { it.copy(showChromaKey = false) } }
+
+    // --- Video Scopes ---
+    fun toggleScopes() {
+        _state.update { it.copy(showScopes = !it.showScopes) }
+    }
+
+    fun setScopeType(type: com.novacut.editor.ui.editor.ScopeType) {
+        _state.update { it.copy(activeScopeType = type) }
+    }
+
+    // --- Transform overlay ---
+    fun setClipAnchor(x: Float, y: Float) {
+        val clipId = _state.value.selectedClipId ?: return
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(anchorX = x, anchorY = y) else clip
+                })
+            })
+        }
+    }
+
+    // --- Auto-ducking ---
+    fun autoDuck() {
+        val s = _state.value
+        val musicTracks = s.tracks.filter { it.type == TrackType.AUDIO }
+        val voiceTracks = s.tracks.filter { it.type == TrackType.VIDEO }
+
+        if (musicTracks.isEmpty() || voiceTracks.isEmpty()) {
+            showToast("Need both voice and music tracks for ducking")
+            return
+        }
+
+        viewModelScope.launch {
+            showToast("Analyzing speech regions...")
+            val voiceClip = voiceTracks.flatMap { it.clips }.firstOrNull() ?: return@launch
+            val waveform = audioEngine.extractWaveform(voiceClip.sourceUri, 44100)
+            val pcm = waveform.map { (it * 32767).toInt().toShort() }.toShortArray()
+            val speechRegions = com.novacut.editor.engine.AudioEffectsEngine.detectSpeechRegions(pcm, 44100, 1)
+
+            if (speechRegions.isEmpty()) {
+                showToast("No speech detected")
+                return@launch
+            }
+
+            saveUndoState("Auto duck")
+
+            // Create volume keyframes on music tracks
+            _state.update { state ->
+                state.copy(tracks = state.tracks.map { track ->
+                    if (track.type == TrackType.AUDIO) {
+                        track.copy(clips = track.clips.map { clip ->
+                            val duckKeyframes = mutableListOf<com.novacut.editor.model.Keyframe>()
+                            for ((start, end) in speechRegions) {
+                                duckKeyframes.addAll(
+                                    com.novacut.editor.engine.KeyframeEngine.createVolumeDuck(
+                                        startMs = start, endMs = end,
+                                        normalVolume = clip.volume, duckVolume = clip.volume * 0.15f
+                                    )
+                                )
+                            }
+                            clip.copy(keyframes = clip.keyframes + duckKeyframes)
+                        })
+                    } else track
+                })
+            }
+            showToast("Ducking applied: ${speechRegions.size} regions")
+        }
     }
 
     // Voiceover recording

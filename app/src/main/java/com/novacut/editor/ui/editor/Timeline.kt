@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +52,7 @@ fun Timeline(
     onToggleTrackMute: (String) -> Unit = {},
     onToggleTrackVisible: (String) -> Unit = {},
     onToggleTrackLock: (String) -> Unit = {},
+    beatMarkers: List<Long> = emptyList(),
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -313,7 +315,7 @@ fun Timeline(
                                             }
                                         }
 
-                                        // Audio waveform
+                                        // Audio waveform + volume envelope
                                         if (track.type == TrackType.AUDIO) {
                                             val waveform = waveforms[clip.id]
                                             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -321,6 +323,36 @@ fun Timeline(
                                                     drawWaveform(waveform, clipColor)
                                                 } else {
                                                     drawWaveformPlaceholder(clipColor)
+                                                }
+
+                                                // Volume envelope (keyframe-based volume line)
+                                                val volumeKfs = clip.keyframes.filter {
+                                                    it.property == KeyframeProperty.VOLUME
+                                                }.sortedBy { it.timeOffsetMs }
+                                                if (volumeKfs.size >= 2) {
+                                                    val path = Path()
+                                                    val steps = 100
+                                                    for (i in 0..steps) {
+                                                        val t = i.toFloat() / steps
+                                                        val timeMs = (t * clip.durationMs).toLong()
+                                                        val vol = com.novacut.editor.engine.KeyframeEngine.getValueAt(
+                                                            volumeKfs, KeyframeProperty.VOLUME, timeMs
+                                                        ) ?: clip.volume
+                                                        val x = t * size.width
+                                                        val y = size.height * (1f - (vol / 2f).coerceIn(0f, 1f))
+                                                        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                                    }
+                                                    drawPath(
+                                                        path,
+                                                        Color(0xFFF9E2AF), // Yellow
+                                                        style = Stroke(width = 1.5f)
+                                                    )
+                                                    // Draw keyframe dots on envelope
+                                                    volumeKfs.forEach { kf ->
+                                                        val x = (kf.timeOffsetMs.toFloat() / clip.durationMs) * size.width
+                                                        val y = size.height * (1f - (kf.value / 2f).coerceIn(0f, 1f))
+                                                        drawCircle(Color(0xFFF9E2AF), 3f, Offset(x, y))
+                                                    }
                                                 }
                                             }
                                         }
@@ -461,6 +493,54 @@ fun Timeline(
                                                             center = Offset(x, size.height - 6f)
                                                         )
                                                     }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Beat markers
+                            beatMarkers.forEach { beatMs ->
+                                val beatPx = ((beatMs - scrollOffsetMs) * pixelsPerMs)
+                                if (beatPx in 0f..timelineWidthPx) {
+                                    Canvas(
+                                        modifier = Modifier
+                                            .offset(x = with(density) { beatPx.toDp() })
+                                            .width(1.dp)
+                                            .fillMaxHeight()
+                                    ) {
+                                        drawRect(
+                                            color = Color(0x40F9E2AF), // Yellow semi-transparent
+                                            size = Size(1f * density.density, size.height)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Magnetic snap indicator (shows when clip edges align)
+                            // Snap lines are drawn at clip boundaries for visual feedback
+                            val allClipEdges = track.clips.flatMap { listOf(it.timelineStartMs, it.timelineEndMs) }.distinct()
+                            val selectedClipObj = track.clips.find { it.id == selectedClipId }
+                            if (selectedClipObj != null) {
+                                allClipEdges.forEach { edgeMs ->
+                                    if (edgeMs != selectedClipObj.timelineStartMs && edgeMs != selectedClipObj.timelineEndMs) {
+                                        val selStart = selectedClipObj.timelineStartMs
+                                        val selEnd = selectedClipObj.timelineEndMs
+                                        val snapThreshold = (5 / pixelsPerMs).toLong() // 5px snap distance
+                                        if (kotlin.math.abs(selStart - edgeMs) < snapThreshold || kotlin.math.abs(selEnd - edgeMs) < snapThreshold) {
+                                            val snapPx = ((edgeMs - scrollOffsetMs) * pixelsPerMs)
+                                            if (snapPx in 0f..timelineWidthPx) {
+                                                Canvas(
+                                                    modifier = Modifier
+                                                        .offset(x = with(density) { snapPx.toDp() })
+                                                        .width(1.dp)
+                                                        .fillMaxHeight()
+                                                ) {
+                                                    drawRect(
+                                                        color = Color(0xFF89B4FA), // Blue snap line
+                                                        size = Size(1.5f * density.density, size.height)
+                                                    )
                                                 }
                                             }
                                         }

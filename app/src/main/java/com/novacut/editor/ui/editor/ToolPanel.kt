@@ -76,7 +76,9 @@ private val clipMotionSubMenu = listOf(
     SubMenuItem("transform", Icons.Default.Transform, "Transform"),
     SubMenuItem("keyframes", Icons.Default.Timeline, "Keyframes"),
     SubMenuItem("masks", Icons.Default.Layers, "Masks"),
-    SubMenuItem("blend_mode", Icons.Default.BlurOn, "Blend\nMode")
+    SubMenuItem("blend_mode", Icons.Default.BlurOn, "Blend\nMode"),
+    SubMenuItem("pip", Icons.Default.PictureInPicture, "PiP"),
+    SubMenuItem("chroma_key", Icons.Default.Deblur, "Chroma\nKey")
 )
 
 // Clip mode — Color tab sub-menu
@@ -108,7 +110,9 @@ private val clipAiSubMenu = listOf(
 private val projectToolsSubMenu = listOf(
     SubMenuItem("audio_mixer", Icons.Default.Equalizer, "Audio\nMixer"),
     SubMenuItem("beat_detect", Icons.Default.GraphicEq, "Beat\nDetect"),
+    SubMenuItem("auto_duck", Icons.Default.RecordVoiceOver, "Auto\nDuck"),
     SubMenuItem("adjustment_layer", Icons.Default.Tune, "Adj\nLayer"),
+    SubMenuItem("scopes", Icons.Default.Insights, "Video\nScopes"),
     SubMenuItem("snapshot", Icons.Default.Save, "Snapshot"),
     SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
 )

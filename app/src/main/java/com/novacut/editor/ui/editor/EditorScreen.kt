@@ -45,7 +45,7 @@ fun EditorScreen(
         state.showVoiceoverRecorder || state.selectedEffectId != null || state.editingTextOverlayId != null ||
         state.showColorGrading || state.showAudioMixer || state.showKeyframeEditor ||
         state.showSpeedCurveEditor || state.showMaskEditor || state.showBlendModeSelector ||
-        state.showBatchExport
+        state.showBatchExport || state.showPipPresets || state.showChromaKey
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -107,6 +107,7 @@ fun EditorScreen(
                 onToggleTrackMute = viewModel::toggleTrackMute,
                 onToggleTrackVisible = viewModel::toggleTrackVisibility,
                 onToggleTrackLock = viewModel::toggleTrackLock,
+                beatMarkers = state.beatMarkers,
                 engine = viewModel.engine,
                 modifier = Modifier.weight(0.55f)
             )
@@ -149,6 +150,12 @@ fun EditorScreen(
                         "masks_disabled" -> viewModel.showToast("Select a clip for masks")
                         "blend_mode" -> viewModel.showBlendModeSelector()
                         "blend_mode_disabled" -> viewModel.showToast("Select a clip for blend mode")
+                        "pip" -> viewModel.showPipPresets()
+                        "pip_disabled" -> viewModel.showToast("Select a clip for PiP")
+                        "chroma_key" -> viewModel.showChromaKey()
+                        "chroma_key_disabled" -> viewModel.showToast("Select a clip for chroma key")
+                        "auto_duck" -> viewModel.autoDuck()
+                        "scopes" -> viewModel.toggleScopes()
                         "audio_mixer" -> viewModel.showAudioMixer()
                         "beat_detect" -> viewModel.detectBeats()
                         "adjustment_layer" -> viewModel.addAdjustmentLayer()
@@ -580,6 +587,101 @@ fun EditorScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
+        }
+
+        // PiP Presets
+        AnimatedVisibility(
+            visible = state.showPipPresets,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            PipPresetsPanel(
+                onPresetSelected = { preset ->
+                    viewModel.applyPipPreset(preset)
+                    viewModel.hidePipPresets()
+                },
+                onClose = viewModel::hidePipPresets
+            )
+        }
+
+        // Chroma Key Refinement
+        AnimatedVisibility(
+            visible = state.showChromaKey,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            val chromaEffect = clip?.effects?.find { it.type == EffectType.CHROMA_KEY }
+            ChromaKeyPanel(
+                similarity = chromaEffect?.params?.get("similarity") ?: 0.4f,
+                smoothness = chromaEffect?.params?.get("smoothness") ?: 0.1f,
+                spillSuppression = chromaEffect?.params?.get("spill") ?: 0.1f,
+                keyColorR = chromaEffect?.params?.get("keyR") ?: 0f,
+                keyColorG = chromaEffect?.params?.get("keyG") ?: 1f,
+                keyColorB = chromaEffect?.params?.get("keyB") ?: 0f,
+                onSimilarityChanged = { v ->
+                    state.selectedClipId?.let { cid ->
+                        chromaEffect?.let { viewModel.updateEffect(cid, it.id, it.params + ("similarity" to v)) }
+                    }
+                },
+                onSmoothnessChanged = { v ->
+                    state.selectedClipId?.let { cid ->
+                        chromaEffect?.let { viewModel.updateEffect(cid, it.id, it.params + ("smoothness" to v)) }
+                    }
+                },
+                onSpillChanged = { v ->
+                    state.selectedClipId?.let { cid ->
+                        chromaEffect?.let { viewModel.updateEffect(cid, it.id, it.params + ("spill" to v)) }
+                    }
+                },
+                onKeyColorChanged = { r, g, b ->
+                    state.selectedClipId?.let { cid ->
+                        chromaEffect?.let { viewModel.updateEffect(cid, it.id, it.params + ("keyR" to r) + ("keyG" to g) + ("keyB" to b)) }
+                    }
+                },
+                onShowAlphaMatte = { viewModel.showToast("Alpha matte preview") },
+                onClose = viewModel::hideChromaKey
+            )
+        }
+
+        // Transform overlay on preview (when clip selected and transform visible)
+        if (state.selectedClipId != null && state.showTransformPanel) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            if (clip != null) {
+                TransformOverlay(
+                    positionX = clip.positionX,
+                    positionY = clip.positionY,
+                    scaleX = clip.scaleX,
+                    scaleY = clip.scaleY,
+                    rotation = clip.rotation,
+                    anchorX = clip.anchorX,
+                    anchorY = clip.anchorY,
+                    opacity = clip.opacity,
+                    previewWidth = 400f,
+                    previewHeight = 225f,
+                    onPositionChanged = { x, y -> state.selectedClipId?.let { viewModel.setClipTransform(it, positionX = x, positionY = y) } },
+                    onScaleChanged = { sx, sy -> state.selectedClipId?.let { viewModel.setClipTransform(it, scaleX = sx, scaleY = sy) } },
+                    onRotationChanged = { r -> state.selectedClipId?.let { viewModel.setClipTransform(it, rotation = r) } },
+                    onAnchorChanged = viewModel::setClipAnchor,
+                    onTransformStarted = viewModel::beginEffectAdjust,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
+
+        // Video scopes overlay
+        if (state.showScopes) {
+            VideoScopesOverlay(
+                frameBitmap = null, // TODO: capture current frame from ExoPlayer
+                activeScope = state.activeScopeType,
+                onScopeChanged = viewModel::setScopeType,
+                onClose = viewModel::toggleScopes,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+            )
         }
 
         // Toast messages
