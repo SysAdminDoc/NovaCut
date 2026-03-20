@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 47
-        versionName = "1.8.0"
+        versionCode = 48
+        versionName = "1.8.1"
     }
 
     signingConfigs {
@@ -125,4 +125,7 @@ dependencies {
 
     // ONNX Runtime (Whisper speech-to-text)
     implementation(libs.onnxruntime.android)
+
+    // MediaPipe (selfie segmentation for BG removal)
+    implementation(libs.mediapipe.tasks.vision)
 }

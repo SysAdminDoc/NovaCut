@@ -39,6 +39,8 @@ fun EditorScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val whisperState by viewModel.whisperModelState.collectAsStateWithLifecycle()
     val whisperProgress by viewModel.whisperDownloadProgress.collectAsStateWithLifecycle()
+    val segmentationState by viewModel.segmentationModelState.collectAsStateWithLifecycle()
+    val segmentationProgress by viewModel.segmentationDownloadProgress.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val hasOpenPanel = state.showMediaPicker || state.showExportSheet || state.showEffectsPanel ||
@@ -449,7 +451,11 @@ fun EditorScreen(
                 whisperModelState = whisperState,
                 whisperDownloadProgress = whisperProgress,
                 onDownloadWhisper = viewModel::downloadWhisperModel,
-                onDeleteWhisper = viewModel::deleteWhisperModel
+                onDeleteWhisper = viewModel::deleteWhisperModel,
+                segmentationModelState = segmentationState,
+                segmentationDownloadProgress = segmentationProgress,
+                onDownloadSegmentation = viewModel::downloadSegmentationModel,
+                onDeleteSegmentation = viewModel::deleteSegmentationModel
             )
         }
 

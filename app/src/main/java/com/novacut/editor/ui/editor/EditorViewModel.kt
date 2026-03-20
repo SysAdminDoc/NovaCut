@@ -170,6 +170,10 @@ class EditorViewModel @Inject constructor(
     val whisperModelState = aiFeatures.whisperEngine.modelState
     val whisperDownloadProgress = aiFeatures.whisperEngine.downloadProgress
 
+    // Segmentation model state
+    val segmentationModelState = aiFeatures.segmentationEngine.modelState
+    val segmentationDownloadProgress = aiFeatures.segmentationEngine.downloadProgress
+
     // Stored outside EditorState to avoid recomposition on every resize
     @Volatile
     private var timelineWidthPx: Float = 0f
@@ -2242,6 +2246,19 @@ class EditorViewModel @Inject constructor(
         showToast("Whisper model deleted")
     }
 
+    fun downloadSegmentationModel() {
+        viewModelScope.launch {
+            showToast("Downloading segmentation model...")
+            val success = aiFeatures.segmentationEngine.downloadModel()
+            showToast(if (success) "Segmentation model ready" else "Model download failed")
+        }
+    }
+
+    fun deleteSegmentationModel() {
+        aiFeatures.segmentationEngine.deleteModel()
+        showToast("Segmentation model deleted")
+    }
+
     fun runAiTool(toolId: String) {
         val clip = getSelectedClip()
         if (clip == null) {
@@ -2451,42 +2468,72 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "remove_bg" -> {
-                        val analysis = aiFeatures.analyzeBackground(clip.sourceUri)
-                        if (analysis.confidence < 0.1f) {
-                            showToast("Could not detect background")
-                        } else {
-                            saveUndoState("AI remove background")
-                            // Apply chroma key effect with detected background color parameters
-                            val chromaKeyEffect = Effect(
-                                type = EffectType.CHROMA_KEY,
-                                params = mapOf(
-                                    "similarity" to analysis.recommendedSimilarity,
-                                    "smoothness" to analysis.recommendedSmoothness,
-                                    "spill" to analysis.recommendedSpill
+                        val segEngine = aiFeatures.segmentationEngine
+                        if (segEngine.isReady()) {
+                            // Use MediaPipe selfie segmentation (pixel-accurate)
+                            val result = segEngine.segmentVideoFrame(clip.sourceUri)
+                            if (result == null || result.confidence < 0.05f) {
+                                showToast("Could not detect subject in frame")
+                            } else {
+                                saveUndoState("AI remove background")
+                                val bgEffect = Effect(
+                                    type = EffectType.BG_REMOVAL,
+                                    params = mapOf("threshold" to 0.5f)
                                 )
-                            )
-                            _state.update { state ->
-                                val tracks = state.tracks.map { track ->
-                                    val idx = track.clips.indexOfFirst { it.id == clip.id }
-                                    if (idx < 0) return@map track
-                                    val c = track.clips[idx]
-                                    // Remove existing chroma key, add new one
-                                    val filtered = c.effects.filter { it.type != EffectType.CHROMA_KEY }
-                                    val updated = c.copy(effects = filtered + chromaKeyEffect)
-                                    track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                _state.update { state ->
+                                    val tracks = state.tracks.map { track ->
+                                        val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                        if (idx < 0) return@map track
+                                        val c = track.clips[idx]
+                                        val filtered = c.effects.filter {
+                                            it.type != EffectType.BG_REMOVAL && it.type != EffectType.CHROMA_KEY
+                                        }
+                                        val updated = c.copy(effects = filtered + bgEffect)
+                                        track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                    }
+                                    recalculateDuration(state.copy(tracks = tracks))
                                 }
-                                recalculateDuration(state.copy(tracks = tracks))
+                                rebuildPlayerTimeline()
+                                saveProject()
+                                showToast("AI background removal applied (${"%.0f".format(result.confidence * 100)}% coverage)")
                             }
-                            rebuildPlayerTimeline()
-                            saveProject()
-                            val bgType = when {
-                                analysis.isGreenScreen -> "green screen"
-                                analysis.isBlueScreen -> "blue screen"
-                                else -> "background"
+                        } else {
+                            // Fallback: chroma key analysis
+                            val analysis = aiFeatures.analyzeBackground(clip.sourceUri)
+                            if (analysis.confidence < 0.1f) {
+                                showToast("Could not detect background")
+                            } else {
+                                saveUndoState("AI remove background")
+                                val chromaKeyEffect = Effect(
+                                    type = EffectType.CHROMA_KEY,
+                                    params = mapOf(
+                                        "similarity" to analysis.recommendedSimilarity,
+                                        "smoothness" to analysis.recommendedSmoothness,
+                                        "spill" to analysis.recommendedSpill
+                                    )
+                                )
+                                _state.update { state ->
+                                    val tracks = state.tracks.map { track ->
+                                        val idx = track.clips.indexOfFirst { it.id == clip.id }
+                                        if (idx < 0) return@map track
+                                        val c = track.clips[idx]
+                                        val filtered = c.effects.filter { it.type != EffectType.CHROMA_KEY }
+                                        val updated = c.copy(effects = filtered + chromaKeyEffect)
+                                        track.copy(clips = track.clips.toMutableList().apply { set(idx, updated) })
+                                    }
+                                    recalculateDuration(state.copy(tracks = tracks))
+                                }
+                                rebuildPlayerTimeline()
+                                saveProject()
+                                val bgType = when {
+                                    analysis.isGreenScreen -> "green screen"
+                                    analysis.isBlueScreen -> "blue screen"
+                                    else -> "background"
+                                }
+                                showToast("Applied $bgType removal (${
+                                    "%.0f".format(analysis.confidence * 100)
+                                }% confidence)")
                             }
-                            showToast("Applied $bgType removal (${
-                                "%.0f".format(analysis.confidence * 100)
-                            }% confidence)")
                         }
                     }
                     "track_motion" -> {

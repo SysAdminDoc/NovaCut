@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.8.0
+v1.8.1
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -53,6 +53,8 @@ v1.8.0
   - `engine/ProxyEngine.kt` - Low-res proxy generation for smooth editing
   - `engine/whisper/WhisperEngine.kt` - Whisper tiny.en ONNX speech-to-text (model download, PCM decode, inference, token decode)
   - `engine/whisper/WhisperMel.kt` - 80-channel log-mel spectrogram (FFT, mel filterbank, Whisper preprocessing)
+  - `engine/segmentation/SegmentationEngine.kt` - MediaPipe selfie segmenter (model download, per-frame segmentation)
+  - `engine/segmentation/SegmentationGlEffect.kt` - Custom GlEffect for export pipeline (GL readback + segmentation + mask shader)
   - `ui/editor/ColorGradingPanel.kt` - Lift/gamma/gain color wheels, RGB curves editor, HSL qualifier, LUT import
   - `ui/editor/AudioMixerPanel.kt` - Per-track faders, pan, mute/solo, VU meters, audio effect chain
   - `ui/editor/KeyframeCurveEditor.kt` - Bezier keyframe curve editor with property toggles, diamond handles, presets
@@ -386,8 +388,9 @@ v1.8.0
 
 - **Whisper ONNX auto captions** — `WhisperEngine` provides real speech-to-text when model is downloaded (~75MB whisper-tiny.en from HuggingFace). Auto-downloads encoder_model.onnx + decoder_model.onnx + vocab.json to `filesDir/whisper/`. Falls back to energy segmentation when model not available. AiToolsPanel shows model download status card with progress bar. Uses ONNX Runtime Android 1.17.0. Greedy decoding with timestamp tokens (50364+, each = 0.02s). 30-second chunk processing. GPT-2 byte-level BPE vocab decoded via `decodeGpt2Bytes()`. `INTERNET` permission added for model download.
 
+- **MediaPipe selfie segmentation** — `SegmentationEngine` wraps MediaPipe Tasks Vision `ImageSegmenter` with selfie_segmenter.tflite (~256KB, auto-downloaded from Google storage). `BG_REMOVAL` EffectType added. Per-frame segmentation during export via `SegmentationGlEffect` (GL readback + CPU segmentation + mask texture upload). Falls back to chroma key when model not available. `ByteBufferExtractor.extract()` for MPImage float confidence values. AiToolsPanel shows segmentation model card. Threshold slider (0.1-0.9) via EffectAdjustment panel.
+
 ## Next Steps
-- Integrate MediaPipe SelfieSegmentation for pixel-accurate background removal (current version uses chroma key auto-detect)
 - Template system (save/load project templates)
 - Proper Room migration strategy (replace destructive migration before production)
 - FFmpeg integration for broader codec support

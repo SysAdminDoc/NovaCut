@@ -598,6 +598,11 @@ fun EffectAdjustmentPanel(
                     onUpdateParams(mapOf("spill" to it))
                 }
             }
+            EffectType.BG_REMOVAL -> {
+                EffectSlider("Threshold", param("threshold"), 0.1f, 0.9f, ds) {
+                    onUpdateParams(mapOf("threshold" to it))
+                }
+            }
             EffectType.FILM_GRAIN -> {
                 EffectSlider("Intensity", param("intensity"), 0f, 0.5f, ds) {
                     onUpdateParams(mapOf("intensity" to it))

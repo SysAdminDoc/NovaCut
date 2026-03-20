@@ -498,6 +498,7 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
 
     // Keying
     CHROMA_KEY("Chroma Key", EffectCategory.KEYING),
+    BG_REMOVAL("BG Removal", EffectCategory.KEYING),
 
     // Speed
     SPEED("Speed", EffectCategory.SPEED),
@@ -523,6 +524,7 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
             PIXELATE -> mapOf("size" to 10f)
             CHROMATIC_ABERRATION -> mapOf("intensity" to 0.5f)
             CHROMA_KEY -> mapOf("similarity" to 0.4f, "smoothness" to 0.1f, "spill" to 0.1f)
+            BG_REMOVAL -> mapOf("threshold" to 0.5f)
             TILT_SHIFT -> mapOf("blur" to 0.01f, "focusY" to 0.5f, "width" to 0.1f)
             CYBERPUNK, NOIR, VINTAGE -> mapOf("intensity" to 0.7f)
             COOL_TONE, WARM_TONE -> mapOf("intensity" to 0.5f)

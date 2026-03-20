@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.novacut.editor.engine.segmentation.SegmentationModelState
 import com.novacut.editor.engine.whisper.WhisperModelState
 import com.novacut.editor.ui.theme.Mocha
 
@@ -83,6 +84,10 @@ fun AiToolsPanel(
     whisperDownloadProgress: Float = 0f,
     onDownloadWhisper: () -> Unit = {},
     onDeleteWhisper: () -> Unit = {},
+    segmentationModelState: SegmentationModelState = SegmentationModelState.NOT_DOWNLOADED,
+    segmentationDownloadProgress: Float = 0f,
+    onDownloadSegmentation: () -> Unit = {},
+    onDeleteSegmentation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -190,6 +195,85 @@ fun AiToolsPanel(
                     WhisperModelState.READY -> {
                         TextButton(
                             onClick = onDeleteWhisper,
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("Remove", color = Mocha.Subtext0, fontSize = 11.sp)
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Segmentation model status
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Mocha.Surface0)
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.PersonOff,
+                    contentDescription = null,
+                    tint = when (segmentationModelState) {
+                        SegmentationModelState.READY -> Mocha.Green
+                        SegmentationModelState.DOWNLOADING -> Mocha.Yellow
+                        SegmentationModelState.ERROR -> Mocha.Red
+                        else -> Mocha.Surface2
+                    },
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        when (segmentationModelState) {
+                            SegmentationModelState.READY -> "BG Removal (AI segmentation)"
+                            SegmentationModelState.DOWNLOADING -> "Downloading model..."
+                            SegmentationModelState.ERROR -> "Download failed"
+                            else -> "Selfie segmenter (~256 KB)"
+                        },
+                        color = Mocha.Text,
+                        fontSize = 12.sp
+                    )
+                    if (segmentationModelState == SegmentationModelState.DOWNLOADING) {
+                        LinearProgressIndicator(
+                            progress = { segmentationDownloadProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .height(3.dp),
+                            color = Mocha.Green,
+                            trackColor = Mocha.Surface2
+                        )
+                    }
+                    if (segmentationModelState == SegmentationModelState.NOT_DOWNLOADED) {
+                        Text(
+                            "Pixel-accurate background removal",
+                            color = Mocha.Subtext0,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                when (segmentationModelState) {
+                    SegmentationModelState.NOT_DOWNLOADED, SegmentationModelState.ERROR -> {
+                        TextButton(
+                            onClick = onDownloadSegmentation,
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp), tint = Mocha.Green)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Get", color = Mocha.Green, fontSize = 12.sp)
+                        }
+                    }
+                    SegmentationModelState.READY -> {
+                        TextButton(
+                            onClick = onDeleteSegmentation,
                             contentPadding = PaddingValues(horizontal = 8.dp)
                         ) {
                             Text("Remove", color = Mocha.Subtext0, fontSize = 11.sp)

@@ -8,6 +8,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import com.novacut.editor.engine.segmentation.SegmentationEngine
 import com.novacut.editor.engine.whisper.WhisperEngine
 import com.novacut.editor.model.TextOverlay
 import com.novacut.editor.model.TextAlignment
@@ -40,7 +41,8 @@ import kotlin.math.sqrt
 @Singleton
 class AiFeatures @Inject constructor(
     @ApplicationContext private val context: Context,
-    val whisperEngine: WhisperEngine
+    val whisperEngine: WhisperEngine,
+    val segmentationEngine: SegmentationEngine
 ) {
     // ---- Auto Captions ----
 

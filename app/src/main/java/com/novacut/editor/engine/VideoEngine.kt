@@ -24,6 +24,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.*
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.*
+import com.novacut.editor.engine.segmentation.SegmentationEngine
 import com.novacut.editor.model.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -40,7 +41,8 @@ private const val TAG = "VideoEngine"
 
 @Singleton
 class VideoEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val segmentationEngine: SegmentationEngine
 ) {
     private var player: ExoPlayer? = null
     private var playerListener: Player.Listener? = null
@@ -1155,6 +1157,12 @@ class VideoEngine @Inject constructor(
                 val keyG = (effect.params["keyG"] ?: 1f).coerceIn(0f, 1f)
                 val keyB = (effect.params["keyB"] ?: 0f).coerceIn(0f, 1f)
                 EffectShaders.chromaKey(keyR, keyG, keyB, similarity, smoothness)
+            }
+            EffectType.BG_REMOVAL -> {
+                val threshold = (effect.params["threshold"] ?: 0.5f).coerceIn(0.1f, 0.9f)
+                if (segmentationEngine.isReady()) {
+                    segmentationEngine.createExportEffect(threshold)
+                } else null
             }
             // Speed/Reverse handled separately in export pipeline, not as visual effects
             EffectType.SPEED, EffectType.REVERSE -> null
