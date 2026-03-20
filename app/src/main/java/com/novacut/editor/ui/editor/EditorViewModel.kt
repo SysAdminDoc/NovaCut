@@ -247,8 +247,9 @@ class EditorViewModel @Inject constructor(
             }
         })
 
-        // Periodic playhead sync (~30fps) with auto-scroll
+        // Periodic playhead sync (~30fps) with auto-scroll + per-clip speed tracking
         viewModelScope.launch {
+            var lastClipIndex = -1
             while (isActive) {
                 delay(33)
                 val player = videoEngine.getPlayer()
@@ -270,6 +271,19 @@ class EditorViewModel @Inject constructor(
                         }
                         s.copy(playheadMs = currentMs, scrollOffsetMs = newScroll)
                     }
+                    // Track clip transitions during playback — update speed/effects for current clip
+                    val currentIndex = videoEngine.getCurrentClipIndex()
+                    if (currentIndex != lastClipIndex) {
+                        lastClipIndex = currentIndex
+                        val videoClips = _state.value.tracks
+                            .filter { it.type == TrackType.VIDEO }
+                            .flatMap { it.clips }
+                        val currentClip = videoClips.getOrNull(currentIndex)
+                        if (currentClip != null) {
+                            videoEngine.setPreviewSpeed(currentClip.speed)
+                            videoEngine.applyPreviewEffects(currentClip)
+                        }
+                    }
                 }
             }
         }
@@ -289,6 +303,15 @@ class EditorViewModel @Inject constructor(
     /** Rebuild ExoPlayer timeline from current tracks. Call after any clip mutation. */
     private fun rebuildPlayerTimeline() {
         videoEngine.prepareTimeline(_state.value.tracks)
+        updatePreview()
+    }
+
+    /** Apply the selected clip's effects and speed to ExoPlayer for live preview. */
+    private fun updatePreview() {
+        val clip = getSelectedClip()
+        videoEngine.applyPreviewEffects(clip)
+        val speed = clip?.speed ?: 1f
+        videoEngine.setPreviewSpeed(speed)
     }
 
     fun addClipToTrack(uri: Uri, trackType: TrackType = TrackType.VIDEO) {
@@ -353,6 +376,7 @@ class EditorViewModel @Inject constructor(
 
     fun selectClip(clipId: String?, trackId: String? = null) {
         _state.update { it.copy(selectedClipId = clipId, selectedTrackId = trackId) }
+        updatePreview()
     }
 
     fun deleteSelectedClip() {
@@ -553,6 +577,7 @@ class EditorViewModel @Inject constructor(
 
     fun beginTrim() {
         saveUndoState("Trim clip")
+        videoEngine.setScrubbingMode(true)
     }
 
     fun trimClip(clipId: String, newTrimStartMs: Long? = null, newTrimEndMs: Long? = null) {
@@ -588,7 +613,8 @@ class EditorViewModel @Inject constructor(
             }
             recalculateDuration(state.copy(tracks = tracks))
         }
-        rebuildPlayerTimeline()
+        // Apply speed to preview immediately (don't rebuild full timeline for smooth slider)
+        videoEngine.setPreviewSpeed(speed.coerceIn(0.1f, 16f))
     }
 
     fun setClipReversed(clipId: String, reversed: Boolean) {
@@ -622,6 +648,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
         saveProject()
     }
 
@@ -643,6 +670,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
     }
 
     fun toggleEffectEnabled(clipId: String, effectId: String) {
@@ -660,6 +688,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
         saveProject()
     }
 
@@ -674,6 +703,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
         saveProject()
     }
 
@@ -713,6 +743,7 @@ class EditorViewModel @Inject constructor(
             state.copy(tracks = tracks)
         }
         showToast("Pasted ${filtered.size} effects")
+        updatePreview()
         saveProject()
     }
 
@@ -727,6 +758,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
         saveProject()
     }
 
@@ -831,6 +863,10 @@ class EditorViewModel @Inject constructor(
         _state.update { it.copy(playheadMs = positionMs) }
     }
 
+    /** Enable scrubbing mode during timeline drag for smoother seeking. */
+    fun beginScrub() { videoEngine.setScrubbingMode(true) }
+    fun endScrub() { videoEngine.setScrubbingMode(false) }
+
     fun updatePlayheadPosition(positionMs: Long) {
         _state.update { it.copy(playheadMs = positionMs) }
     }
@@ -846,6 +882,10 @@ class EditorViewModel @Inject constructor(
 
     // Tool selection
     fun setTool(tool: EditorTool) {
+        // Disable scrubbing mode when leaving trim tool
+        if (_state.value.currentTool == EditorTool.TRIM && tool != EditorTool.TRIM) {
+            videoEngine.setScrubbingMode(false)
+        }
         _state.update { it.copy(currentTool = tool) }
     }
 
@@ -940,6 +980,7 @@ class EditorViewModel @Inject constructor(
                 })
             })
         }
+        updatePreview()
     }
 
     fun importLut() {
@@ -1218,6 +1259,7 @@ class EditorViewModel @Inject constructor(
                 })
             })
         }
+        updatePreview()
     }
 
     fun setTrackBlendMode(trackId: String, blendMode: BlendMode) {
@@ -1876,6 +1918,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
     }
 
     fun resetClipTransform(clipId: String) {
@@ -1904,6 +1947,7 @@ class EditorViewModel @Inject constructor(
             }
             state.copy(tracks = tracks)
         }
+        updatePreview()
     }
 
     fun beginFadeAdjust() {

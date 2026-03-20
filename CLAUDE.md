@@ -4,12 +4,12 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.5.1
+v1.7.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
 - **UI**: Jetpack Compose (Material 3, Catppuccin Mocha theme)
-- **Video Engine**: Media3 Transformer 1.5.1 + ExoPlayer
+- **Video Engine**: Media3 Transformer 1.9.2 + ExoPlayer
 - **Effects**: OpenGL ES 3.0 GLSL shaders (via Media3 RgbMatrix + custom GlEffect)
 - **Audio**: MediaCodec PCM decode, waveform extraction, mixing engine
 - **DI**: Hilt/Dagger
@@ -372,6 +372,15 @@ v1.5.1
 - **BackHandler priority** — `hasOpenPanel` checks 12 boolean panel states. Priority: dismiss panels > clear tool > deselect clip. `enabled` parameter gates the handler to avoid intercepting when nothing to dismiss.
 - **pauseIfPlaying pattern** — Checks `videoEngine.isPlaying()`, calls `videoEngine.pause()`, updates `isPlaying = false` in state. Called at start of every `show*()` method to prevent playback during panel interaction.
 - **SubMenuGrid disabledIds** — `Set<String>` parameter. Disabled items get `Modifier.alpha(0.35f)` and no `clickable` modifier. Used for paste_fx when `hasCopiedEffects = false`.
+- **Live preview effects** — `VideoEngine.applyPreviewEffects(clip)` builds and applies the selected clip's effects (user effects, color grading, LUT, blend mode, transitions, opacity, transforms) to ExoPlayer via `player.setVideoEffects()`. Called on clip selection, effect add/remove/update/toggle, color grade, blend mode, transition, transform, and opacity changes. Effects are global to the player (not per-clip in playlist), so only the selected clip's effects are shown.
+- **Live preview speed** — `VideoEngine.setPreviewSpeed(speed)` applies `PlaybackParameters` to ExoPlayer for real-time speed preview. Updated on speed slider change and during playback when crossing clip boundaries (detected via `getCurrentClipIndex()` in the playhead sync loop).
+- **Clip-tracking during playback** — The playhead sync loop now tracks `lastClipIndex`. When ExoPlayer's `currentMediaItemIndex` changes, the current clip's speed and effects are applied automatically, enabling correct preview across multi-clip timelines.
+- **ToolPanel "Transform/Motion" tab fixed** — Clip mode "transform" tab now toggles the Motion sub-menu (Transform, Keyframes, Masks, Blend Mode, PiP, Chroma Key) instead of directly opening the Transform panel.
+- **ToolPanel "Color" tab wired** — Clip mode "color" tab now toggles the Color sub-menu (Color Grade, Effects, Normalize Audio). Previously had no handler.
+- **ToolPanel "Tools" tab wired** — Project mode "project_tools" tab now toggles the Tools sub-menu (Audio Mixer, Beat Detect, Auto Duck, Adjustment Layer, Scopes, Chapters, etc.). Previously had no handler.
+- **Media3 upgraded from 1.5.1 to 1.9.2** — Major version bump. `OverlaySettings` renamed to `StaticOverlaySettings`. `ExportTextOverlay.getOverlaySettings()` replaced with `getVertexTransformation()` returning 4x4 column-major GL matrix. Alpha now modulated directly in text ForegroundColorSpan. Added `media3-muxer` dependency (Muxer moved from transformer module).
+- **Variable speed export via SpeedProvider** — `SpeedChangeEffect` replaced with `EditedMediaItem.Builder.setSpeed(SpeedProvider)`. When a clip has a `SpeedCurve` with bezier control points, the curve is wired as a per-frame `SpeedProvider` in the export pipeline. Constant speed clips also use SpeedProvider (required by 1.9.x API). Speed curves with ramp up/down/pulse presets now exported correctly.
+- **ExoPlayer scrubbing mode** — `VideoEngine.setScrubbingMode(enabled)` wraps `player.setScrubbingModeEnabled()` (Media3 1.8.0+). Enabled during timeline trim drag (`beginTrim()`), disabled on tool change away from TRIM. `beginScrub()`/`endScrub()` exposed for timeline ruler drag. Optimizes seek performance during frequent position changes.
 
 ## Next Steps
 - Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)

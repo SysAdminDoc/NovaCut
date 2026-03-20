@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 44
-        versionName = "1.5.1"
+        versionCode = 46
+        versionName = "1.7.0"
     }
 
     signingConfigs {
@@ -106,6 +106,7 @@ dependencies {
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
     implementation(libs.media3.ui)
+    implementation(libs.media3.muxer)
 
     // Room
     implementation(libs.androidx.room.runtime)

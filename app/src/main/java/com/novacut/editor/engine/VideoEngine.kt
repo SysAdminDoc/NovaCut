@@ -76,6 +76,14 @@ class VideoEngine @Inject constructor(
         return player!!
     }
 
+    /**
+     * Enable/disable scrubbing mode for optimized frequent seeking (e.g., timeline dragging).
+     */
+    @androidx.annotation.OptIn(UnstableApi::class)
+    fun setScrubbingMode(enabled: Boolean) {
+        player?.setScrubbingModeEnabled(enabled)
+    }
+
     fun setPlayerListener(listener: Player.Listener) {
         playerListener?.let { player?.removeListener(it) }
         playerListener = listener
@@ -455,9 +463,7 @@ class VideoEngine @Inject constructor(
                         }
                         add(MatrixTransformation { m })
                     }
-                    if (clip.speed != 1.0f) {
-                        add(SpeedChangeEffect(clip.speed))
-                    }
+                    // Speed handled via EditedMediaItem.Builder.setSpeed() below
                     // Text overlays that overlap this clip's timeline range
                     val clipStart = clip.timelineStartMs
                     val clipEnd = clip.timelineEndMs
@@ -507,9 +513,31 @@ class VideoEngine @Inject constructor(
                     }
                 }
 
-                EditedMediaItem.Builder(mediaItem)
+                val itemBuilder = EditedMediaItem.Builder(mediaItem)
                     .setEffects(Effects(audioProcessors, videoEffects))
-                    .build()
+
+                // Apply speed: variable speed curve via SpeedProvider, or constant speed
+                if (clip.speedCurve != null && clip.speedCurve.points.size >= 2) {
+                    val curve = clip.speedCurve
+                    val clipDurMs = clip.durationMs
+                    itemBuilder.setSpeed(object : androidx.media3.common.audio.SpeedProvider {
+                        override fun getSpeed(presentationTimeUs: Long): Float {
+                            val timeMs = presentationTimeUs / 1000L
+                            return curve.getSpeedAt(timeMs, clipDurMs).coerceIn(0.1f, 16f)
+                        }
+                        override fun getNextSpeedChangeTimeUs(timeUs: Long): Long {
+                            return androidx.media3.common.C.TIME_UNSET
+                        }
+                    })
+                } else if (clip.speed != 1.0f) {
+                    val constSpeed = clip.speed.coerceIn(0.1f, 16f)
+                    itemBuilder.setSpeed(object : androidx.media3.common.audio.SpeedProvider {
+                        override fun getSpeed(presentationTimeUs: Long): Float = constSpeed
+                        override fun getNextSpeedChangeTimeUs(timeUs: Long): Long = androidx.media3.common.C.TIME_UNSET
+                    })
+                }
+
+                itemBuilder.build()
             }
 
             val videoSequence = EditedMediaItemSequence.Builder(editedItems).build()
@@ -644,6 +672,183 @@ class VideoEngine @Inject constructor(
         _exportProgress.value = 0f
         activeTransformer?.cancel()
         activeTransformer = null
+    }
+
+    // --- Preview effects & speed ---
+
+    /**
+     * Apply visual effects to ExoPlayer preview for the given clip.
+     * Builds RgbMatrix/GlEffect effects from the clip's enabled effects, opacity, and transforms.
+     * Does NOT include speed (handled via PlaybackParameters), text overlays, Presentation, or FrameDropEffect.
+     */
+    @androidx.annotation.OptIn(UnstableApi::class)
+    fun applyPreviewEffects(clip: Clip?) {
+        val p = player ?: return
+        if (clip == null) {
+            p.setVideoEffects(emptyList())
+            return
+        }
+        val effects = buildList<androidx.media3.common.Effect> {
+            // User effects
+            for (effect in clip.effects.filter { it.enabled }) {
+                buildVideoEffect(effect)?.let { add(it) }
+            }
+            // Color grading (lift/gamma/gain + HSL)
+            clip.colorGrade?.let { grade ->
+                if (grade.enabled) {
+                    val hasLGG = grade.liftR != 0f || grade.liftG != 0f || grade.liftB != 0f ||
+                        grade.gammaR != 1f || grade.gammaG != 1f || grade.gammaB != 1f ||
+                        grade.gainR != 1f || grade.gainG != 1f || grade.gainB != 1f ||
+                        grade.offsetR != 0f || grade.offsetG != 0f || grade.offsetB != 0f
+                    if (hasLGG) {
+                        add(EffectShaders.colorGrade(
+                            grade.liftR, grade.liftG, grade.liftB,
+                            grade.gammaR, grade.gammaG, grade.gammaB,
+                            grade.gainR, grade.gainG, grade.gainB,
+                            grade.offsetR, grade.offsetG, grade.offsetB
+                        ))
+                    }
+                    grade.hslQualifier?.let { hsl ->
+                        add(EffectShaders.hslQualify(
+                            hsl.hueCenter, hsl.hueWidth,
+                            hsl.satMin, hsl.satMax,
+                            hsl.lumMin, hsl.lumMax,
+                            hsl.softness,
+                            hsl.adjustHue, hsl.adjustSat, hsl.adjustLum
+                        ))
+                    }
+                    grade.lutPath?.let { path ->
+                        val lutFile = java.io.File(path)
+                        if (lutFile.exists()) {
+                            val lut = when {
+                                path.endsWith(".cube", true) -> LutEngine.parseCube(lutFile)
+                                path.endsWith(".3dl", true) -> LutEngine.parse3dl(lutFile)
+                                else -> null
+                            }
+                            lut?.let { add(LutEngine.createLutEffect(it, grade.lutIntensity)) }
+                        }
+                    }
+                }
+            }
+            // Blend mode
+            if (clip.blendMode != com.novacut.editor.model.BlendMode.NORMAL) {
+                add(EffectShaders.blendMode(clip.blendMode, clip.opacity))
+            }
+            // Transition-in (preview)
+            clip.transition?.let { transition ->
+                val durationUs = transition.durationMs * 1000f
+                add(when (transition.type) {
+                    TransitionType.DISSOLVE, TransitionType.FADE_BLACK -> EffectShaders.transitionFadeIn(durationUs)
+                    TransitionType.FADE_WHITE -> EffectShaders.transitionFadeIn(durationUs, fadeToWhite = true)
+                    TransitionType.WIPE_LEFT -> EffectShaders.transitionWipe(durationUs, -1f, 0f)
+                    TransitionType.WIPE_RIGHT -> EffectShaders.transitionWipe(durationUs, 1f, 0f)
+                    TransitionType.WIPE_UP -> EffectShaders.transitionWipe(durationUs, 0f, 1f)
+                    TransitionType.WIPE_DOWN -> EffectShaders.transitionWipe(durationUs, 0f, -1f)
+                    TransitionType.SLIDE_LEFT -> EffectShaders.transitionSlideIn(durationUs, 1f, 0f)
+                    TransitionType.SLIDE_RIGHT -> EffectShaders.transitionSlideIn(durationUs, -1f, 0f)
+                    TransitionType.ZOOM_IN -> EffectShaders.transitionZoomIn(durationUs)
+                    TransitionType.ZOOM_OUT -> EffectShaders.transitionZoomOut(durationUs)
+                    TransitionType.SPIN -> EffectShaders.transitionSpin(durationUs)
+                    TransitionType.FLIP -> EffectShaders.transitionFlip(durationUs)
+                    TransitionType.CUBE -> EffectShaders.transitionCube(durationUs)
+                    TransitionType.RIPPLE -> EffectShaders.transitionRipple(durationUs)
+                    TransitionType.PIXELATE -> EffectShaders.transitionPixelate(durationUs)
+                    TransitionType.DIRECTIONAL_WARP -> EffectShaders.transitionDirectionalWarp(durationUs)
+                    TransitionType.WIND -> EffectShaders.transitionWind(durationUs)
+                    TransitionType.MORPH -> EffectShaders.transitionMorph(durationUs)
+                    TransitionType.GLITCH -> EffectShaders.transitionGlitch(durationUs)
+                    TransitionType.CIRCLE_OPEN -> EffectShaders.transitionCircleOpen(durationUs)
+                    TransitionType.CROSS_ZOOM -> EffectShaders.transitionCrossZoom(durationUs)
+                    TransitionType.DREAMY -> EffectShaders.transitionDreamy(durationUs)
+                    TransitionType.HEART -> EffectShaders.transitionHeart(durationUs)
+                    TransitionType.SWIRL -> EffectShaders.transitionSwirl(durationUs)
+                })
+            }
+            // Opacity
+            val hasKeyframeOpacity = clip.keyframes.any { it.property == KeyframeProperty.OPACITY }
+            if (hasKeyframeOpacity) {
+                add(RgbMatrix { presentationTimeUs, _ ->
+                    val timeMs = presentationTimeUs / 1000L
+                    val opacity = KeyframeEngine.getValueAt(
+                        clip.keyframes, KeyframeProperty.OPACITY, timeMs
+                    ) ?: 1f
+                    floatArrayOf(
+                        opacity, 0f, 0f, 0f,
+                        0f, opacity, 0f, 0f,
+                        0f, 0f, opacity, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                })
+            } else if (clip.opacity != 1f) {
+                val o = clip.opacity.coerceIn(0f, 1f)
+                add(RgbMatrix { _, _ ->
+                    floatArrayOf(
+                        o, 0f, 0f, 0f,
+                        0f, o, 0f, 0f,
+                        0f, 0f, o, 0f,
+                        0f, 0f, 0f, 1f
+                    )
+                })
+            }
+            // Transform (rotation, scale, position) — keyframe-animated or static
+            val hasKfScale = clip.keyframes.any {
+                it.property == KeyframeProperty.SCALE_X || it.property == KeyframeProperty.SCALE_Y
+            }
+            val hasKfRotation = clip.keyframes.any { it.property == KeyframeProperty.ROTATION }
+            val hasKfPosition = clip.keyframes.any {
+                it.property == KeyframeProperty.POSITION_X || it.property == KeyframeProperty.POSITION_Y
+            }
+            val needsStaticTransform = clip.rotation != 0f || clip.scaleX != 1f || clip.scaleY != 1f || clip.positionX != 0f || clip.positionY != 0f
+            if (hasKfScale || hasKfRotation || hasKfPosition) {
+                val kfs = clip.keyframes
+                val staticSx = clip.scaleX; val staticSy = clip.scaleY
+                val staticRot = clip.rotation
+                val staticPx = clip.positionX; val staticPy = clip.positionY
+                add(MatrixTransformation { presentationTimeUs ->
+                    val timeMs = presentationTimeUs / 1000L
+                    val sx = KeyframeEngine.getValueAt(kfs, KeyframeProperty.SCALE_X, timeMs) ?: staticSx
+                    val sy = KeyframeEngine.getValueAt(kfs, KeyframeProperty.SCALE_Y, timeMs) ?: staticSy
+                    val rot = KeyframeEngine.getValueAt(kfs, KeyframeProperty.ROTATION, timeMs) ?: staticRot
+                    val px = KeyframeEngine.getValueAt(kfs, KeyframeProperty.POSITION_X, timeMs) ?: staticPx
+                    val py = KeyframeEngine.getValueAt(kfs, KeyframeProperty.POSITION_Y, timeMs) ?: staticPy
+                    android.graphics.Matrix().apply {
+                        postScale(sx, sy)
+                        postRotate(rot)
+                        postTranslate(px, -py)
+                    }
+                })
+            } else if (needsStaticTransform) {
+                val m = android.graphics.Matrix().apply {
+                    postScale(clip.scaleX, clip.scaleY)
+                    postRotate(clip.rotation)
+                    postTranslate(clip.positionX, -clip.positionY)
+                }
+                add(MatrixTransformation { m })
+            }
+        }
+        try {
+            p.setVideoEffects(effects)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to apply preview effects", e)
+        }
+    }
+
+    /**
+     * Set ExoPlayer playback speed for preview. Does not affect export.
+     */
+    fun setPreviewSpeed(speed: Float) {
+        try {
+            player?.playbackParameters = androidx.media3.common.PlaybackParameters(speed.coerceIn(0.1f, 16f))
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to set preview speed", e)
+        }
+    }
+
+    /**
+     * Get the currently playing clip index in the playlist.
+     */
+    fun getCurrentClipIndex(): Int {
+        return player?.currentMediaItemIndex ?: 0
     }
 
     @androidx.annotation.OptIn(UnstableApi::class)
@@ -1086,12 +1291,19 @@ private class ExportTextOverlay(
 ) : androidx.media3.effect.TextOverlay() {
 
     private val animDurationMs = 500L
+    // Current alpha computed per-frame for text color modulation
+    private var currentAlpha = 1f
 
     override fun getText(presentationTimeUs: Long): SpannableString {
         val timeMs = presentationTimeUs / 1000L
         if (timeMs < relStartMs || timeMs > relEndMs) {
+            currentAlpha = 0f
             return SpannableString("")
         }
+
+        // Compute animation alpha
+        computeAnimationState(timeMs)
+
         val fullText = overlay.text
         // Typewriter animation: reveal characters progressively
         val displayText = if (overlay.animationIn == com.novacut.editor.model.TextAnimation.TYPEWRITER) {
@@ -1104,8 +1316,12 @@ private class ExportTextOverlay(
         }
         val text = SpannableString(displayText)
         if (displayText.isNotEmpty()) {
+            // Apply alpha to text color
+            val baseColor = overlay.color.toInt()
+            val alphaInt = (currentAlpha * 255f).toInt().coerceIn(0, 255)
+            val alphaColor = (baseColor and 0x00FFFFFF) or (alphaInt shl 24)
             text.setSpan(
-                ForegroundColorSpan(overlay.color.toInt()),
+                ForegroundColorSpan(alphaColor),
                 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             text.setSpan(
@@ -1121,19 +1337,18 @@ private class ExportTextOverlay(
             if (style != Typeface.NORMAL) {
                 text.setSpan(StyleSpan(style), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            // Font family
             text.setSpan(
                 TypefaceSpan(overlay.fontFamily),
                 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
-            // Background color (skip if fully transparent)
             if (overlay.backgroundColor.toInt() and 0xFF000000.toInt() != 0) {
+                val bgAlpha = (currentAlpha * ((overlay.backgroundColor.toInt() ushr 24) and 0xFF)).toInt().coerceIn(0, 255)
+                val bgColor = (overlay.backgroundColor.toInt() and 0x00FFFFFF) or (bgAlpha shl 24)
                 text.setSpan(
-                    BackgroundColorSpan(overlay.backgroundColor.toInt()),
+                    BackgroundColorSpan(bgColor),
                     0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }
-            // Text alignment
             val alignment = when (overlay.alignment) {
                 com.novacut.editor.model.TextAlignment.LEFT -> Layout.Alignment.ALIGN_NORMAL
                 com.novacut.editor.model.TextAlignment.CENTER -> Layout.Alignment.ALIGN_CENTER
@@ -1147,86 +1362,112 @@ private class ExportTextOverlay(
         return text
     }
 
-    override fun getOverlaySettings(presentationTimeUs: Long): OverlaySettings {
+    /**
+     * Returns a 4x4 column-major vertex transformation matrix for overlay positioning.
+     * Encodes position, scale, and rotation computed from animation state.
+     */
+    override fun getVertexTransformation(presentationTimeUs: Long): FloatArray {
         val timeMs = presentationTimeUs / 1000L
         if (timeMs < relStartMs || timeMs > relEndMs) {
-            return OverlaySettings.Builder().setAlphaScale(0f).build()
+            // Zero-scale matrix to hide overlay
+            return floatArrayOf(
+                0f, 0f, 0f, 0f,
+                0f, 0f, 0f, 0f,
+                0f, 0f, 1f, 0f,
+                0f, 0f, 0f, 1f
+            )
         }
 
-        val baseAnchorX = overlay.positionX * 2f - 1f
-        val baseAnchorY = -(overlay.positionY * 2f - 1f)
+        computeAnimationState(timeMs)
 
-        // Compute animation-in progress (0..1)
+        val tx = currentOffsetX + (overlay.positionX * 2f - 1f)
+        val ty = currentOffsetY - (overlay.positionY * 2f - 1f)
+        val sx = currentScale
+        val sy = currentScale
+        val rad = currentRotation * (kotlin.math.PI.toFloat() / 180f)
+        val cos = kotlin.math.cos(rad)
+        val sin = kotlin.math.sin(rad)
+
+        // Column-major 4x4: scale * rotate, then translate
+        return floatArrayOf(
+            sx * cos, sx * sin, 0f, 0f,
+            -sy * sin, sy * cos, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            tx, ty, 0f, 1f
+        )
+    }
+
+    // Cached animation state (computed once per frame, used by both getText and getVertexTransformation)
+    private var lastComputedTimeMs = -1L
+    private var currentOffsetX = 0f
+    private var currentOffsetY = 0f
+    private var currentScale = 1f
+    private var currentRotation = 0f
+
+    private fun computeAnimationState(timeMs: Long) {
+        if (timeMs == lastComputedTimeMs) return
+        lastComputedTimeMs = timeMs
+
+        currentAlpha = 1f
+        currentOffsetX = 0f
+        currentOffsetY = 0f
+        currentScale = 1f
+        currentRotation = 0f
+
         val inProgress = if (overlay.animationIn != com.novacut.editor.model.TextAnimation.NONE) {
             ((timeMs - relStartMs).toFloat() / animDurationMs).coerceIn(0f, 1f)
         } else 1f
 
-        // Compute animation-out progress (1..0)
         val outProgress = if (overlay.animationOut != com.novacut.editor.model.TextAnimation.NONE) {
             ((relEndMs - timeMs).toFloat() / animDurationMs).coerceIn(0f, 1f)
         } else 1f
 
-        // Apply animation effects
-        var alpha = 1f
-        var offsetX = 0f
-        var offsetY = 0f
-        var scale = 1f
-        var rotation = 0f
-
         // Animation in
         when (overlay.animationIn) {
-            com.novacut.editor.model.TextAnimation.FADE -> alpha *= easeOut(inProgress)
-            com.novacut.editor.model.TextAnimation.SLIDE_UP -> offsetY -= (1f - easeOut(inProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SLIDE_DOWN -> offsetY += (1f - easeOut(inProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SLIDE_LEFT -> offsetX -= (1f - easeOut(inProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SLIDE_RIGHT -> offsetX += (1f - easeOut(inProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SCALE -> scale *= easeOut(inProgress)
-            com.novacut.editor.model.TextAnimation.SPIN -> rotation += (1f - easeOut(inProgress)) * 360f
+            com.novacut.editor.model.TextAnimation.FADE -> currentAlpha *= easeOut(inProgress)
+            com.novacut.editor.model.TextAnimation.SLIDE_UP -> currentOffsetY -= (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_DOWN -> currentOffsetY += (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_LEFT -> currentOffsetX -= (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_RIGHT -> currentOffsetX += (1f - easeOut(inProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SCALE -> currentScale *= easeOut(inProgress)
+            com.novacut.editor.model.TextAnimation.SPIN -> currentRotation += (1f - easeOut(inProgress)) * 360f
             com.novacut.editor.model.TextAnimation.BOUNCE -> {
                 val t = easeOut(inProgress)
-                offsetY -= (1f - bounceEase(t)) * 0.3f
+                currentOffsetY -= (1f - bounceEase(t)) * 0.3f
             }
             com.novacut.editor.model.TextAnimation.TYPEWRITER -> { /* handled in getText() */ }
             com.novacut.editor.model.TextAnimation.NONE -> { }
-            com.novacut.editor.model.TextAnimation.BLUR_IN -> alpha *= easeOut(inProgress)
-            com.novacut.editor.model.TextAnimation.GLITCH -> offsetX += (1f - easeOut(inProgress)) * 0.05f * kotlin.math.sin(inProgress * 30f)
-            com.novacut.editor.model.TextAnimation.WAVE -> offsetY -= kotlin.math.sin(inProgress * 6.28f) * 0.05f
+            com.novacut.editor.model.TextAnimation.BLUR_IN -> currentAlpha *= easeOut(inProgress)
+            com.novacut.editor.model.TextAnimation.GLITCH -> currentOffsetX += (1f - easeOut(inProgress)) * 0.05f * kotlin.math.sin(inProgress * 30f)
+            com.novacut.editor.model.TextAnimation.WAVE -> currentOffsetY -= kotlin.math.sin(inProgress * 6.28f) * 0.05f
             com.novacut.editor.model.TextAnimation.ELASTIC -> {
                 val t = easeOut(inProgress)
-                scale *= if (t < 1f) (1f + 0.3f * kotlin.math.sin(t * 3.14f * 3f) * (1f - t)) else 1f
+                currentScale *= if (t < 1f) (1f + 0.3f * kotlin.math.sin(t * 3.14f * 3f) * (1f - t)) else 1f
             }
-            com.novacut.editor.model.TextAnimation.FLIP -> rotation += (1f - easeOut(inProgress)) * 180f
+            com.novacut.editor.model.TextAnimation.FLIP -> currentRotation += (1f - easeOut(inProgress)) * 180f
         }
 
         // Animation out
         when (overlay.animationOut) {
-            com.novacut.editor.model.TextAnimation.FADE -> alpha *= easeOut(outProgress)
-            com.novacut.editor.model.TextAnimation.SLIDE_UP -> offsetY += (1f - easeOut(outProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SLIDE_DOWN -> offsetY -= (1f - easeOut(outProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SLIDE_LEFT -> offsetX += (1f - easeOut(outProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SLIDE_RIGHT -> offsetX -= (1f - easeOut(outProgress)) * 0.3f
-            com.novacut.editor.model.TextAnimation.SCALE -> scale *= easeOut(outProgress)
-            com.novacut.editor.model.TextAnimation.SPIN -> rotation -= (1f - easeOut(outProgress)) * 360f
+            com.novacut.editor.model.TextAnimation.FADE -> currentAlpha *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.SLIDE_UP -> currentOffsetY += (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_DOWN -> currentOffsetY -= (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_LEFT -> currentOffsetX += (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SLIDE_RIGHT -> currentOffsetX -= (1f - easeOut(outProgress)) * 0.3f
+            com.novacut.editor.model.TextAnimation.SCALE -> currentScale *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.SPIN -> currentRotation -= (1f - easeOut(outProgress)) * 360f
             com.novacut.editor.model.TextAnimation.BOUNCE -> {
                 val t = easeOut(outProgress)
-                offsetY += (1f - bounceEase(t)) * 0.3f
+                currentOffsetY += (1f - bounceEase(t)) * 0.3f
             }
-            com.novacut.editor.model.TextAnimation.TYPEWRITER -> alpha *= outProgress
+            com.novacut.editor.model.TextAnimation.TYPEWRITER -> currentAlpha *= outProgress
             com.novacut.editor.model.TextAnimation.NONE -> { }
-            com.novacut.editor.model.TextAnimation.BLUR_IN -> alpha *= easeOut(outProgress)
-            com.novacut.editor.model.TextAnimation.GLITCH -> offsetX -= (1f - easeOut(outProgress)) * 0.05f * kotlin.math.sin(outProgress * 30f)
-            com.novacut.editor.model.TextAnimation.WAVE -> offsetY += kotlin.math.sin(outProgress * 6.28f) * 0.05f
-            com.novacut.editor.model.TextAnimation.ELASTIC -> scale *= easeOut(outProgress)
-            com.novacut.editor.model.TextAnimation.FLIP -> rotation -= (1f - easeOut(outProgress)) * 180f
+            com.novacut.editor.model.TextAnimation.BLUR_IN -> currentAlpha *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.GLITCH -> currentOffsetX -= (1f - easeOut(outProgress)) * 0.05f * kotlin.math.sin(outProgress * 30f)
+            com.novacut.editor.model.TextAnimation.WAVE -> currentOffsetY += kotlin.math.sin(outProgress * 6.28f) * 0.05f
+            com.novacut.editor.model.TextAnimation.ELASTIC -> currentScale *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.FLIP -> currentRotation -= (1f - easeOut(outProgress)) * 180f
         }
-
-        return OverlaySettings.Builder()
-            .setOverlayFrameAnchor(baseAnchorX + offsetX, baseAnchorY + offsetY)
-            .setBackgroundFrameAnchor(baseAnchorX + offsetX, baseAnchorY + offsetY)
-            .setAlphaScale(alpha)
-            .setScale(scale, scale)
-            .setRotationDegrees(rotation)
-            .build()
     }
 
     private fun easeOut(t: Float): Float = 1f - (1f - t) * (1f - t)

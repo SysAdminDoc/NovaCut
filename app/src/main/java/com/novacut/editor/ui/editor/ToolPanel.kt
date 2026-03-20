@@ -227,8 +227,13 @@ fun BottomToolArea(
                         onAction("speed")
                     }
                     "transform" -> {
-                        activeTabId = null
-                        onAction("transform")
+                        // Clip mode: show Motion sub-menu (Transform, Keyframes, Masks, Blend, PiP, Chroma)
+                        if (isClipMode) {
+                            activeTabId = if (activeTabId == "transform") null else "transform"
+                        } else {
+                            activeTabId = null
+                            onAction("transform")
+                        }
                     }
                     "effects" -> {
                         activeTabId = null
@@ -238,12 +243,20 @@ fun BottomToolArea(
                         activeTabId = null
                         onAction("transition")
                     }
+                    "color" -> {
+                        // Clip mode: show Color sub-menu (Color Grade, Effects, Normalize Audio)
+                        activeTabId = if (activeTabId == "color") null else "color"
+                    }
                     "ai" -> {
                         activeTabId = if (activeTabId == "ai") null else "ai"
                     }
                     "aspect" -> {
                         activeTabId = null
                         onAction("aspect")
+                    }
+                    "project_tools" -> {
+                        // Project mode: show Tools sub-menu (Audio Mixer, Beat Detect, etc.)
+                        activeTabId = if (activeTabId == "project_tools") null else "project_tools"
                     }
                 }
             }
