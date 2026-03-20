@@ -14,6 +14,7 @@ import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.ProjectAutoSave
 import com.novacut.editor.engine.ProxyEngine
+import com.novacut.editor.engine.SettingsRepository
 import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.SubtitleExporter
 import com.novacut.editor.engine.VideoEngine
@@ -159,6 +160,7 @@ class EditorViewModel @Inject constructor(
     private val voiceoverEngine: VoiceoverRecorderEngine,
     private val templateManager: TemplateManager,
     private val proxyEngine: ProxyEngine,
+    private val settingsRepo: SettingsRepository,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -300,15 +302,47 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        // Start auto-save
-        autoSave.startAutoSave(autoSaveId) {
-            val s = _state.value
-            AutoSaveState(
-                projectId = s.project.id,
-                tracks = s.tracks,
-                textOverlays = s.textOverlays,
-                playheadMs = s.playheadMs
-            )
+        // Apply user settings (export defaults + auto-save)
+        var appliedDefaults = false
+        var lastAutoSaveEnabled: Boolean? = null
+        var lastAutoSaveInterval: Int? = null
+        viewModelScope.launch {
+            settingsRepo.settings.collect { settings ->
+                // Apply default export config from settings once on first load
+                if (!appliedDefaults) {
+                    appliedDefaults = true
+                    _state.update { s ->
+                        s.copy(exportConfig = s.exportConfig.copy(
+                            resolution = settings.defaultResolution,
+                            frameRate = settings.defaultFrameRate
+                        ))
+                    }
+                }
+
+                // Only restart auto-save when auto-save settings actually change
+                val enabledChanged = settings.autoSaveEnabled != lastAutoSaveEnabled
+                val intervalChanged = settings.autoSaveIntervalSec != lastAutoSaveInterval
+                if (enabledChanged || intervalChanged) {
+                    lastAutoSaveEnabled = settings.autoSaveEnabled
+                    lastAutoSaveInterval = settings.autoSaveIntervalSec
+                    if (settings.autoSaveEnabled) {
+                        autoSave.startAutoSave(
+                            projectId ?: _state.value.project.id,
+                            intervalMs = settings.autoSaveIntervalSec * 1000L
+                        ) {
+                            val s = _state.value
+                            AutoSaveState(
+                                projectId = s.project.id,
+                                tracks = s.tracks,
+                                textOverlays = s.textOverlays,
+                                playheadMs = s.playheadMs
+                            )
+                        }
+                    } else {
+                        autoSave.stop()
+                    }
+                }
+            }
         }
     }
 

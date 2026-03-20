@@ -25,13 +25,14 @@ class ProjectAutoSave @Inject constructor(
 
     fun startAutoSave(
         projectId: String,
+        intervalMs: Long = 30_000,
         getState: () -> AutoSaveState
     ) {
         autoSaveJob?.cancel()
         consecutiveFailures = 0
         autoSaveJob = scope.launch {
             while (isActive) {
-                delay(30_000)
+                delay(intervalMs.coerceIn(10_000, 600_000))
                 try {
                     saveState(projectId, getState())
                     consecutiveFailures = 0

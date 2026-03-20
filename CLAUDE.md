@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v2.2.0
+v2.3.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -417,6 +417,9 @@ v2.2.0
 - **Timeline multi-select** — Long-press on clip toggles multi-select via `toggleClipMultiSelect()`. Orange highlight for multi-selected clips. Action bar shows "N selected" with Delete and Cancel buttons. `selectedClipIds: Set<String>` in EditorState wired to Timeline. `deleteMultiSelectedClips()` with undo support.
 - **MediaManager remove unused** — `removeUnusedMedia()` removes empty non-default tracks with undo. Wired to MediaManagerPanel's "Remove Unused" button (was a toast stub).
 - **Key files added**: `engine/SettingsRepository.kt`, `ui/settings/SettingsViewModel.kt`
+- **Settings wired to EditorViewModel** — `SettingsRepository` injected. Export defaults (resolution, fps) applied on project open. Auto-save interval/enabled respected. Uses `appliedDefaults` flag (not fragile equality check). Only restarts auto-save when enabled/interval actually change (not on every settings emit).
+- **ProjectAutoSave accepts interval** — `startAutoSave(projectId, intervalMs)` parameter added. Interval clamped to 10s-600s.
+- **README rewritten** — Full feature list matching v2.3.0, accurate tech stack table, build instructions, AI tool descriptions updated (Whisper needs internet for model download).
 
 ## Next Steps
 - FFmpeg integration for broader codec support
