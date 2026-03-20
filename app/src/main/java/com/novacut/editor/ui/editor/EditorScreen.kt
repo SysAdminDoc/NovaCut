@@ -46,7 +46,8 @@ fun EditorScreen(
         state.showColorGrading || state.showAudioMixer || state.showKeyframeEditor ||
         state.showSpeedCurveEditor || state.showMaskEditor || state.showBlendModeSelector ||
         state.showBatchExport || state.showPipPresets || state.showChromaKey ||
-        state.showCaptionEditor || state.showChapterMarkers || state.showSnapshotHistory
+        state.showCaptionEditor || state.showChapterMarkers || state.showSnapshotHistory ||
+        state.showTextTemplates
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -167,6 +168,9 @@ fun EditorScreen(
                         "history" -> viewModel.showSnapshotHistory()
                         "export_srt" -> viewModel.exportSubtitles(SubtitleFormat.SRT)
                         "export_vtt" -> viewModel.exportSubtitles(SubtitleFormat.VTT)
+                        "text_templates" -> viewModel.showTextTemplates()
+                        "archive" -> viewModel.exportProjectArchive()
+                        "unlink_av" -> viewModel.unlinkAudioVideo()
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
                         "batch_export" -> viewModel.showBatchExport()
                         // AI tools
@@ -730,6 +734,37 @@ fun EditorScreen(
                 onRestoreSnapshot = viewModel::restoreSnapshot,
                 onDeleteSnapshot = viewModel::deleteSnapshot,
                 onClose = viewModel::hideSnapshotHistory
+            )
+        }
+
+        // Text Template Gallery
+        AnimatedVisibility(
+            visible = state.showTextTemplates,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            TextTemplateGallery(
+                playheadMs = state.playheadMs,
+                onTemplateSelected = { template -> viewModel.applyTextTemplate(template) },
+                onClose = viewModel::hideTextTemplates
+            )
+        }
+
+        // Caption preview on video (always show when captions exist)
+        val allCaptions = state.tracks.flatMap { it.clips }.flatMap { clip ->
+            clip.captions.map { caption ->
+                caption.copy(
+                    startTimeMs = caption.startTimeMs + clip.timelineStartMs,
+                    endTimeMs = caption.endTimeMs + clip.timelineStartMs
+                )
+            }
+        }
+        if (allCaptions.isNotEmpty()) {
+            CaptionPreviewOverlay(
+                captions = allCaptions,
+                currentTimeMs = state.playheadMs,
+                modifier = Modifier.align(Alignment.Center)
             )
         }
 

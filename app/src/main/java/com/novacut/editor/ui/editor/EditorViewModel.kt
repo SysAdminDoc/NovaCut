@@ -92,6 +92,7 @@ data class EditorState(
     val showCaptionEditor: Boolean = false,
     val showChapterMarkers: Boolean = false,
     val showSnapshotHistory: Boolean = false,
+    val showTextTemplates: Boolean = false,
     // Chapter markers
     val chapterMarkers: List<ChapterMarker> = emptyList(),
     // Multi-select
@@ -871,6 +872,7 @@ class EditorViewModel @Inject constructor(
         showCaptionEditor = false,
         showChapterMarkers = false,
         showSnapshotHistory = false,
+        showTextTemplates = false,
         selectedEffectId = null,
         editingTextOverlayId = null,
         selectedMaskId = null
@@ -1341,6 +1343,59 @@ class EditorViewModel @Inject constructor(
     // --- Proxy ---
     fun setProxyEnabled(enabled: Boolean) {
         _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
+    }
+
+    // --- Text Templates ---
+    fun showTextTemplates() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showTextTemplates = true) } }
+    fun hideTextTemplates() { _state.update { it.copy(showTextTemplates = false) } }
+
+    fun applyTextTemplate(template: com.novacut.editor.model.TextTemplate) {
+        saveUndoState("Apply text template")
+        val playhead = _state.value.playheadMs
+        template.layers.forEachIndexed { index, layer ->
+            val overlay = layer.copy(
+                id = UUID.randomUUID().toString(),
+                startTimeMs = playhead + index * 100L,
+                endTimeMs = playhead + template.durationMs + index * 100L
+            )
+            _state.update { s -> s.copy(textOverlays = s.textOverlays + overlay) }
+        }
+        hideTextTemplates()
+        showToast("Template applied: ${template.name}")
+    }
+
+    // --- Project Archive ---
+    fun exportProjectArchive() {
+        viewModelScope.launch {
+            showToast("Exporting project archive...")
+            val s = _state.value
+            val dir = java.io.File(appContext.getExternalFilesDir(null), "archives")
+            dir.mkdirs()
+            val file = java.io.File(dir, "${s.project.name}.novacut")
+            val success = com.novacut.editor.engine.ProjectArchive.exportArchive(
+                context = appContext,
+                projectId = s.project.id,
+                tracks = s.tracks,
+                textOverlays = s.textOverlays,
+                playheadMs = s.playheadMs,
+                outputFile = file
+            )
+            showToast(if (success) "Archive saved: ${file.name}" else "Archive export failed")
+        }
+    }
+
+    // --- Linked A/V ---
+    fun unlinkAudioVideo() {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Unlink A/V")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(linkedClipId = null) else clip
+                })
+            })
+        }
+        showToast("Audio/video unlinked")
     }
 
     // --- Captions ---

@@ -58,6 +58,7 @@ val clipTabs = listOf(
 // Project mode — Text tab sub-menu
 private val textSubMenu = listOf(
     SubMenuItem("add_text", Icons.Default.Title, "Add Text"),
+    SubMenuItem("text_templates", Icons.Default.Dashboard, "Templates"),
     SubMenuItem("captions", Icons.Default.ClosedCaption, "Captions")
 )
 
@@ -69,7 +70,8 @@ private val clipEditSubMenu = listOf(
     SubMenuItem("duplicate", Icons.Default.ContentCopy, "Duplicate"),
     SubMenuItem("freeze", Icons.Default.AcUnit, "Freeze\nFrame"),
     SubMenuItem("copy_fx", Icons.Default.FileCopy, "Copy\nEffects"),
-    SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects")
+    SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects"),
+    SubMenuItem("unlink_av", Icons.Default.LinkOff, "Unlink\nA/V")
 )
 
 // Clip mode — Motion tab sub-menu (replaces simple Transform panel)
@@ -118,6 +120,7 @@ private val projectToolsSubMenu = listOf(
     SubMenuItem("snapshot", Icons.Default.Save, "Snapshot"),
     SubMenuItem("history", Icons.Default.History, "Version\nHistory"),
     SubMenuItem("export_srt", Icons.Default.Subtitles, "Export\nSRT"),
+    SubMenuItem("archive", Icons.Default.Archive, "Project\nArchive"),
     SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
 )
 
