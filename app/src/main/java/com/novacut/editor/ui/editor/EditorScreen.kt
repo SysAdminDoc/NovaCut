@@ -42,7 +42,10 @@ fun EditorScreen(
     val hasOpenPanel = state.showMediaPicker || state.showExportSheet || state.showEffectsPanel ||
         state.showTextEditor || state.showTransitionPicker || state.showAudioPanel ||
         state.showAiToolsPanel || state.showTransformPanel || state.showCropPanel ||
-        state.showVoiceoverRecorder || state.selectedEffectId != null || state.editingTextOverlayId != null
+        state.showVoiceoverRecorder || state.selectedEffectId != null || state.editingTextOverlayId != null ||
+        state.showColorGrading || state.showAudioMixer || state.showKeyframeEditor ||
+        state.showSpeedCurveEditor || state.showMaskEditor || state.showBlendModeSelector ||
+        state.showBatchExport
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -122,7 +125,7 @@ fun EditorScreen(
                         "edit" -> viewModel.showMediaPicker()
                         "audio_add" -> viewModel.showMediaPicker()
                         "audio_tool" -> viewModel.showAudioPanel()
-                        "speed" -> { viewModel.setTool(EditorTool.SPEED); viewModel.dismissAllPanels() }
+                        "speed" -> viewModel.showSpeedCurveEditor()
                         "transform" -> viewModel.showTransformPanel()
                         "effects" -> viewModel.showEffectsPanel()
                         "effects_disabled" -> viewModel.showToast("Select a clip to use Effects")
@@ -137,6 +140,21 @@ fun EditorScreen(
                         "freeze" -> { viewModel.insertFreezeFrame(); viewModel.setTool(EditorTool.NONE) }
                         "copy_fx" -> viewModel.copyEffects()
                         "paste_fx" -> viewModel.pasteEffects()
+                        // New features
+                        "color_grade" -> viewModel.showColorGrading()
+                        "color_grade_disabled" -> viewModel.showToast("Select a clip to color grade")
+                        "keyframes" -> viewModel.showKeyframeEditor()
+                        "keyframes_disabled" -> viewModel.showToast("Select a clip for keyframes")
+                        "masks" -> viewModel.showMaskEditor()
+                        "masks_disabled" -> viewModel.showToast("Select a clip for masks")
+                        "blend_mode" -> viewModel.showBlendModeSelector()
+                        "blend_mode_disabled" -> viewModel.showToast("Select a clip for blend mode")
+                        "audio_mixer" -> viewModel.showAudioMixer()
+                        "beat_detect" -> viewModel.detectBeats()
+                        "adjustment_layer" -> viewModel.addAdjustmentLayer()
+                        "snapshot" -> viewModel.createSnapshot()
+                        "batch_export" -> viewModel.showBatchExport()
+                        // AI tools
                         "auto_captions" -> viewModel.runAiTool("auto_captions")
                         "scene_detect" -> viewModel.runAiTool("scene_detect")
                         "smart_crop" -> viewModel.runAiTool("smart_crop")
@@ -145,6 +163,13 @@ fun EditorScreen(
                         "denoise" -> viewModel.runAiTool("denoise")
                         "remove_bg" -> viewModel.runAiTool("remove_bg")
                         "track_motion" -> viewModel.runAiTool("track_motion")
+                        "style_transfer" -> viewModel.runAiTool("style_transfer")
+                        "face_track" -> viewModel.runAiTool("face_track")
+                        "upscale" -> viewModel.runAiTool("upscale")
+                        "frame_interp" -> viewModel.runAiTool("frame_interp")
+                        "object_remove" -> viewModel.runAiTool("object_remove")
+                        "bg_replace" -> viewModel.runAiTool("bg_replace")
+                        "smart_reframe" -> viewModel.runAiTool("smart_reframe")
                         else -> Log.w("EditorScreen", "Unknown action: $actionId")
                     }
                 }
@@ -421,6 +446,138 @@ fun EditorScreen(
                         viewModel.clearSelectedEffect()
                     },
                     onClose = viewModel::clearSelectedEffect
+                )
+            }
+        }
+
+        // Color Grading panel
+        AnimatedVisibility(
+            visible = state.showColorGrading,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            ColorGradingPanel(
+                colorGrade = clip?.colorGrade ?: ColorGrade(),
+                onColorGradeChanged = viewModel::updateClipColorGrade,
+                onLutImport = viewModel::importLut,
+                onClose = viewModel::hideColorGrading
+            )
+        }
+
+        // Audio Mixer panel
+        AnimatedVisibility(
+            visible = state.showAudioMixer,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            AudioMixerPanel(
+                tracks = state.tracks,
+                onTrackVolumeChanged = viewModel::setTrackVolume,
+                onTrackPanChanged = viewModel::setTrackPan,
+                onTrackMuteToggled = { viewModel.toggleTrackMute(it) },
+                onTrackSoloToggled = viewModel::toggleTrackSolo,
+                onTrackAudioEffectAdded = viewModel::addTrackAudioEffect,
+                onTrackAudioEffectRemoved = viewModel::removeTrackAudioEffect,
+                onTrackAudioEffectParamChanged = viewModel::updateTrackAudioEffectParam,
+                vuLevels = state.vuLevels,
+                onClose = viewModel::hideAudioMixer
+            )
+        }
+
+        // Keyframe Curve Editor
+        AnimatedVisibility(
+            visible = state.showKeyframeEditor,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            if (clip != null) {
+                KeyframeCurveEditor(
+                    keyframes = clip.keyframes,
+                    clipDurationMs = clip.durationMs,
+                    playheadMs = (state.playheadMs - clip.timelineStartMs).coerceAtLeast(0L),
+                    activeProperties = state.activeKeyframeProperties,
+                    onKeyframesChanged = viewModel::updateClipKeyframes,
+                    onPropertyToggled = viewModel::toggleKeyframeProperty,
+                    onAddKeyframe = viewModel::addKeyframe,
+                    onDeleteKeyframe = viewModel::deleteKeyframe,
+                    onClose = viewModel::hideKeyframeEditor
+                )
+            }
+        }
+
+        // Speed Curve Editor
+        AnimatedVisibility(
+            visible = state.showSpeedCurveEditor,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            if (clip != null) {
+                SpeedCurveEditor(
+                    speedCurve = clip.speedCurve,
+                    constantSpeed = clip.speed,
+                    clipDurationMs = clip.durationMs,
+                    onSpeedCurveChanged = viewModel::setClipSpeedCurve,
+                    onConstantSpeedChanged = { speed -> state.selectedClipId?.let { viewModel.setClipSpeed(it, speed) } },
+                    isReversed = clip.isReversed,
+                    onReversedChanged = { rev -> state.selectedClipId?.let { viewModel.setClipReversed(it, rev) } },
+                    onClose = viewModel::hideSpeedCurveEditor
+                )
+            }
+        }
+
+        // Mask Editor panel
+        AnimatedVisibility(
+            visible = state.showMaskEditor,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            MaskEditorPanel(
+                masks = clip?.masks ?: emptyList(),
+                selectedMaskId = state.selectedMaskId,
+                onMaskSelected = viewModel::selectMask,
+                onMaskAdded = viewModel::addMask,
+                onMaskUpdated = viewModel::updateMask,
+                onMaskDeleted = viewModel::deleteMask,
+                onClose = viewModel::hideMaskEditor
+            )
+        }
+
+        // Blend Mode selector
+        AnimatedVisibility(
+            visible = state.showBlendModeSelector,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            BlendModeSelector(
+                currentMode = state.tracks.flatMap { it.clips }
+                    .find { it.id == state.selectedClipId }?.blendMode ?: BlendMode.NORMAL,
+                onModeSelected = viewModel::setClipBlendMode,
+                onClose = viewModel::hideBlendModeSelector
+            )
+        }
+
+        // Mask preview overlay on the video preview (when mask editor is open)
+        if (state.showMaskEditor) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            if (clip != null) {
+                MaskPreviewOverlay(
+                    masks = clip.masks,
+                    selectedMaskId = state.selectedMaskId,
+                    previewWidth = 1920f, // Will be overridden by actual preview size
+                    previewHeight = 1080f,
+                    onMaskPointMoved = viewModel::updateMaskPoint,
+                    onFreehandDraw = viewModel::setFreehandMaskPoints,
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
         }

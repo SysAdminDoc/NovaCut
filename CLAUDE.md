@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v0.35.0
+v1.0.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -47,9 +47,19 @@ v0.35.0
   - `engine/ProjectAutoSave.kt` - Periodic auto-save with full JSON serialization/deserialization
   - `engine/AppModule.kt` - Hilt DI module (Room DB + DAO)
   - `engine/db/ProjectDatabase.kt` - Room database (v3) + ProjectDao + converters
-  - `engine/ShaderEffect.kt` - Custom GLSL shader framework (ShaderEffect/ShaderProgram/EffectShaders) for 14 visual effects + 25 transition shaders via BaseGlShaderProgram
-  - `ai/AiFeatures.kt` - AI features (auto captions, bg removal, scene detect, motion track, auto color, stabilize, denoise)
-  - `model/Project.kt` - All data models (Project, Track, Clip, Effect, Transition, Keyframe, etc.)
+  - `engine/ShaderEffect.kt` - Custom GLSL shader framework (ShaderEffect/ShaderProgram/EffectShaders) for 14 visual effects + 25 transition shaders + color grading + blend modes + masks via BaseGlShaderProgram
+  - `engine/AudioEffectsEngine.kt` - DSP audio effects (EQ, compressor, limiter, reverb, delay, chorus, flanger, de-esser, noise gate, pitch shift, normalizer, filters) + beat detection + VU metering
+  - `engine/LutEngine.kt` - 3D LUT parser (.cube/.3dl) + GPU LUT application via 3D texture
+  - `engine/ProxyEngine.kt` - Low-res proxy generation for smooth editing
+  - `ui/editor/ColorGradingPanel.kt` - Lift/gamma/gain color wheels, RGB curves editor, HSL qualifier, LUT import
+  - `ui/editor/AudioMixerPanel.kt` - Per-track faders, pan, mute/solo, VU meters, audio effect chain
+  - `ui/editor/KeyframeCurveEditor.kt` - Bezier keyframe curve editor with property toggles, diamond handles, presets
+  - `ui/editor/SpeedCurveEditor.kt` - Speed ramping with bezier curve editor + presets (ramp up/down, pulse)
+  - `ui/editor/MaskEditorPanel.kt` - Freehand/rect/ellipse/gradient masks with feather, invert, motion tracking + preview overlay
+  - `ui/editor/BlendModeSelector.kt` - 18 blend modes (multiply, screen, overlay, etc.)
+  - `ui/export/BatchExportPanel.kt` - Platform presets (YouTube/TikTok/Instagram/etc), batch queue, audio-only/stems export
+  - `ai/AiFeatures.kt` - AI features (auto captions, bg removal, scene detect, motion track, auto color, stabilize, denoise, style transfer, face track, upscale, frame interp, object remove, bg replace, smart reframe)
+  - `model/Project.kt` - All data models (Project, Track, Clip, Effect, Transition, Keyframe, ColorGrade, Mask, SpeedCurve, AudioEffect, Caption, BlendMode, BatchExport, ProjectSnapshot, etc.)
 
 ## Architecture Decisions
 - **Immutable collections** in all models (List/Map, not MutableList/MutableMap) for safe undo/redo copy-on-write

@@ -14,7 +14,10 @@ data class Project(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val durationMs: Long = 0L,
-    val thumbnailUri: String? = null
+    val thumbnailUri: String? = null,
+    val templateId: String? = null,
+    val proxyEnabled: Boolean = false,
+    val version: Int = 1
 )
 
 enum class AspectRatio(val widthRatio: Int, val heightRatio: Int, val label: String) {
@@ -50,7 +53,7 @@ enum class Resolution(val width: Int, val height: Int, val label: String) {
     }
 }
 
-enum class TrackType { VIDEO, AUDIO, OVERLAY, TEXT }
+enum class TrackType { VIDEO, AUDIO, OVERLAY, TEXT, ADJUSTMENT }
 
 data class Track(
     val id: String = UUID.randomUUID().toString(),
@@ -59,7 +62,14 @@ data class Track(
     val clips: List<Clip> = emptyList(),
     val isLocked: Boolean = false,
     val isVisible: Boolean = true,
-    val isMuted: Boolean = false
+    val isMuted: Boolean = false,
+    val isSolo: Boolean = false,
+    val volume: Float = 1.0f,
+    val pan: Float = 0f,
+    val opacity: Float = 1.0f,
+    val blendMode: BlendMode = BlendMode.NORMAL,
+    val audioEffects: List<AudioEffect> = emptyList(),
+    val isLinkedAV: Boolean = true
 )
 
 data class Clip(
@@ -80,19 +90,368 @@ data class Clip(
     val scaleY: Float = 1f,
     val positionX: Float = 0f,
     val positionY: Float = 0f,
+    val anchorX: Float = 0.5f,
+    val anchorY: Float = 0.5f,
     val fadeInMs: Long = 0L,
     val fadeOutMs: Long = 0L,
-    val keyframes: List<Keyframe> = emptyList()
+    val keyframes: List<Keyframe> = emptyList(),
+    val blendMode: BlendMode = BlendMode.NORMAL,
+    val speedCurve: SpeedCurve? = null,
+    val colorGrade: ColorGrade? = null,
+    val masks: List<Mask> = emptyList(),
+    val linkedClipId: String? = null,
+    val isCompound: Boolean = false,
+    val compoundClips: List<Clip> = emptyList(),
+    val audioEffects: List<AudioEffect> = emptyList(),
+    val proxyUri: Uri? = null,
+    val motionTrackingData: MotionTrackingData? = null,
+    val captions: List<Caption> = emptyList()
 ) {
     val durationMs: Long get() = ((trimEndMs - trimStartMs) / speed).toLong()
     val timelineEndMs: Long get() = timelineStartMs + durationMs
+
+    fun getEffectiveSpeed(timeOffsetMs: Long): Float {
+        return speedCurve?.getSpeedAt(timeOffsetMs, durationMs) ?: speed
+    }
 }
+
+// --- Blend Modes ---
+
+enum class BlendMode(val displayName: String) {
+    NORMAL("Normal"),
+    MULTIPLY("Multiply"),
+    SCREEN("Screen"),
+    OVERLAY("Overlay"),
+    DARKEN("Darken"),
+    LIGHTEN("Lighten"),
+    COLOR_DODGE("Color Dodge"),
+    COLOR_BURN("Color Burn"),
+    HARD_LIGHT("Hard Light"),
+    SOFT_LIGHT("Soft Light"),
+    DIFFERENCE("Difference"),
+    EXCLUSION("Exclusion"),
+    HUE("Hue"),
+    SATURATION_BLEND("Saturation"),
+    COLOR("Color"),
+    LUMINOSITY("Luminosity"),
+    ADD("Add"),
+    SUBTRACT("Subtract")
+}
+
+// --- Speed Curve (Bezier speed ramping) ---
+
+data class SpeedCurve(
+    val points: List<SpeedPoint> = listOf(
+        SpeedPoint(0f, 1f),
+        SpeedPoint(1f, 1f)
+    )
+) {
+    fun getSpeedAt(timeOffsetMs: Long, clipDurationMs: Long): Float {
+        if (points.size < 2) return points.firstOrNull()?.speed ?: 1f
+        val t = (timeOffsetMs.toFloat() / clipDurationMs.toFloat()).coerceIn(0f, 1f)
+        val sorted = points.sortedBy { it.position }
+
+        if (t <= sorted.first().position) return sorted.first().speed
+        if (t >= sorted.last().position) return sorted.last().speed
+
+        for (i in 0 until sorted.size - 1) {
+            if (t >= sorted[i].position && t <= sorted[i + 1].position) {
+                val p0 = sorted[i]
+                val p1 = sorted[i + 1]
+                val localT = (t - p0.position) / (p1.position - p0.position)
+                return cubicBezierInterpolate(
+                    p0.speed, p0.handleOutY, p1.handleInY, p1.speed, localT
+                )
+            }
+        }
+        return 1f
+    }
+
+    companion object {
+        fun cubicBezierInterpolate(
+            p0: Float, c0: Float, c1: Float, p1: Float, t: Float
+        ): Float {
+            val mt = 1f - t
+            return mt * mt * mt * p0 +
+                    3f * mt * mt * t * c0 +
+                    3f * mt * t * t * c1 +
+                    t * t * t * p1
+        }
+
+        fun constant(speed: Float) = SpeedCurve(
+            listOf(SpeedPoint(0f, speed), SpeedPoint(1f, speed))
+        )
+
+        fun rampUp(from: Float = 0.5f, to: Float = 2f) = SpeedCurve(
+            listOf(
+                SpeedPoint(0f, from, handleOutY = from + (to - from) * 0.3f),
+                SpeedPoint(1f, to, handleInY = to - (to - from) * 0.3f)
+            )
+        )
+
+        fun rampDown(from: Float = 2f, to: Float = 0.5f) = rampUp(from, to)
+
+        fun pulse(normalSpeed: Float = 1f, peakSpeed: Float = 4f) = SpeedCurve(
+            listOf(
+                SpeedPoint(0f, normalSpeed),
+                SpeedPoint(0.3f, normalSpeed, handleOutY = peakSpeed * 0.5f),
+                SpeedPoint(0.5f, peakSpeed, handleInY = peakSpeed * 0.7f, handleOutY = peakSpeed * 0.7f),
+                SpeedPoint(0.7f, normalSpeed, handleInY = peakSpeed * 0.5f),
+                SpeedPoint(1f, normalSpeed)
+            )
+        )
+    }
+}
+
+data class SpeedPoint(
+    val position: Float,
+    val speed: Float,
+    val handleInY: Float = speed,
+    val handleOutY: Float = speed
+)
+
+// --- Color Grading ---
+
+data class ColorGrade(
+    val enabled: Boolean = true,
+    val liftR: Float = 0f, val liftG: Float = 0f, val liftB: Float = 0f,
+    val gammaR: Float = 1f, val gammaG: Float = 1f, val gammaB: Float = 1f,
+    val gainR: Float = 1f, val gainG: Float = 1f, val gainB: Float = 1f,
+    val offsetR: Float = 0f, val offsetG: Float = 0f, val offsetB: Float = 0f,
+    val curves: ColorCurves = ColorCurves(),
+    val hslQualifier: HslQualifier? = null,
+    val lutPath: String? = null,
+    val lutIntensity: Float = 1f,
+    val colorMatchRef: String? = null
+)
+
+data class ColorCurves(
+    val master: List<CurvePoint> = listOf(CurvePoint(0f, 0f), CurvePoint(1f, 1f)),
+    val red: List<CurvePoint> = listOf(CurvePoint(0f, 0f), CurvePoint(1f, 1f)),
+    val green: List<CurvePoint> = listOf(CurvePoint(0f, 0f), CurvePoint(1f, 1f)),
+    val blue: List<CurvePoint> = listOf(CurvePoint(0f, 0f), CurvePoint(1f, 1f))
+) {
+    fun evaluateCurve(points: List<CurvePoint>, input: Float): Float {
+        if (points.size < 2) return input
+        val sorted = points.sortedBy { it.x }
+        if (input <= sorted.first().x) return sorted.first().y
+        if (input >= sorted.last().x) return sorted.last().y
+
+        for (i in 0 until sorted.size - 1) {
+            if (input >= sorted[i].x && input <= sorted[i + 1].x) {
+                val p0 = sorted[i]
+                val p1 = sorted[i + 1]
+                val t = (input - p0.x) / (p1.x - p0.x)
+                return SpeedCurve.cubicBezierInterpolate(
+                    p0.y, p0.handleOutY, p1.handleInY, p1.y, t
+                )
+            }
+        }
+        return input
+    }
+}
+
+data class CurvePoint(
+    val x: Float,
+    val y: Float,
+    val handleInX: Float = x,
+    val handleInY: Float = y,
+    val handleOutX: Float = x,
+    val handleOutY: Float = y
+)
+
+data class HslQualifier(
+    val hueCenter: Float = 0f,
+    val hueWidth: Float = 30f,
+    val satMin: Float = 0f,
+    val satMax: Float = 1f,
+    val lumMin: Float = 0f,
+    val lumMax: Float = 1f,
+    val softness: Float = 0.1f,
+    val adjustHue: Float = 0f,
+    val adjustSat: Float = 0f,
+    val adjustLum: Float = 0f
+)
+
+// --- Masks ---
+
+data class Mask(
+    val id: String = UUID.randomUUID().toString(),
+    val type: MaskType,
+    val points: List<MaskPoint> = emptyList(),
+    val feather: Float = 0f,
+    val opacity: Float = 1f,
+    val inverted: Boolean = false,
+    val expansion: Float = 0f,
+    val keyframes: List<MaskKeyframe> = emptyList(),
+    val trackToMotion: Boolean = false
+)
+
+enum class MaskType(val displayName: String) {
+    RECTANGLE("Rectangle"),
+    ELLIPSE("Ellipse"),
+    FREEHAND("Freehand"),
+    LINEAR_GRADIENT("Linear Gradient"),
+    RADIAL_GRADIENT("Radial Gradient")
+}
+
+data class MaskPoint(
+    val x: Float,
+    val y: Float,
+    val handleInX: Float = x,
+    val handleInY: Float = y,
+    val handleOutX: Float = x,
+    val handleOutY: Float = y
+)
+
+data class MaskKeyframe(
+    val timeOffsetMs: Long,
+    val points: List<MaskPoint>,
+    val easing: Easing = Easing.LINEAR
+)
+
+// --- Audio Effects ---
+
+data class AudioEffect(
+    val id: String = UUID.randomUUID().toString(),
+    val type: AudioEffectType,
+    val params: Map<String, Float> = emptyMap(),
+    val enabled: Boolean = true
+)
+
+enum class AudioEffectType(val displayName: String) {
+    PARAMETRIC_EQ("Parametric EQ"),
+    COMPRESSOR("Compressor"),
+    LIMITER("Limiter"),
+    NOISE_GATE("Noise Gate"),
+    REVERB("Reverb"),
+    DELAY("Delay"),
+    DE_ESSER("De-esser"),
+    CHORUS("Chorus"),
+    FLANGER("Flanger"),
+    PITCH_SHIFT("Pitch Shift"),
+    NORMALIZER("Normalizer"),
+    HIGH_PASS("High Pass"),
+    LOW_PASS("Low Pass"),
+    BAND_PASS("Band Pass"),
+    NOTCH("Notch");
+
+    companion object {
+        fun defaultParams(type: AudioEffectType): Map<String, Float> = when (type) {
+            PARAMETRIC_EQ -> mapOf(
+                "band1_freq" to 80f, "band1_gain" to 0f, "band1_q" to 1f,
+                "band2_freq" to 250f, "band2_gain" to 0f, "band2_q" to 1f,
+                "band3_freq" to 1000f, "band3_gain" to 0f, "band3_q" to 1f,
+                "band4_freq" to 4000f, "band4_gain" to 0f, "band4_q" to 1f,
+                "band5_freq" to 12000f, "band5_gain" to 0f, "band5_q" to 1f
+            )
+            COMPRESSOR -> mapOf(
+                "threshold" to -20f, "ratio" to 4f, "attack" to 10f,
+                "release" to 100f, "knee" to 6f, "makeupGain" to 0f
+            )
+            LIMITER -> mapOf("ceiling" to -1f, "release" to 50f)
+            NOISE_GATE -> mapOf(
+                "threshold" to -40f, "attack" to 1f, "hold" to 50f, "release" to 100f
+            )
+            REVERB -> mapOf(
+                "roomSize" to 0.5f, "damping" to 0.5f, "wetDry" to 0.3f,
+                "preDelay" to 20f, "decay" to 2f
+            )
+            DELAY -> mapOf(
+                "delayMs" to 250f, "feedback" to 0.3f, "wetDry" to 0.3f, "pingPong" to 0f
+            )
+            DE_ESSER -> mapOf("frequency" to 6000f, "threshold" to -20f, "ratio" to 3f)
+            CHORUS -> mapOf("rate" to 1.5f, "depth" to 0.5f, "wetDry" to 0.3f)
+            FLANGER -> mapOf("rate" to 0.5f, "depth" to 0.5f, "feedback" to 0.3f, "wetDry" to 0.3f)
+            PITCH_SHIFT -> mapOf("semitones" to 0f, "cents" to 0f)
+            NORMALIZER -> mapOf("targetLufs" to -14f, "mode" to 0f)
+            HIGH_PASS -> mapOf("frequency" to 80f, "resonance" to 0.7f)
+            LOW_PASS -> mapOf("frequency" to 12000f, "resonance" to 0.7f)
+            BAND_PASS -> mapOf("frequency" to 1000f, "bandwidth" to 1f)
+            NOTCH -> mapOf("frequency" to 1000f, "bandwidth" to 0.5f)
+        }
+    }
+}
+
+// --- Motion Tracking ---
+
+data class MotionTrackingData(
+    val id: String = UUID.randomUUID().toString(),
+    val trackPoints: List<MotionTrackPoint> = emptyList(),
+    val targetType: TrackTargetType = TrackTargetType.POINT,
+    val isActive: Boolean = false
+)
+
+data class MotionTrackPoint(
+    val timeOffsetMs: Long,
+    val x: Float,
+    val y: Float,
+    val scaleX: Float = 1f,
+    val scaleY: Float = 1f,
+    val rotation: Float = 0f,
+    val confidence: Float = 1f
+)
+
+enum class TrackTargetType { POINT, SURFACE, FACE }
+
+// --- Captions ---
+
+data class Caption(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String,
+    val startTimeMs: Long,
+    val endTimeMs: Long,
+    val words: List<CaptionWord> = emptyList(),
+    val style: CaptionStyle = CaptionStyle()
+)
+
+data class CaptionWord(
+    val text: String,
+    val startTimeMs: Long,
+    val endTimeMs: Long,
+    val confidence: Float = 1f
+)
+
+data class CaptionStyle(
+    val type: CaptionStyleType = CaptionStyleType.SUBTITLE_BAR,
+    val fontFamily: String = "sans-serif-medium",
+    val fontSize: Float = 36f,
+    val color: Long = 0xFFFFFFFF,
+    val backgroundColor: Long = 0xCC000000,
+    val highlightColor: Long = 0xFFFFD700,
+    val positionY: Float = 0.85f,
+    val outline: Boolean = true,
+    val shadow: Boolean = true
+)
+
+enum class CaptionStyleType(val displayName: String) {
+    SUBTITLE_BAR("Subtitle Bar"),
+    WORD_BY_WORD("Word Pop"),
+    KARAOKE("Karaoke Highlight"),
+    BOUNCE("Bounce"),
+    TYPEWRITER("Typewriter"),
+    MINIMAL("Minimal")
+}
+
+// --- Effects ---
 
 data class Effect(
     val id: String = UUID.randomUUID().toString(),
     val type: EffectType,
     val params: Map<String, Float> = emptyMap(),
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    val keyframes: List<EffectKeyframe> = emptyList()
+)
+
+data class EffectKeyframe(
+    val timeOffsetMs: Long,
+    val paramName: String,
+    val value: Float,
+    val easing: Easing = Easing.LINEAR,
+    val handleInX: Float = 0f,
+    val handleInY: Float = 0f,
+    val handleOutX: Float = 0f,
+    val handleOutY: Float = 0f
 )
 
 enum class EffectType(val displayName: String, val category: EffectCategory) {
@@ -219,20 +578,32 @@ enum class TransitionType(val displayName: String) {
     SWIRL("Swirl")
 }
 
+// --- Keyframes ---
+
 data class Keyframe(
     val timeOffsetMs: Long,
     val property: KeyframeProperty,
     val value: Float,
-    val easing: Easing = Easing.LINEAR
+    val easing: Easing = Easing.LINEAR,
+    val handleInX: Float = 0f,
+    val handleInY: Float = 0f,
+    val handleOutX: Float = 0f,
+    val handleOutY: Float = 0f,
+    val interpolation: KeyframeInterpolation = KeyframeInterpolation.BEZIER
 )
 
 enum class KeyframeProperty {
-    POSITION_X, POSITION_Y, SCALE_X, SCALE_Y, ROTATION, OPACITY, VOLUME
+    POSITION_X, POSITION_Y, SCALE_X, SCALE_Y, ROTATION, OPACITY, VOLUME,
+    ANCHOR_X, ANCHOR_Y, MASK_FEATHER, MASK_EXPANSION, MASK_OPACITY
 }
+
+enum class KeyframeInterpolation { LINEAR, BEZIER, HOLD }
 
 enum class Easing {
     LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT, SPRING
 }
+
+// --- Text Overlays ---
 
 data class TextOverlay(
     val id: String = UUID.randomUUID().toString(),
@@ -251,8 +622,48 @@ data class TextOverlay(
     val startTimeMs: Long = 0L,
     val endTimeMs: Long = 3000L,
     val animationIn: TextAnimation = TextAnimation.NONE,
-    val animationOut: TextAnimation = TextAnimation.NONE
+    val animationOut: TextAnimation = TextAnimation.NONE,
+    val rotation: Float = 0f,
+    val scaleX: Float = 1f,
+    val scaleY: Float = 1f,
+    val shadowColor: Long = 0x80000000,
+    val shadowOffsetX: Float = 0f,
+    val shadowOffsetY: Float = 0f,
+    val shadowBlur: Float = 0f,
+    val glowColor: Long = 0x00000000,
+    val glowRadius: Float = 0f,
+    val letterSpacing: Float = 0f,
+    val lineHeight: Float = 1.2f,
+    val textPath: TextPath? = null,
+    val templateId: String? = null,
+    val keyframes: List<Keyframe> = emptyList()
 )
+
+data class TextPath(
+    val type: TextPathType,
+    val points: List<MaskPoint> = emptyList(),
+    val progress: Float = 1f
+)
+
+enum class TextPathType { STRAIGHT, CURVED, CIRCULAR, WAVE }
+
+data class TextTemplate(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val category: TextTemplateCategory,
+    val layers: List<TextOverlay>,
+    val durationMs: Long = 3000L,
+    val thumbnailRes: Int = 0
+)
+
+enum class TextTemplateCategory(val displayName: String) {
+    LOWER_THIRD("Lower Thirds"),
+    TITLE_CARD("Title Cards"),
+    END_SCREEN("End Screens"),
+    CALL_TO_ACTION("Call to Action"),
+    SOCIAL("Social Media"),
+    MINIMAL("Minimal")
+}
 
 enum class TextAlignment { LEFT, CENTER, RIGHT }
 
@@ -266,8 +677,15 @@ enum class TextAnimation(val displayName: String) {
     SCALE("Scale"),
     TYPEWRITER("Typewriter"),
     BOUNCE("Bounce"),
-    SPIN("Spin")
+    SPIN("Spin"),
+    BLUR_IN("Blur In"),
+    GLITCH("Glitch"),
+    WAVE("Wave"),
+    ELASTIC("Elastic"),
+    FLIP("Flip")
 }
+
+// --- Export ---
 
 data class ExportConfig(
     val resolution: Resolution = Resolution.FHD_1080P,
@@ -276,7 +694,14 @@ data class ExportConfig(
     val quality: ExportQuality = ExportQuality.HIGH,
     val audioCodec: AudioCodec = AudioCodec.AAC,
     val audioBitrate: Int = 256_000,
-    val aspectRatio: AspectRatio = AspectRatio.RATIO_16_9
+    val aspectRatio: AspectRatio = AspectRatio.RATIO_16_9,
+    val bitrateMode: BitrateMode = BitrateMode.VBR,
+    val platformPreset: PlatformPreset? = null,
+    val exportAudioOnly: Boolean = false,
+    val exportStemsOnly: Boolean = false,
+    val includeChapterMarkers: Boolean = false,
+    val chapters: List<ChapterMarker> = emptyList(),
+    val subtitleFormat: SubtitleFormat? = null
 ) {
     val videoBitrate: Int get() = when (resolution) {
         Resolution.SD_480P -> when (quality) {
@@ -309,11 +734,14 @@ data class ExportConfig(
 
 enum class VideoCodec(val mimeType: String, val label: String) {
     H264("video/avc", "H.264"),
-    HEVC("video/hevc", "H.265/HEVC")
+    HEVC("video/hevc", "H.265/HEVC"),
+    AV1("video/av01", "AV1")
 }
 
 enum class AudioCodec(val mimeType: String, val label: String) {
-    AAC("audio/mp4a-latm", "AAC")
+    AAC("audio/mp4a-latm", "AAC"),
+    OPUS("audio/opus", "Opus"),
+    FLAC("audio/flac", "FLAC")
 }
 
 enum class ExportQuality(val label: String) {
@@ -321,6 +749,117 @@ enum class ExportQuality(val label: String) {
     MEDIUM("Balanced"),
     HIGH("Best Quality")
 }
+
+enum class BitrateMode(val label: String) {
+    CBR("Constant"),
+    VBR("Variable"),
+    CQ("Constant Quality")
+}
+
+enum class PlatformPreset(
+    val displayName: String,
+    val resolution: Resolution,
+    val aspectRatio: AspectRatio,
+    val frameRate: Int,
+    val codec: VideoCodec
+) {
+    YOUTUBE_1080(
+        "YouTube 1080p", Resolution.FHD_1080P, AspectRatio.RATIO_16_9, 30, VideoCodec.H264
+    ),
+    YOUTUBE_4K(
+        "YouTube 4K", Resolution.UHD_4K, AspectRatio.RATIO_16_9, 30, VideoCodec.HEVC
+    ),
+    TIKTOK(
+        "TikTok", Resolution.FHD_1080P, AspectRatio.RATIO_9_16, 30, VideoCodec.H264
+    ),
+    INSTAGRAM_FEED(
+        "Instagram Feed", Resolution.FHD_1080P, AspectRatio.RATIO_1_1, 30, VideoCodec.H264
+    ),
+    INSTAGRAM_REEL(
+        "Instagram Reels", Resolution.FHD_1080P, AspectRatio.RATIO_9_16, 30, VideoCodec.H264
+    ),
+    INSTAGRAM_STORY(
+        "Instagram Story", Resolution.FHD_1080P, AspectRatio.RATIO_9_16, 30, VideoCodec.H264
+    ),
+    TWITTER(
+        "Twitter/X", Resolution.FHD_1080P, AspectRatio.RATIO_16_9, 30, VideoCodec.H264
+    ),
+    LINKEDIN(
+        "LinkedIn", Resolution.FHD_1080P, AspectRatio.RATIO_16_9, 30, VideoCodec.H264
+    )
+}
+
+data class ChapterMarker(
+    val timeMs: Long,
+    val title: String
+)
+
+enum class SubtitleFormat(val extension: String, val displayName: String) {
+    SRT("srt", "SubRip (.srt)"),
+    VTT("vtt", "WebVTT (.vtt)"),
+    ASS("ass", "Advanced SubStation (.ass)")
+}
+
+// --- Batch Export ---
+
+data class BatchExportItem(
+    val id: String = UUID.randomUUID().toString(),
+    val config: ExportConfig,
+    val outputName: String,
+    val status: BatchExportStatus = BatchExportStatus.QUEUED,
+    val progress: Float = 0f
+)
+
+enum class BatchExportStatus { QUEUED, IN_PROGRESS, COMPLETED, FAILED, CANCELLED }
+
+// --- Project Templates ---
+
+data class ProjectTemplate(
+    val id: String,
+    val name: String,
+    val category: TemplateCategory,
+    val description: String,
+    val aspectRatio: AspectRatio,
+    val tracks: List<Track>,
+    val textOverlays: List<TextOverlay> = emptyList(),
+    val durationMs: Long
+)
+
+enum class TemplateCategory(val displayName: String) {
+    VLOG("Vlog"),
+    TUTORIAL("Tutorial"),
+    SHORT_FORM("Short Form"),
+    CINEMATIC("Cinematic"),
+    SLIDESHOW("Slideshow"),
+    PROMO("Promo"),
+    BLANK("Blank")
+}
+
+// --- Project Versioning ---
+
+data class ProjectSnapshot(
+    val id: String = UUID.randomUUID().toString(),
+    val projectId: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val label: String = "",
+    val stateJson: String
+)
+
+// --- Proxy ---
+
+data class ProxySettings(
+    val enabled: Boolean = false,
+    val resolution: ProxyResolution = ProxyResolution.QUARTER,
+    val autoGenerate: Boolean = true
+)
+
+enum class ProxyResolution(val scale: Float, val label: String) {
+    HALF(0.5f, "1/2"),
+    QUARTER(0.25f, "1/4"),
+    EIGHTH(0.125f, "1/8")
+}
+
+// --- Sort Mode ---
 
 enum class SortMode(val label: String) {
     DATE_DESC("Recent"),

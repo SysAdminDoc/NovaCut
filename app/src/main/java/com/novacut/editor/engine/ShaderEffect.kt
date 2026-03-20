@@ -639,4 +639,268 @@ object EffectShaders {
         "  uv = vec2(uv.x * cs - uv.y * sn, uv.x * sn + uv.y * cs);\n" +
         "  vec4 col = texture(uTexSampler, clamp(uv + 0.5, 0.0, 1.0));\n" +
         "  fragColor = vec4(col.rgb * progress, col.a);\n}"
+
+    // ─── Color Grading shader ─────────────────────────────────────────
+
+    fun colorGrade(
+        liftR: Float, liftG: Float, liftB: Float,
+        gammaR: Float, gammaG: Float, gammaB: Float,
+        gainR: Float, gainG: Float, gainB: Float,
+        offsetR: Float, offsetG: Float, offsetB: Float
+    ) = ShaderEffect(
+        FRAG_COLOR_GRADE,
+        mapOf(
+            "uLiftR" to liftR, "uLiftG" to liftG, "uLiftB" to liftB,
+            "uGammaR" to gammaR, "uGammaG" to gammaG, "uGammaB" to gammaB,
+            "uGainR" to gainR, "uGainG" to gainG, "uGainB" to gainB,
+            "uOffsetR" to offsetR, "uOffsetG" to offsetG, "uOffsetB" to offsetB
+        )
+    )
+
+    fun hslQualify(
+        hueCenter: Float, hueWidth: Float,
+        satMin: Float, satMax: Float,
+        lumMin: Float, lumMax: Float,
+        softness: Float,
+        adjustHue: Float, adjustSat: Float, adjustLum: Float
+    ) = ShaderEffect(
+        FRAG_HSL_QUALIFY,
+        mapOf(
+            "uHueCenter" to hueCenter, "uHueWidth" to hueWidth,
+            "uSatMin" to satMin, "uSatMax" to satMax,
+            "uLumMin" to lumMin, "uLumMax" to lumMax,
+            "uSoftness" to softness,
+            "uAdjHue" to adjustHue, "uAdjSat" to adjustSat, "uAdjLum" to adjustLum
+        )
+    )
+
+    // ─── Blend Mode shaders ──────────────────────────────────────────
+
+    fun blendMode(mode: com.novacut.editor.model.BlendMode, opacity: Float = 1f) = ShaderEffect(
+        when (mode) {
+            com.novacut.editor.model.BlendMode.MULTIPLY -> FRAG_BLEND_MULTIPLY
+            com.novacut.editor.model.BlendMode.SCREEN -> FRAG_BLEND_SCREEN
+            com.novacut.editor.model.BlendMode.OVERLAY -> FRAG_BLEND_OVERLAY
+            com.novacut.editor.model.BlendMode.DARKEN -> FRAG_BLEND_DARKEN
+            com.novacut.editor.model.BlendMode.LIGHTEN -> FRAG_BLEND_LIGHTEN
+            com.novacut.editor.model.BlendMode.COLOR_DODGE -> FRAG_BLEND_COLOR_DODGE
+            com.novacut.editor.model.BlendMode.COLOR_BURN -> FRAG_BLEND_COLOR_BURN
+            com.novacut.editor.model.BlendMode.HARD_LIGHT -> FRAG_BLEND_HARD_LIGHT
+            com.novacut.editor.model.BlendMode.SOFT_LIGHT -> FRAG_BLEND_SOFT_LIGHT
+            com.novacut.editor.model.BlendMode.DIFFERENCE -> FRAG_BLEND_DIFFERENCE
+            com.novacut.editor.model.BlendMode.EXCLUSION -> FRAG_BLEND_EXCLUSION
+            com.novacut.editor.model.BlendMode.ADD -> FRAG_BLEND_ADD
+            com.novacut.editor.model.BlendMode.SUBTRACT -> FRAG_BLEND_SUBTRACT
+            else -> FRAG_BLEND_NORMAL
+        },
+        mapOf("uOpacity" to opacity)
+    )
+
+    // ─── Mask shader ─────────────────────────────────────────────────
+
+    fun rectangleMask(
+        x: Float, y: Float, w: Float, h: Float,
+        feather: Float, inverted: Float
+    ) = ShaderEffect(
+        FRAG_RECT_MASK,
+        mapOf(
+            "uMaskX" to x, "uMaskY" to y, "uMaskW" to w, "uMaskH" to h,
+            "uFeather" to feather, "uInverted" to inverted
+        )
+    )
+
+    fun ellipseMask(
+        cx: Float, cy: Float, rx: Float, ry: Float,
+        feather: Float, inverted: Float
+    ) = ShaderEffect(
+        FRAG_ELLIPSE_MASK,
+        mapOf(
+            "uCenterX" to cx, "uCenterY" to cy, "uRadiusX" to rx, "uRadiusY" to ry,
+            "uFeather" to feather, "uInverted" to inverted
+        )
+    )
+
+    // ─── Color Grading fragment shaders ──────────────────────────────
+
+    private const val FRAG_COLOR_GRADE = H +
+        "uniform float uLiftR, uLiftG, uLiftB;\n" +
+        "uniform float uGammaR, uGammaG, uGammaB;\n" +
+        "uniform float uGainR, uGainG, uGainB;\n" +
+        "uniform float uOffsetR, uOffsetG, uOffsetB;\n" +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 lift = vec3(uLiftR, uLiftG, uLiftB);\n" +
+        "  vec3 gamma = vec3(uGammaR, uGammaG, uGammaB);\n" +
+        "  vec3 gain = vec3(uGainR, uGainG, uGainB);\n" +
+        "  vec3 offset = vec3(uOffsetR, uOffsetG, uOffsetB);\n" +
+        "  vec3 rgb = c.rgb;\n" +
+        "  rgb = rgb * gain + lift * (1.0 - rgb);\n" +
+        "  rgb = pow(max(rgb, 0.0), 1.0 / max(gamma, 0.01));\n" +
+        "  rgb = clamp(rgb + offset, 0.0, 1.0);\n" +
+        "  fragColor = vec4(rgb, c.a);\n}"
+
+    private const val FRAG_HSL_QUALIFY = H +
+        "uniform float uHueCenter, uHueWidth;\n" +
+        "uniform float uSatMin, uSatMax;\n" +
+        "uniform float uLumMin, uLumMax;\n" +
+        "uniform float uSoftness;\n" +
+        "uniform float uAdjHue, uAdjSat, uAdjLum;\n" +
+        "vec3 rgb2hsl(vec3 c) {\n" +
+        "  float mx = max(c.r, max(c.g, c.b));\n" +
+        "  float mn = min(c.r, min(c.g, c.b));\n" +
+        "  float l = (mx + mn) * 0.5;\n" +
+        "  if (mx == mn) return vec3(0.0, 0.0, l);\n" +
+        "  float d = mx - mn;\n" +
+        "  float s = l > 0.5 ? d / (2.0 - mx - mn) : d / (mx + mn);\n" +
+        "  float h;\n" +
+        "  if (mx == c.r) h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);\n" +
+        "  else if (mx == c.g) h = (c.b - c.r) / d + 2.0;\n" +
+        "  else h = (c.r - c.g) / d + 4.0;\n" +
+        "  return vec3(h / 6.0, s, l);\n" +
+        "}\n" +
+        "float hue2rgb(float p, float q, float t) {\n" +
+        "  if (t < 0.0) t += 1.0;\n" +
+        "  if (t > 1.0) t -= 1.0;\n" +
+        "  if (t < 1.0/6.0) return p + (q - p) * 6.0 * t;\n" +
+        "  if (t < 1.0/2.0) return q;\n" +
+        "  if (t < 2.0/3.0) return p + (q - p) * (2.0/3.0 - t) * 6.0;\n" +
+        "  return p;\n" +
+        "}\n" +
+        "vec3 hsl2rgb(vec3 hsl) {\n" +
+        "  if (hsl.y == 0.0) return vec3(hsl.z);\n" +
+        "  float q = hsl.z < 0.5 ? hsl.z * (1.0 + hsl.y) : hsl.z + hsl.y - hsl.z * hsl.y;\n" +
+        "  float p = 2.0 * hsl.z - q;\n" +
+        "  return vec3(hue2rgb(p, q, hsl.x + 1.0/3.0), hue2rgb(p, q, hsl.x), hue2rgb(p, q, hsl.x - 1.0/3.0));\n" +
+        "}\n" +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 hsl = rgb2hsl(c.rgb);\n" +
+        "  float hueDist = abs(hsl.x - uHueCenter / 360.0);\n" +
+        "  hueDist = min(hueDist, 1.0 - hueDist);\n" +
+        "  float hueMatch = 1.0 - smoothstep(uHueWidth / 720.0 - uSoftness, uHueWidth / 720.0 + uSoftness, hueDist);\n" +
+        "  float satMatch = smoothstep(uSatMin - uSoftness, uSatMin + uSoftness, hsl.y) *\n" +
+        "                    (1.0 - smoothstep(uSatMax - uSoftness, uSatMax + uSoftness, hsl.y));\n" +
+        "  float lumMatch = smoothstep(uLumMin - uSoftness, uLumMin + uSoftness, hsl.z) *\n" +
+        "                    (1.0 - smoothstep(uLumMax - uSoftness, uLumMax + uSoftness, hsl.z));\n" +
+        "  float mask = hueMatch * satMatch * lumMatch;\n" +
+        "  vec3 adjusted = vec3(hsl.x + uAdjHue / 360.0, clamp(hsl.y + uAdjSat, 0.0, 1.0), clamp(hsl.z + uAdjLum, 0.0, 1.0));\n" +
+        "  vec3 result = mix(c.rgb, hsl2rgb(adjusted), mask);\n" +
+        "  fragColor = vec4(result, c.a);\n}"
+
+    // ─── Blend Mode fragment shaders ─────────────────────────────────
+
+    private const val BH = H + "uniform float uOpacity;\n"
+
+    private const val FRAG_BLEND_NORMAL = BH +
+        "void main() {\n" +
+        "  fragColor = texture(uTexSampler, vTexCoord);\n" +
+        "  fragColor.a *= uOpacity;\n}"
+
+    private const val FRAG_BLEND_MULTIPLY = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = c.rgb * c.rgb;\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_SCREEN = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = 1.0 - (1.0 - c.rgb) * (1.0 - c.rgb);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_OVERLAY = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result;\n" +
+        "  result.r = c.r < 0.5 ? 2.0 * c.r * c.r : 1.0 - 2.0 * (1.0 - c.r) * (1.0 - c.r);\n" +
+        "  result.g = c.g < 0.5 ? 2.0 * c.g * c.g : 1.0 - 2.0 * (1.0 - c.g) * (1.0 - c.g);\n" +
+        "  result.b = c.b < 0.5 ? 2.0 * c.b * c.b : 1.0 - 2.0 * (1.0 - c.b) * (1.0 - c.b);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_DARKEN = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = min(c.rgb, c.rgb);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_LIGHTEN = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = max(c.rgb, c.rgb);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_COLOR_DODGE = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = clamp(c.rgb / max(1.0 - c.rgb, 0.001), 0.0, 1.0);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_COLOR_BURN = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = clamp(1.0 - (1.0 - c.rgb) / max(c.rgb, 0.001), 0.0, 1.0);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_HARD_LIGHT = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result;\n" +
+        "  result.r = c.r > 0.5 ? 1.0 - 2.0 * (1.0 - c.r) * (1.0 - c.r) : 2.0 * c.r * c.r;\n" +
+        "  result.g = c.g > 0.5 ? 1.0 - 2.0 * (1.0 - c.g) * (1.0 - c.g) : 2.0 * c.g * c.g;\n" +
+        "  result.b = c.b > 0.5 ? 1.0 - 2.0 * (1.0 - c.b) * (1.0 - c.b) : 2.0 * c.b * c.b;\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_SOFT_LIGHT = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = (1.0 - 2.0 * c.rgb) * c.rgb * c.rgb + 2.0 * c.rgb * c.rgb;\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_DIFFERENCE = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = abs(c.rgb - 0.5);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_EXCLUSION = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = c.rgb + c.rgb - 2.0 * c.rgb * c.rgb;\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_ADD = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = clamp(c.rgb + c.rgb, 0.0, 1.0);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    private const val FRAG_BLEND_SUBTRACT = BH +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 result = clamp(c.rgb - c.rgb, 0.0, 1.0);\n" +
+        "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    // ─── Mask fragment shaders ───────────────────────────────────────
+
+    private const val FRAG_RECT_MASK = H +
+        "uniform float uMaskX, uMaskY, uMaskW, uMaskH;\n" +
+        "uniform float uFeather, uInverted;\n" +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec2 d = abs(vTexCoord - vec2(uMaskX, uMaskY)) - vec2(uMaskW, uMaskH) * 0.5;\n" +
+        "  float dist = length(max(d, 0.0));\n" +
+        "  float mask = 1.0 - smoothstep(0.0, max(uFeather, 0.001), dist);\n" +
+        "  if (uInverted > 0.5) mask = 1.0 - mask;\n" +
+        "  fragColor = vec4(c.rgb, c.a * mask);\n}"
+
+    private const val FRAG_ELLIPSE_MASK = H +
+        "uniform float uCenterX, uCenterY, uRadiusX, uRadiusY;\n" +
+        "uniform float uFeather, uInverted;\n" +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec2 d = (vTexCoord - vec2(uCenterX, uCenterY)) / vec2(max(uRadiusX, 0.001), max(uRadiusY, 0.001));\n" +
+        "  float dist = length(d) - 1.0;\n" +
+        "  float mask = 1.0 - smoothstep(0.0, max(uFeather, 0.001) * 5.0, dist);\n" +
+        "  if (uInverted > 0.5) mask = 1.0 - mask;\n" +
+        "  fragColor = vec4(c.rgb, c.a * mask);\n}"
 }

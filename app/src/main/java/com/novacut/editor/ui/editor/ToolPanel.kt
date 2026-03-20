@@ -38,19 +38,21 @@ val projectTabs = listOf(
     TabItem("audio", Icons.Default.MusicNote, "Audio"),
     TabItem("text", Icons.Default.Title, "Text"),
     TabItem("effects", Icons.Default.AutoFixHigh, "Effects"),
-    TabItem("aspect", Icons.Default.AspectRatio, "Aspect\nRatio")
+    TabItem("aspect", Icons.Default.AspectRatio, "Aspect"),
+    TabItem("project_tools", Icons.Default.Build, "Tools")
 )
 
 // Clip mode tabs (clip selected)
 val clipTabs = listOf(
     TabItem("back", Icons.AutoMirrored.Filled.ArrowBack, ""),
     TabItem("edit", Icons.Default.Edit, "Edit"),
-    TabItem("audio", Icons.Default.MusicNote, "Audio Tool"),
+    TabItem("audio", Icons.Default.MusicNote, "Audio"),
     TabItem("speed", Icons.Default.Speed, "Speed"),
-    TabItem("transform", Icons.Default.Transform, "Transform"),
-    TabItem("effects", Icons.Default.AutoFixHigh, "Effects"),
-    TabItem("transition", Icons.Default.SwapHoriz, "Transition"),
-    TabItem("ai", Icons.Default.AutoAwesome, "AI Magic")
+    TabItem("transform", Icons.Default.Transform, "Motion"),
+    TabItem("effects", Icons.Default.AutoFixHigh, "FX"),
+    TabItem("transition", Icons.Default.SwapHoriz, "Trans"),
+    TabItem("color", Icons.Default.Palette, "Color"),
+    TabItem("ai", Icons.Default.AutoAwesome, "AI")
 )
 
 // Project mode — Text tab sub-menu
@@ -69,16 +71,46 @@ private val clipEditSubMenu = listOf(
     SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects")
 )
 
-// Clip mode — AI Magic tab sub-menu
+// Clip mode — Motion tab sub-menu (replaces simple Transform panel)
+private val clipMotionSubMenu = listOf(
+    SubMenuItem("transform", Icons.Default.Transform, "Transform"),
+    SubMenuItem("keyframes", Icons.Default.Timeline, "Keyframes"),
+    SubMenuItem("masks", Icons.Default.Layers, "Masks"),
+    SubMenuItem("blend_mode", Icons.Default.BlurOn, "Blend\nMode")
+)
+
+// Clip mode — Color tab sub-menu
+private val clipColorSubMenu = listOf(
+    SubMenuItem("color_grade", Icons.Default.Palette, "Color\nGrade"),
+    SubMenuItem("effects", Icons.Default.AutoFixHigh, "Effects")
+)
+
+// Clip mode — AI Magic tab sub-menu (expanded)
 private val clipAiSubMenu = listOf(
     SubMenuItem("scene_detect", Icons.Default.ContentCut, "Scene\nDetect"),
     SubMenuItem("remove_bg", Icons.Default.Wallpaper, "Remove\nBG"),
+    SubMenuItem("bg_replace", Icons.Default.PhotoFilter, "Replace\nBG"),
     SubMenuItem("track_motion", Icons.Default.GpsFixed, "Track\nMotion"),
+    SubMenuItem("face_track", Icons.Default.Face, "Face\nTrack"),
     SubMenuItem("smart_crop", Icons.Default.Crop, "Smart\nCrop"),
+    SubMenuItem("smart_reframe", Icons.Default.CropRotate, "Smart\nReframe"),
     SubMenuItem("stabilize", Icons.Default.Straighten, "Stabilize"),
-    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise\nAudio"),
+    SubMenuItem("denoise", Icons.AutoMirrored.Filled.VolumeOff, "Denoise"),
     SubMenuItem("auto_captions", Icons.Default.ClosedCaption, "Auto\nCaptions"),
-    SubMenuItem("auto_color", Icons.Default.Palette, "Auto\nColor")
+    SubMenuItem("auto_color", Icons.Default.Palette, "Auto\nColor"),
+    SubMenuItem("style_transfer", Icons.Default.Style, "Style\nTransfer"),
+    SubMenuItem("object_remove", Icons.Default.HideImage, "Object\nRemove"),
+    SubMenuItem("upscale", Icons.Default.ZoomIn, "Upscale\n4K"),
+    SubMenuItem("frame_interp", Icons.Default.SlowMotionVideo, "Frame\nInterp")
+)
+
+// Project mode — Tools tab sub-menu
+private val projectToolsSubMenu = listOf(
+    SubMenuItem("audio_mixer", Icons.Default.Equalizer, "Audio\nMixer"),
+    SubMenuItem("beat_detect", Icons.Default.GraphicEq, "Beat\nDetect"),
+    SubMenuItem("adjustment_layer", Icons.Default.Tune, "Adj\nLayer"),
+    SubMenuItem("snapshot", Icons.Default.Save, "Snapshot"),
+    SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
 )
 
 // --- Bottom tool area (tab bar + contextual sub-menu grids) ---
@@ -105,7 +137,10 @@ fun BottomToolArea(
     // Resolve sub-menu for the currently active tab
     val subMenuItems: List<SubMenuItem>? = when {
         !isClipMode && activeTabId == "text" -> textSubMenu
+        !isClipMode && activeTabId == "project_tools" -> projectToolsSubMenu
         isClipMode && activeTabId == "edit" -> clipEditSubMenu
+        isClipMode && activeTabId == "transform" -> clipMotionSubMenu
+        isClipMode && activeTabId == "color" -> clipColorSubMenu
         isClipMode && activeTabId == "ai" -> clipAiSubMenu
         else -> null
     }
@@ -127,6 +162,9 @@ fun BottomToolArea(
                         },
                         disabledIds = buildSet {
                             if (!hasCopiedEffects) add("paste_fx")
+                            if (!isClipMode) {
+                                add("color_grade"); add("keyframes"); add("masks"); add("blend_mode")
+                            }
                         }
                     )
                     // Text overlay list when text tab active

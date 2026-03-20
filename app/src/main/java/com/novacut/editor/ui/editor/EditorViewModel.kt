@@ -75,7 +75,33 @@ data class EditorState(
     val isRecordingVoiceover: Boolean = false,
     val voiceoverDurationMs: Long = 0L,
     val isLooping: Boolean = false,
-    val editingTextOverlayId: String? = null
+    val editingTextOverlayId: String? = null,
+    // New panels
+    val showColorGrading: Boolean = false,
+    val showAudioMixer: Boolean = false,
+    val showKeyframeEditor: Boolean = false,
+    val showSpeedCurveEditor: Boolean = false,
+    val showMaskEditor: Boolean = false,
+    val showBlendModeSelector: Boolean = false,
+    val showBatchExport: Boolean = false,
+    // Mask state
+    val selectedMaskId: String? = null,
+    // Keyframe state
+    val activeKeyframeProperties: Set<KeyframeProperty> = setOf(
+        KeyframeProperty.POSITION_X, KeyframeProperty.POSITION_Y,
+        KeyframeProperty.SCALE_X, KeyframeProperty.SCALE_Y,
+        KeyframeProperty.OPACITY
+    ),
+    // Audio mixer state
+    val vuLevels: Map<String, Pair<Float, Float>> = emptyMap(),
+    // Beat markers
+    val beatMarkers: List<Long> = emptyList(),
+    // Batch export
+    val batchExportQueue: List<BatchExportItem> = emptyList(),
+    // Project snapshots
+    val projectSnapshots: List<ProjectSnapshot> = emptyList(),
+    // Proxy
+    val proxySettings: ProxySettings = ProxySettings()
 )
 
 enum class EditorTool(val displayName: String) {
@@ -821,8 +847,16 @@ class EditorViewModel @Inject constructor(
         showTransformPanel = false,
         showCropPanel = false,
         showVoiceoverRecorder = false,
+        showColorGrading = false,
+        showAudioMixer = false,
+        showKeyframeEditor = false,
+        showSpeedCurveEditor = false,
+        showMaskEditor = false,
+        showBlendModeSelector = false,
+        showBatchExport = false,
         selectedEffectId = null,
-        editingTextOverlayId = null
+        editingTextOverlayId = null,
+        selectedMaskId = null
     )
 
     fun dismissAllPanels() { _state.update { dismissedPanelState(it) } }
@@ -859,6 +893,437 @@ class EditorViewModel @Inject constructor(
         if (_state.value.isRecordingVoiceover) stopVoiceover()
         voiceoverDurationJob?.cancel()
         _state.update { it.copy(showVoiceoverRecorder = false) }
+    }
+
+    // --- Color Grading ---
+    fun showColorGrading() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showColorGrading = true) } }
+    fun hideColorGrading() { _state.update { it.copy(showColorGrading = false) } }
+
+    fun updateClipColorGrade(colorGrade: ColorGrade) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Color grade")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(colorGrade = colorGrade) else clip
+                })
+            })
+        }
+    }
+
+    fun importLut() {
+        // Trigger file picker via activity result — handled in EditorScreen
+        showToast("Select a .cube or .3dl LUT file")
+    }
+
+    fun setClipLut(lutPath: String) {
+        val clipId = _state.value.selectedClipId ?: return
+        val currentGrade = getSelectedClip()?.colorGrade ?: ColorGrade()
+        updateClipColorGrade(currentGrade.copy(lutPath = lutPath))
+    }
+
+    // --- Audio Mixer ---
+    fun showAudioMixer() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showAudioMixer = true) } }
+    fun hideAudioMixer() { _state.update { it.copy(showAudioMixer = false) } }
+
+    fun setTrackVolume(trackId: String, volume: Float) {
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) track.copy(volume = volume.coerceIn(0f, 2f)) else track
+            })
+        }
+    }
+
+    fun setTrackPan(trackId: String, pan: Float) {
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) track.copy(pan = pan.coerceIn(-1f, 1f)) else track
+            })
+        }
+    }
+
+    fun toggleTrackSolo(trackId: String) {
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) track.copy(isSolo = !track.isSolo) else track
+            })
+        }
+    }
+
+    fun addTrackAudioEffect(trackId: String, type: AudioEffectType) {
+        saveUndoState("Add audio effect")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) {
+                    val effect = AudioEffect(
+                        type = type,
+                        params = AudioEffectType.defaultParams(type)
+                    )
+                    track.copy(audioEffects = track.audioEffects + effect)
+                } else track
+            })
+        }
+    }
+
+    fun removeTrackAudioEffect(trackId: String, effectId: String) {
+        saveUndoState("Remove audio effect")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) {
+                    track.copy(audioEffects = track.audioEffects.filter { it.id != effectId })
+                } else track
+            })
+        }
+    }
+
+    fun updateTrackAudioEffectParam(trackId: String, effectId: String, param: String, value: Float) {
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) {
+                    track.copy(audioEffects = track.audioEffects.map { effect ->
+                        if (effect.id == effectId) {
+                            effect.copy(params = effect.params + (param to value))
+                        } else effect
+                    })
+                } else track
+            })
+        }
+    }
+
+    fun detectBeats() {
+        val s = _state.value
+        val audioClips = s.tracks
+            .filter { it.type == TrackType.AUDIO || it.type == TrackType.VIDEO }
+            .flatMap { it.clips }
+        if (audioClips.isEmpty()) {
+            showToast("No audio clips to analyze")
+            return
+        }
+        viewModelScope.launch {
+            showToast("Detecting beats...")
+            val waveform = audioEngine.extractWaveform(audioClips.first().sourceUri, 44100)
+            val pcm = waveform.map { (it * 32767).toInt().toShort() }.toShortArray()
+            val beats = com.novacut.editor.engine.AudioEffectsEngine.detectBeats(pcm, 44100, 1)
+            _state.update { it.copy(beatMarkers = beats) }
+            showToast("Found ${beats.size} beats")
+        }
+    }
+
+    // --- Keyframe Editor ---
+    fun showKeyframeEditor() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showKeyframeEditor = true) } }
+    fun hideKeyframeEditor() { _state.update { it.copy(showKeyframeEditor = false) } }
+
+    fun toggleKeyframeProperty(property: KeyframeProperty) {
+        _state.update { s ->
+            val current = s.activeKeyframeProperties
+            val updated = if (property in current) current - property else current + property
+            s.copy(activeKeyframeProperties = updated)
+        }
+    }
+
+    fun updateClipKeyframes(keyframes: List<Keyframe>) {
+        val clipId = _state.value.selectedClipId ?: return
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(keyframes = keyframes) else clip
+                })
+            })
+        }
+    }
+
+    fun addKeyframe(property: KeyframeProperty, timeOffsetMs: Long, value: Float) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Add keyframe")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        val kf = Keyframe(timeOffsetMs, property, value, interpolation = KeyframeInterpolation.BEZIER)
+                        clip.copy(keyframes = clip.keyframes + kf)
+                    } else clip
+                })
+            })
+        }
+    }
+
+    fun deleteKeyframe(keyframe: Keyframe) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Delete keyframe")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(keyframes = clip.keyframes.filter {
+                            !(it.timeOffsetMs == keyframe.timeOffsetMs && it.property == keyframe.property && it.value == keyframe.value)
+                        })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    // --- Speed Curve ---
+    fun showSpeedCurveEditor() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showSpeedCurveEditor = true) } }
+    fun hideSpeedCurveEditor() { _state.update { it.copy(showSpeedCurveEditor = false) } }
+
+    fun setClipSpeedCurve(speedCurve: SpeedCurve?) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Speed curve")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(speedCurve = speedCurve) else clip
+                })
+            })
+        }
+        rebuildPlayerTimeline()
+    }
+
+    // --- Mask Editor ---
+    fun showMaskEditor() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showMaskEditor = true) } }
+    fun hideMaskEditor() { _state.update { it.copy(showMaskEditor = false, selectedMaskId = null) } }
+
+    fun selectMask(maskId: String?) {
+        _state.update { it.copy(selectedMaskId = maskId) }
+    }
+
+    fun addMask(type: MaskType) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Add mask")
+        val defaultPoints = when (type) {
+            MaskType.RECTANGLE -> listOf(MaskPoint(0.25f, 0.25f), MaskPoint(0.75f, 0.75f))
+            MaskType.ELLIPSE -> listOf(MaskPoint(0.5f, 0.5f), MaskPoint(0.25f, 0.25f))
+            MaskType.LINEAR_GRADIENT -> listOf(MaskPoint(0.5f, 0.3f), MaskPoint(0.5f, 0.7f))
+            MaskType.RADIAL_GRADIENT -> listOf(MaskPoint(0.5f, 0.5f), MaskPoint(0.3f, 0.3f))
+            MaskType.FREEHAND -> emptyList()
+        }
+        val mask = Mask(type = type, points = defaultPoints)
+        _state.update { s ->
+            s.copy(
+                tracks = s.tracks.map { track ->
+                    track.copy(clips = track.clips.map { clip ->
+                        if (clip.id == clipId) clip.copy(masks = clip.masks + mask) else clip
+                    })
+                },
+                selectedMaskId = mask.id
+            )
+        }
+    }
+
+    fun updateMask(mask: Mask) {
+        val clipId = _state.value.selectedClipId ?: return
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(masks = clip.masks.map { if (it.id == mask.id) mask else it })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    fun deleteMask(maskId: String) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Delete mask")
+        _state.update { s ->
+            s.copy(
+                tracks = s.tracks.map { track ->
+                    track.copy(clips = track.clips.map { clip ->
+                        if (clip.id == clipId) clip.copy(masks = clip.masks.filter { it.id != maskId }) else clip
+                    })
+                },
+                selectedMaskId = null
+            )
+        }
+    }
+
+    fun updateMaskPoint(maskId: String, pointIndex: Int, x: Float, y: Float) {
+        val clipId = _state.value.selectedClipId ?: return
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(masks = clip.masks.map { mask ->
+                            if (mask.id == maskId && pointIndex in mask.points.indices) {
+                                mask.copy(points = mask.points.toMutableList().apply {
+                                    set(pointIndex, get(pointIndex).copy(x = x, y = y))
+                                })
+                            } else mask
+                        })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    fun setFreehandMaskPoints(maskId: String, points: List<MaskPoint>) {
+        val clipId = _state.value.selectedClipId ?: return
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(masks = clip.masks.map { mask ->
+                            if (mask.id == maskId) mask.copy(points = points) else mask
+                        })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    // --- Blend Mode ---
+    fun showBlendModeSelector() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showBlendModeSelector = true) } }
+    fun hideBlendModeSelector() { _state.update { it.copy(showBlendModeSelector = false) } }
+
+    fun setClipBlendMode(blendMode: BlendMode) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Blend mode")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(blendMode = blendMode) else clip
+                })
+            })
+        }
+    }
+
+    fun setTrackBlendMode(trackId: String, blendMode: BlendMode) {
+        saveUndoState("Track blend mode")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) track.copy(blendMode = blendMode) else track
+            })
+        }
+    }
+
+    fun setTrackOpacity(trackId: String, opacity: Float) {
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                if (track.id == trackId) track.copy(opacity = opacity.coerceIn(0f, 1f)) else track
+            })
+        }
+    }
+
+    // --- Batch Export ---
+    fun showBatchExport() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showBatchExport = true) } }
+    fun hideBatchExport() { _state.update { it.copy(showBatchExport = false) } }
+
+    fun addBatchExportItem(config: ExportConfig, name: String) {
+        val item = BatchExportItem(config = config, outputName = name)
+        _state.update { it.copy(batchExportQueue = it.batchExportQueue + item) }
+    }
+
+    fun removeBatchExportItem(id: String) {
+        _state.update { it.copy(batchExportQueue = it.batchExportQueue.filter { it.id != id }) }
+    }
+
+    // --- Effect Keyframes ---
+    fun addEffectKeyframe(effectId: String, paramName: String, timeOffsetMs: Long, value: Float) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Effect keyframe")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(effects = clip.effects.map { effect ->
+                            if (effect.id == effectId) {
+                                val kf = EffectKeyframe(timeOffsetMs, paramName, value)
+                                effect.copy(keyframes = effect.keyframes + kf)
+                            } else effect
+                        })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    // --- Adjustment Layers ---
+    fun addAdjustmentLayer() {
+        saveUndoState("Add adjustment layer")
+        _state.update { s ->
+            val newTrack = Track(
+                type = TrackType.ADJUSTMENT,
+                index = s.tracks.size
+            )
+            s.copy(tracks = s.tracks + newTrack)
+        }
+    }
+
+    // --- Captions ---
+    fun addCaption(caption: Caption) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Add caption")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(captions = clip.captions + caption) else clip
+                })
+            })
+        }
+    }
+
+    fun updateCaption(caption: Caption) {
+        val clipId = _state.value.selectedClipId ?: return
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(captions = clip.captions.map { if (it.id == caption.id) caption else it })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    fun removeCaption(captionId: String) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Remove caption")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) {
+                        clip.copy(captions = clip.captions.filter { it.id != captionId })
+                    } else clip
+                })
+            })
+        }
+    }
+
+    // --- Project Snapshots ---
+    fun createSnapshot(label: String = "") {
+        val s = _state.value
+        val autoSaveState = AutoSaveState(projectId = s.project.id, tracks = s.tracks, textOverlays = s.textOverlays, playheadMs = s.playheadMs)
+        val json = autoSaveState.serialize()
+        val snapshot = ProjectSnapshot(
+            projectId = s.project.id,
+            timestamp = System.currentTimeMillis(),
+            label = label.ifEmpty { "Snapshot ${s.projectSnapshots.size + 1}" },
+            stateJson = json
+        )
+        _state.update { it.copy(projectSnapshots = it.projectSnapshots + snapshot) }
+        showToast("Snapshot saved: ${snapshot.label}")
+    }
+
+    fun restoreSnapshot(snapshotId: String) {
+        val snapshot = _state.value.projectSnapshots.find { it.id == snapshotId } ?: return
+        val recovery = AutoSaveState.deserialize(snapshot.stateJson)
+        saveUndoState("Restore snapshot")
+        _state.update {
+            it.copy(
+                tracks = recovery.tracks,
+                textOverlays = recovery.textOverlays,
+                playheadMs = recovery.playheadMs
+            )
+        }
+        rebuildPlayerTimeline()
+        showToast("Restored: ${snapshot.label}")
+    }
+
+    // --- Proxy ---
+    fun setProxyEnabled(enabled: Boolean) {
+        _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
     }
 
     // Voiceover recording

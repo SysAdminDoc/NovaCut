@@ -122,6 +122,7 @@ fun Timeline(
                         TrackType.AUDIO -> Mocha.Green
                         TrackType.OVERLAY -> Mocha.Peach
                         TrackType.TEXT -> Mocha.Mauve
+                        TrackType.ADJUSTMENT -> Mocha.Yellow
                     }
                     Column(
                         modifier = Modifier
@@ -138,6 +139,7 @@ fun Timeline(
                                 TrackType.AUDIO -> Icons.Default.MusicNote
                                 TrackType.OVERLAY -> Icons.Default.Layers
                                 TrackType.TEXT -> Icons.Default.Title
+                                TrackType.ADJUSTMENT -> Icons.Default.Tune
                             },
                             contentDescription = track.type.name,
                             tint = if (track.isVisible) trackColor else Mocha.Surface2,
@@ -267,6 +269,7 @@ fun Timeline(
                                         TrackType.AUDIO -> Mocha.Green
                                         TrackType.OVERLAY -> Mocha.Peach
                                         TrackType.TEXT -> Mocha.Mauve
+                                        TrackType.ADJUSTMENT -> Mocha.Yellow
                                     }
 
                                     Box(

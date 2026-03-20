@@ -261,10 +261,83 @@ class VideoEngine @Inject constructor(
                     .build()
 
                 val videoEffects = buildList<androidx.media3.common.Effect> {
+                    // User effects
                     for (effect in clip.effects.filter { it.enabled }) {
-                        if (!effect.enabled) continue
                         buildVideoEffect(effect)?.let { add(it) }
                     }
+
+                    // Color grading (lift/gamma/gain + HSL qualification)
+                    clip.colorGrade?.let { grade ->
+                        if (grade.enabled) {
+                            // Lift/Gamma/Gain shader
+                            val hasLGG = grade.liftR != 0f || grade.liftG != 0f || grade.liftB != 0f ||
+                                grade.gammaR != 1f || grade.gammaG != 1f || grade.gammaB != 1f ||
+                                grade.gainR != 1f || grade.gainG != 1f || grade.gainB != 1f ||
+                                grade.offsetR != 0f || grade.offsetG != 0f || grade.offsetB != 0f
+                            if (hasLGG) {
+                                add(EffectShaders.colorGrade(
+                                    grade.liftR, grade.liftG, grade.liftB,
+                                    grade.gammaR, grade.gammaG, grade.gammaB,
+                                    grade.gainR, grade.gainG, grade.gainB,
+                                    grade.offsetR, grade.offsetG, grade.offsetB
+                                ))
+                            }
+                            // HSL qualification
+                            grade.hslQualifier?.let { hsl ->
+                                add(EffectShaders.hslQualify(
+                                    hsl.hueCenter, hsl.hueWidth,
+                                    hsl.satMin, hsl.satMax,
+                                    hsl.lumMin, hsl.lumMax,
+                                    hsl.softness,
+                                    hsl.adjustHue, hsl.adjustSat, hsl.adjustLum
+                                ))
+                            }
+                            // LUT
+                            grade.lutPath?.let { path ->
+                                val lutFile = java.io.File(path)
+                                if (lutFile.exists()) {
+                                    val lut = when {
+                                        path.endsWith(".cube", true) -> LutEngine.parseCube(lutFile)
+                                        path.endsWith(".3dl", true) -> LutEngine.parse3dl(lutFile)
+                                        else -> null
+                                    }
+                                    lut?.let { add(LutEngine.createLutEffect(it, grade.lutIntensity)) }
+                                }
+                            }
+                        }
+                    }
+
+                    // Masks (rectangle/ellipse)
+                    for (mask in clip.masks) {
+                        val points = KeyframeEngine.interpolateMaskPoints(mask, 0L)
+                        when (mask.type) {
+                            com.novacut.editor.model.MaskType.RECTANGLE -> {
+                                if (points.size >= 2) {
+                                    val cx = (points[0].x + points[1].x) / 2f
+                                    val cy = (points[0].y + points[1].y) / 2f
+                                    val w = kotlin.math.abs(points[1].x - points[0].x)
+                                    val h = kotlin.math.abs(points[1].y - points[0].y)
+                                    add(EffectShaders.rectangleMask(cx, cy, w, h, mask.feather / 100f, if (mask.inverted) 1f else 0f))
+                                }
+                            }
+                            com.novacut.editor.model.MaskType.ELLIPSE -> {
+                                if (points.size >= 2) {
+                                    add(EffectShaders.ellipseMask(
+                                        points[0].x, points[0].y,
+                                        points[1].x, points[1].y,
+                                        mask.feather / 100f, if (mask.inverted) 1f else 0f
+                                    ))
+                                }
+                            }
+                            else -> {} // Freehand/gradient masks handled differently
+                        }
+                    }
+
+                    // Blend mode
+                    if (clip.blendMode != com.novacut.editor.model.BlendMode.NORMAL) {
+                        add(EffectShaders.blendMode(clip.blendMode, clip.opacity))
+                    }
+
                     // Transition-in effect (reveals clip at start)
                     clip.transition?.let { transition ->
                         val durationUs = transition.durationMs * 1000f
@@ -487,6 +560,7 @@ class VideoEngine @Inject constructor(
             val mimeType = when (config.codec) {
                 VideoCodec.HEVC -> MimeTypes.VIDEO_H265
                 VideoCodec.H264 -> MimeTypes.VIDEO_H264
+                VideoCodec.AV1 -> MimeTypes.VIDEO_AV1
             }
 
             // Transformer.start() requires a Looper — must run on Main thread
@@ -1114,6 +1188,14 @@ private class ExportTextOverlay(
             }
             com.novacut.editor.model.TextAnimation.TYPEWRITER -> { /* handled in getText() */ }
             com.novacut.editor.model.TextAnimation.NONE -> { }
+            com.novacut.editor.model.TextAnimation.BLUR_IN -> alpha *= easeOut(inProgress)
+            com.novacut.editor.model.TextAnimation.GLITCH -> offsetX += (1f - easeOut(inProgress)) * 0.05f * kotlin.math.sin(inProgress * 30f)
+            com.novacut.editor.model.TextAnimation.WAVE -> offsetY -= kotlin.math.sin(inProgress * 6.28f) * 0.05f
+            com.novacut.editor.model.TextAnimation.ELASTIC -> {
+                val t = easeOut(inProgress)
+                scale *= if (t < 1f) (1f + 0.3f * kotlin.math.sin(t * 3.14f * 3f) * (1f - t)) else 1f
+            }
+            com.novacut.editor.model.TextAnimation.FLIP -> rotation += (1f - easeOut(inProgress)) * 180f
         }
 
         // Animation out
@@ -1131,6 +1213,11 @@ private class ExportTextOverlay(
             }
             com.novacut.editor.model.TextAnimation.TYPEWRITER -> alpha *= outProgress
             com.novacut.editor.model.TextAnimation.NONE -> { }
+            com.novacut.editor.model.TextAnimation.BLUR_IN -> alpha *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.GLITCH -> offsetX -= (1f - easeOut(outProgress)) * 0.05f * kotlin.math.sin(outProgress * 30f)
+            com.novacut.editor.model.TextAnimation.WAVE -> offsetY += kotlin.math.sin(outProgress * 6.28f) * 0.05f
+            com.novacut.editor.model.TextAnimation.ELASTIC -> scale *= easeOut(outProgress)
+            com.novacut.editor.model.TextAnimation.FLIP -> rotation -= (1f - easeOut(outProgress)) * 180f
         }
 
         return OverlaySettings.Builder()
