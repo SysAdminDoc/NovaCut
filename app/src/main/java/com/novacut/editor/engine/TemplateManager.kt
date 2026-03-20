@@ -1,6 +1,7 @@
 package com.novacut.editor.engine
 
 import android.content.Context
+import android.util.Log
 import com.novacut.editor.model.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +99,8 @@ class TemplateManager @Inject constructor(
         return try {
             val state = AutoSaveState.deserialize(template.stateJson)
             state.tracks to state.textOverlays
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("TemplateManager", "Failed to deserialize template '${template.name}'", e)
             null
         }
     }
@@ -127,7 +129,8 @@ class TemplateManager @Inject constructor(
                 createdAt = json.optLong("createdAt", 0L),
                 stateJson = json.optString("stateJson", "{}")
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("TemplateManager", "Failed to load template ${file.name}", e)
             null
         }
     }

@@ -174,8 +174,9 @@ class AiFeatures @Inject constructor(
             }
 
             // Compute RMS energy in 100ms windows
-            val windowSamples = sampleRate / 10 // 100ms
+            val windowSamples = (sampleRate / 10).coerceAtLeast(1)
             val windowCount = totalSamples / windowSamples
+            if (windowCount == 0) return@withContext emptyList()
             val energy = FloatArray(windowCount)
             var maxEnergy = 0f
             for (w in 0 until windowCount) {
@@ -209,7 +210,7 @@ class AiFeatures @Inject constructor(
                             startMs = startMs,
                             endMs = endMs,
                             text = "[Speech segment $captionIndex]",
-                            confidence = energy.slice(segmentStart until w).average().toFloat() / maxEnergy
+                            confidence = energy.slice(segmentStart until w).let { if (it.isEmpty()) 0.0 else it.average() }.toFloat() / maxEnergy
                         ))
                         captionIndex++
                     }
@@ -225,7 +226,7 @@ class AiFeatures @Inject constructor(
                         startMs = startMs,
                         endMs = endMs,
                         text = "[Speech segment $captionIndex]",
-                        confidence = energy.slice(segmentStart until windowCount).average().toFloat() / maxEnergy
+                        confidence = energy.slice(segmentStart until windowCount).let { if (it.isEmpty()) 0.0 else it.average() }.toFloat() / maxEnergy
                     ))
                 }
             }
@@ -643,7 +644,8 @@ class AiFeatures @Inject constructor(
                     signalRmsSum += v * v
                 }
             }
-            val signalRms = sqrt(signalRmsSum / min(monoSamples, sampleRate * 10)).toFloat()
+            val signalSampleCount = min(monoSamples, sampleRate * 10).coerceAtLeast(1)
+            val signalRms = sqrt(signalRmsSum / signalSampleCount).toFloat()
 
             val snrDb = if (noiseFloorRms > 0.0001f) {
                 20f * kotlin.math.log10(signalRms / noiseFloorRms)

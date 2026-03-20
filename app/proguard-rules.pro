@@ -59,8 +59,18 @@
     public static ** valueOf(java.lang.String);
 }
 
+# ONNX Runtime (Whisper speech-to-text)
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
+
+# MediaPipe (selfie segmentation)
+-keep class com.google.mediapipe.** { *; }
+-dontwarn com.google.mediapipe.**
+
 # Suppress common warnings
 -dontwarn org.bouncycastle.**
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
 -dontwarn java.lang.invoke.StringConcatFactory
+-dontwarn javax.lang.model.**
+-dontwarn autovalue.shaded.**

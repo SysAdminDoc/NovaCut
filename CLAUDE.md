@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.9.2
+v2.0.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -403,6 +403,7 @@ v1.9.2
 - **Style transfer AI tool** — `analyzeAndApplyStyle()` samples 3 frames, analyzes luminance/saturation/temperature distribution, applies cinematic color grade (contrast boost, temperature shift, slight desaturation, vignette, film grain). Names the detected style (Noir, Warm Cinematic, Moody, Vibrant Film, Cinematic).
 - **Neural upscale AI tool** — `analyzeForUpscale()` detects source resolution, recommends next tier (480p->720p, 720p->1080p, 1080p->1440p, 1440p->4K). Updates project resolution + applies sharpening (strength inversely proportional to source resolution).
 
+- **v2.0.0 bug audit** — Complete 3-agent audit (engine/UI/model layers). Fixed: division-by-zero in energy captions (`windowSamples`, noise analysis `signalSampleCount`), `.average()` crash on empty energy slices, `Clip.durationMs` speed=0 guard (`coerceAtLeast(0.01f)`), bitmap leak in `SegmentationGlEffect.readCopyTextureToBitmap()`, `ExportSheet` empty error string check (`isNullOrBlank`), `AiToolsPanel` null processing tool name fallback, `TemplateManager` silent exceptions now logged. ProGuard: added ONNX Runtime + MediaPipe + javax.lang.model keep/dontwarn rules.
 - **BatchExportPanel wired** — `AnimatedVisibility` block added for `state.showBatchExport` in EditorScreen. `startBatchExport()` exports queue items sequentially via `startExport(cacheDir)` loop.
 - **VideoScopes frame capture** — `scopeFrame: StateFlow<Bitmap?>` in ViewModel. `updateScopeFrame()` extracts 256x144 thumbnail from selected clip at playhead via `extractThumbnail()`. Updated on seek and scope toggle. Scopes now display real histogram/waveform/vectorscope data.
 - **ProxyEngine wired** — Injected into EditorViewModel. `setProxyEnabled()` triggers `generateProxiesForAllClips()` which iterates all clips and calls `ProxyEngine.generateProxy()`. Clears proxies on disable. "Proxy Edit" menu item added to `projectToolsSubMenu`.

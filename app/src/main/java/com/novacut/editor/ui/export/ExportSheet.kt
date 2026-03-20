@@ -163,7 +163,7 @@ fun ExportSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Export Failed", color = Mocha.Red, fontSize = 16.sp)
-                if (errorMessage != null) {
+                if (!errorMessage.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         errorMessage,

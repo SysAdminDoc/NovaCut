@@ -305,7 +305,7 @@ fun AiToolsPanel(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        "Processing: ${aiTools.find { it.id == processingTool }?.name}...",
+                        "Processing: ${aiTools.find { it.id == processingTool }?.name ?: processingTool}...",
                         color = Mocha.Text,
                         fontSize = 13.sp,
                         modifier = Modifier.weight(1f)

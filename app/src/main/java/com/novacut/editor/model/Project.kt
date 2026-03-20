@@ -107,7 +107,7 @@ data class Clip(
     val motionTrackingData: MotionTrackingData? = null,
     val captions: List<Caption> = emptyList()
 ) {
-    val durationMs: Long get() = ((trimEndMs - trimStartMs) / speed).toLong()
+    val durationMs: Long get() = ((trimEndMs - trimStartMs) / speed.coerceAtLeast(0.01f)).toLong()
     val timelineEndMs: Long get() = timelineStartMs + durationMs
 
     fun getEffectiveSpeed(timeOffsetMs: Long): Float {

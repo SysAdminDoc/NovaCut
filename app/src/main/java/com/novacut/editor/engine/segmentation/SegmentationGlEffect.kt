@@ -152,13 +152,19 @@ private class SegmentationShaderProgram(
         GLES30.glReadPixels(0, 0, width, height, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
 
         buf.rewind()
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.copyPixelsFromBuffer(buf)
-        // GL readback is bottom-up, flip vertically
-        val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, width / 2f, height / 2f) }
-        val flipped = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, false)
-        bitmap.recycle()
-        return flipped
+        var bitmap: Bitmap? = null
+        return try {
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.copyPixelsFromBuffer(buf)
+            // GL readback is bottom-up, flip vertically
+            val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, width / 2f, height / 2f) }
+            val flipped = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, false)
+            bitmap.recycle()
+            flipped
+        } catch (e: Exception) {
+            bitmap?.recycle()
+            null
+        }
     }
 
     private fun uploadMaskTexture(result: SegmentationResult) {
