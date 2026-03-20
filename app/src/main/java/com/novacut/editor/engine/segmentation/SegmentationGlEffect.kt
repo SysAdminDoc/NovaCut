@@ -13,8 +13,8 @@ import java.nio.ByteOrder
 
 /**
  * Media3 GlEffect that applies per-frame MediaPipe selfie segmentation.
- * Reads each frame from GL, runs segmentation on CPU, uploads the mask
- * as a texture, then renders with alpha compositing.
+ * Copies the input texture to an intermediate texture for readback (avoids feedback loop),
+ * runs segmentation on CPU, uploads the mask as a texture, then renders with alpha compositing.
  */
 @UnstableApi
 class SegmentationGlEffect(
@@ -34,9 +34,11 @@ private class SegmentationShaderProgram(
 ) : BaseGlShaderProgram(useHdr, 1) {
 
     private var glProgram = 0
+    private var copyProgram = 0
     private var vao = 0
     private var vbo = 0
     private var maskTexture = 0
+    private var copyTexture = 0
     private var readbackFbo = 0
     private var width = 0
     private var height = 0
@@ -46,17 +48,36 @@ private class SegmentationShaderProgram(
         width = inputWidth
         height = inputHeight
         if (glProgram == 0) setupGl()
-        // Allocate readback buffer
         pixelBuffer = ByteBuffer.allocateDirect(width * height * 4)
             .order(ByteOrder.nativeOrder())
+        // Create intermediate texture for readback (avoids input texture feedback loop)
+        if (copyTexture == 0) {
+            val texs = IntArray(1); GLES30.glGenTextures(1, texs, 0); copyTexture = texs[0]
+        }
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, copyTexture)
+        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0,
+            GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
         return Size(inputWidth, inputHeight)
     }
 
     override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
-        // Step 1: Readback input texture to Bitmap
-        val bitmap = readTextureToBitmap(inputTexId)
+        // Save the current FBO (BaseGlShaderProgram's output FBO)
+        val savedFbo = IntArray(1)
+        GLES30.glGetIntegerv(GLES30.GL_FRAMEBUFFER_BINDING, savedFbo, 0)
+
+        // Step 1: Copy input texture to intermediate texture via FBO blit
+        copyInputToIntermediate(inputTexId)
+
+        // Step 2: Read intermediate texture to Bitmap
+        val bitmap = readCopyTextureToBitmap()
+
+        // Restore the output FBO before rendering
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, savedFbo[0])
+
         if (bitmap != null) {
-            // Step 2: Run segmentation (downscale for speed)
+            // Step 3: Run segmentation (downscale for speed)
             val segScale = 256f / maxOf(bitmap.width, bitmap.height)
             val segW = (bitmap.width * segScale).toInt().coerceAtLeast(1)
             val segH = (bitmap.height * segScale).toInt().coerceAtLeast(1)
@@ -67,17 +88,15 @@ private class SegmentationShaderProgram(
             segBitmap.recycle()
 
             if (result != null) {
-                // Step 3: Upload mask as GL texture (upscaled to frame size)
                 uploadMaskTexture(result)
             } else {
-                // No segmentation result — upload a white (fully opaque) mask
                 uploadFallbackMask()
             }
         } else {
             uploadFallbackMask()
         }
 
-        // Step 4: Render with mask shader
+        // Step 4: Render with mask shader (into BaseGlShaderProgram's output FBO, already bound)
         GLES30.glUseProgram(glProgram)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, inputTexId)
@@ -92,31 +111,45 @@ private class SegmentationShaderProgram(
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
     }
 
-    private fun readTextureToBitmap(texId: Int): Bitmap? {
-        val buf = pixelBuffer ?: return null
-        buf.clear()
-
-        // Create FBO to read from the input texture
+    /**
+     * Copy input texture to intermediate copyTexture using a simple pass-through shader.
+     * This avoids the feedback loop of reading and sampling from the same texture.
+     */
+    private fun copyInputToIntermediate(inputTexId: Int) {
         if (readbackFbo == 0) {
             val fbos = IntArray(1)
             GLES30.glGenFramebuffers(1, fbos, 0)
             readbackFbo = fbos[0]
         }
 
+        // Bind FBO with copyTexture as color attachment
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, readbackFbo)
         GLES30.glFramebufferTexture2D(
             GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0,
-            GLES30.GL_TEXTURE_2D, texId, 0
+            GLES30.GL_TEXTURE_2D, copyTexture, 0
         )
 
-        val status = GLES30.glCheckFramebufferStatus(GLES30.GL_FRAMEBUFFER)
-        if (status != GLES30.GL_FRAMEBUFFER_COMPLETE) {
-            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
-            return null
-        }
+        // Render input texture into copyTexture via pass-through shader
+        GLES30.glViewport(0, 0, width, height)
+        GLES30.glUseProgram(copyProgram)
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, inputTexId)
+        val loc = GLES30.glGetUniformLocation(copyProgram, "uTexSampler")
+        if (loc >= 0) GLES30.glUniform1i(loc, 0)
+        GLES30.glBindVertexArray(vao)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+        GLES30.glBindVertexArray(0)
+    }
 
+    /**
+     * Read the intermediate copyTexture (attached to readbackFbo) into a Bitmap.
+     */
+    private fun readCopyTextureToBitmap(): Bitmap? {
+        val buf = pixelBuffer ?: return null
+        buf.clear()
+
+        // readbackFbo is already bound with copyTexture as attachment from copyInputToIntermediate
         GLES30.glReadPixels(0, 0, width, height, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
 
         buf.rewind()
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -129,7 +162,6 @@ private class SegmentationShaderProgram(
     }
 
     private fun uploadMaskTexture(result: SegmentationResult) {
-        // Create an RGBA bitmap from the mask bytes
         val maskW = result.width
         val maskH = result.height
         val pixels = IntArray(maskW * maskH)
@@ -149,7 +181,6 @@ private class SegmentationShaderProgram(
     }
 
     private fun uploadFallbackMask() {
-        // Upload a 1x1 white pixel (fully opaque = keep everything)
         val white = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         white.setPixel(0, 0, 0xFFFFFFFF.toInt())
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, maskTexture)
@@ -162,31 +193,49 @@ private class SegmentationShaderProgram(
     override fun release() {
         super.release()
         if (glProgram != 0) { GLES30.glDeleteProgram(glProgram); glProgram = 0 }
+        if (copyProgram != 0) { GLES30.glDeleteProgram(copyProgram); copyProgram = 0 }
         if (vao != 0) { GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0); vao = 0 }
         if (vbo != 0) { GLES30.glDeleteBuffers(1, intArrayOf(vbo), 0); vbo = 0 }
         if (maskTexture != 0) { GLES30.glDeleteTextures(1, intArrayOf(maskTexture), 0); maskTexture = 0 }
+        if (copyTexture != 0) { GLES30.glDeleteTextures(1, intArrayOf(copyTexture), 0); copyTexture = 0 }
         if (readbackFbo != 0) { GLES30.glDeleteFramebuffers(1, intArrayOf(readbackFbo), 0); readbackFbo = 0 }
         pixelBuffer = null
     }
 
     private fun setupGl() {
+        // Main segmentation shader
         val vs = compile(GLES30.GL_VERTEX_SHADER, VERT)
         val fs = compile(GLES30.GL_FRAGMENT_SHADER, FRAG_SEGMENTATION)
         glProgram = GLES30.glCreateProgram()
         GLES30.glAttachShader(glProgram, vs)
         GLES30.glAttachShader(glProgram, fs)
         GLES30.glLinkProgram(glProgram)
-        GLES30.glDeleteShader(vs)
         GLES30.glDeleteShader(fs)
         val s = IntArray(1)
         GLES30.glGetProgramiv(glProgram, GLES30.GL_LINK_STATUS, s, 0)
         if (s[0] == 0) {
             val log = GLES30.glGetProgramInfoLog(glProgram)
             GLES30.glDeleteProgram(glProgram); glProgram = 0
+            GLES30.glDeleteShader(vs)
             throw RuntimeException("GL program link failed: $log")
         }
 
-        // VAO/VBO setup
+        // Pass-through copy shader (for copying input to intermediate texture)
+        val copyFs = compile(GLES30.GL_FRAGMENT_SHADER, FRAG_COPY)
+        copyProgram = GLES30.glCreateProgram()
+        GLES30.glAttachShader(copyProgram, vs)
+        GLES30.glAttachShader(copyProgram, copyFs)
+        GLES30.glLinkProgram(copyProgram)
+        GLES30.glDeleteShader(vs)
+        GLES30.glDeleteShader(copyFs)
+        GLES30.glGetProgramiv(copyProgram, GLES30.GL_LINK_STATUS, s, 0)
+        if (s[0] == 0) {
+            val log = GLES30.glGetProgramInfoLog(copyProgram)
+            GLES30.glDeleteProgram(copyProgram); copyProgram = 0
+            throw RuntimeException("Copy shader link failed: $log")
+        }
+
+        // VAO/VBO setup (shared between both programs)
         val vaos = IntArray(1); GLES30.glGenVertexArrays(1, vaos, 0); vao = vaos[0]
         val vbos = IntArray(1); GLES30.glGenBuffers(1, vbos, 0); vbo = vbos[0]
         val quad = floatArrayOf(-1f,-1f,0f,0f, 1f,-1f,1f,0f, -1f,1f,0f,1f, 1f,1f,1f,1f)
@@ -235,6 +284,15 @@ out vec2 vTexCoord;
 void main() {
     gl_Position = vec4(aPosition, 0.0, 1.0);
     vTexCoord = aTexCoord;
+}"""
+
+        private const val FRAG_COPY = """#version 300 es
+precision mediump float;
+uniform sampler2D uTexSampler;
+in vec2 vTexCoord;
+out vec4 outColor;
+void main() {
+    outColor = texture(uTexSampler, vTexCoord);
 }"""
 
         private const val FRAG_SEGMENTATION = """#version 300 es

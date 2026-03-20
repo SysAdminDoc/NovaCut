@@ -2,6 +2,7 @@ package com.novacut.editor.engine.whisper
 
 import android.content.Context
 import android.media.MediaCodec
+import android.util.Log
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
@@ -193,8 +194,15 @@ class WhisperEngine @Inject constructor(
         var decoderSession: OrtSession? = null
 
         try {
-            encoderSession = env.createSession(encoderFile.absolutePath, sessionOpts)
-            decoderSession = env.createSession(decoderFile.absolutePath, sessionOpts)
+            try {
+                encoderSession = env.createSession(encoderFile.absolutePath, sessionOpts)
+                decoderSession = env.createSession(decoderFile.absolutePath, sessionOpts)
+            } catch (e: Exception) {
+                Log.e("WhisperEngine", "Failed to create ONNX sessions (model may be corrupt)", e)
+                sessionOpts.close()
+                return@withContext emptyList()
+            }
+            sessionOpts.close()
 
             for (chunk in 0 until numChunks) {
                 val chunkStart = chunk * chunkSamples
@@ -327,7 +335,7 @@ class WhisperEngine @Inject constructor(
                             break
                         }
                         if (t < TIMESTAMP_BEGIN && t != SOT && t != EN &&
-                            t != TRANSCRIBE && t != NO_TIMESTAMPS) {
+                            t != TRANSCRIBE && t != NO_TIMESTAMPS && t != NO_SPEECH) {
                             textTokens.add(0, t)
                         }
                     }

@@ -691,8 +691,8 @@ class VideoEngine @Inject constructor(
             return
         }
         val effects = buildList<androidx.media3.common.Effect> {
-            // User effects
-            for (effect in clip.effects.filter { it.enabled }) {
+            // User effects (skip BG_REMOVAL in preview — per-frame segmentation is too slow for realtime)
+            for (effect in clip.effects.filter { it.enabled && it.type != EffectType.BG_REMOVAL }) {
                 buildVideoEffect(effect)?.let { add(it) }
             }
             // Color grading (lift/gamma/gain + HSL)
