@@ -71,7 +71,8 @@ private val clipEditSubMenu = listOf(
     SubMenuItem("freeze", Icons.Default.AcUnit, "Freeze\nFrame"),
     SubMenuItem("copy_fx", Icons.Default.FileCopy, "Copy\nEffects"),
     SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects"),
-    SubMenuItem("unlink_av", Icons.Default.LinkOff, "Unlink\nA/V")
+    SubMenuItem("unlink_av", Icons.Default.LinkOff, "Unlink\nA/V"),
+    SubMenuItem("compound", Icons.Default.ViewModule, "Compound\nClip")
 )
 
 // Clip mode — Motion tab sub-menu (replaces simple Transform panel)
@@ -87,7 +88,8 @@ private val clipMotionSubMenu = listOf(
 // Clip mode — Color tab sub-menu
 private val clipColorSubMenu = listOf(
     SubMenuItem("color_grade", Icons.Default.Palette, "Color\nGrade"),
-    SubMenuItem("effects", Icons.Default.AutoFixHigh, "Effects")
+    SubMenuItem("effects", Icons.Default.AutoFixHigh, "Effects"),
+    SubMenuItem("audio_norm", Icons.Default.VolumeUp, "Normalize\nAudio")
 )
 
 // Clip mode — AI Magic tab sub-menu (expanded)
@@ -120,6 +122,7 @@ private val projectToolsSubMenu = listOf(
     SubMenuItem("snapshot", Icons.Default.Save, "Snapshot"),
     SubMenuItem("history", Icons.Default.History, "Version\nHistory"),
     SubMenuItem("export_srt", Icons.Default.Subtitles, "Export\nSRT"),
+    SubMenuItem("media_manager", Icons.Default.FolderOpen, "Media\nManager"),
     SubMenuItem("archive", Icons.Default.Archive, "Project\nArchive"),
     SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
 )

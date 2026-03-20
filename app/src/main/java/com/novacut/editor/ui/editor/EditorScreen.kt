@@ -47,7 +47,7 @@ fun EditorScreen(
         state.showSpeedCurveEditor || state.showMaskEditor || state.showBlendModeSelector ||
         state.showBatchExport || state.showPipPresets || state.showChromaKey ||
         state.showCaptionEditor || state.showChapterMarkers || state.showSnapshotHistory ||
-        state.showTextTemplates
+        state.showTextTemplates || state.showMediaManager || state.showAudioNorm
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -169,6 +169,10 @@ fun EditorScreen(
                         "export_srt" -> viewModel.exportSubtitles(SubtitleFormat.SRT)
                         "export_vtt" -> viewModel.exportSubtitles(SubtitleFormat.VTT)
                         "text_templates" -> viewModel.showTextTemplates()
+                        "media_manager" -> viewModel.showMediaManager()
+                        "audio_norm" -> viewModel.showAudioNorm()
+                        "audio_norm_disabled" -> viewModel.showToast("Select a clip to normalize")
+                        "compound" -> viewModel.createCompoundClip()
                         "archive" -> viewModel.exportProjectArchive()
                         "unlink_av" -> viewModel.unlinkAudioVideo()
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
@@ -736,6 +740,48 @@ fun EditorScreen(
                 onClose = viewModel::hideSnapshotHistory
             )
         }
+
+        // Media Manager
+        AnimatedVisibility(
+            visible = state.showMediaManager,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            MediaManagerPanel(
+                tracks = state.tracks,
+                onJumpToClip = viewModel::jumpToClip,
+                onRelinkMedia = { _, _ -> },
+                onRemoveUnused = { viewModel.showToast("Remove unused: not yet implemented") },
+                onClose = viewModel::hideMediaManager
+            )
+        }
+
+        // Audio Normalization
+        AnimatedVisibility(
+            visible = state.showAudioNorm,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            AudioNormPanel(
+                currentVolume = clip?.volume ?: 1f,
+                onNormalize = viewModel::normalizeAudio,
+                onClose = viewModel::hideAudioNorm
+            )
+        }
+
+        // Export progress floating overlay
+        ExportProgressOverlay(
+            exportState = state.exportState,
+            exportProgress = state.exportProgress,
+            exportStartTime = state.exportStartTime,
+            onCancel = viewModel::cancelExport,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        )
 
         // Text Template Gallery
         AnimatedVisibility(

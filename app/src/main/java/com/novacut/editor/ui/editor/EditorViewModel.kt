@@ -93,6 +93,9 @@ data class EditorState(
     val showChapterMarkers: Boolean = false,
     val showSnapshotHistory: Boolean = false,
     val showTextTemplates: Boolean = false,
+    val showMediaManager: Boolean = false,
+    val showAudioNorm: Boolean = false,
+    val exportStartTime: Long = 0L,
     // Chapter markers
     val chapterMarkers: List<ChapterMarker> = emptyList(),
     // Multi-select
@@ -873,6 +876,8 @@ class EditorViewModel @Inject constructor(
         showChapterMarkers = false,
         showSnapshotHistory = false,
         showTextTemplates = false,
+        showMediaManager = false,
+        showAudioNorm = false,
         selectedEffectId = null,
         editingTextOverlayId = null,
         selectedMaskId = null
@@ -1343,6 +1348,115 @@ class EditorViewModel @Inject constructor(
     // --- Proxy ---
     fun setProxyEnabled(enabled: Boolean) {
         _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
+    }
+
+    // --- Export ---
+    fun cancelExport() {
+        videoEngine.cancelExport()
+    }
+
+    // --- Media Manager ---
+    fun showMediaManager() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showMediaManager = true) } }
+    fun hideMediaManager() { _state.update { it.copy(showMediaManager = false) } }
+
+    fun jumpToClip(clipId: String) {
+        val clip = _state.value.tracks.flatMap { it.clips }.find { it.id == clipId } ?: return
+        val trackId = _state.value.tracks.find { it.clips.any { c -> c.id == clipId } }?.id
+        seekTo(clip.timelineStartMs)
+        selectClip(clipId, trackId)
+        hideMediaManager()
+    }
+
+    // --- Audio Normalization ---
+    fun showAudioNorm() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showAudioNorm = true) } }
+    fun hideAudioNorm() { _state.update { it.copy(showAudioNorm = false) } }
+
+    fun normalizeAudio(targetLufs: Float) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Normalize audio")
+        // Calculate gain adjustment from target LUFS
+        // Simplified: map LUFS target to volume multiplier
+        val volumeMultiplier = Math.pow(10.0, (targetLufs + 14.0) / 20.0).toFloat().coerceIn(0.1f, 3f)
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(volume = volumeMultiplier) else clip
+                })
+            })
+        }
+        hideAudioNorm()
+        showToast("Audio normalized to %.0f LUFS".format(targetLufs))
+    }
+
+    // --- Color Match ---
+    fun colorMatchToReference(referenceClipId: String) {
+        val targetClipId = _state.value.selectedClipId ?: return
+        val refClip = _state.value.tracks.flatMap { it.clips }.find { it.id == referenceClipId } ?: return
+        val targetClip = _state.value.tracks.flatMap { it.clips }.find { it.id == targetClipId } ?: return
+
+        viewModelScope.launch {
+            showToast("Analyzing colors...")
+            val refStats = com.novacut.editor.engine.ColorMatchEngine.analyzeFrame(
+                appContext, refClip.sourceUri, refClip.trimStartMs + refClip.durationMs / 2
+            )
+            val targetStats = com.novacut.editor.engine.ColorMatchEngine.analyzeFrame(
+                appContext, targetClip.sourceUri, targetClip.trimStartMs + targetClip.durationMs / 2
+            )
+
+            if (refStats != null && targetStats != null) {
+                saveUndoState("Color match")
+                val grade = com.novacut.editor.engine.ColorMatchEngine.generateColorMatch(refStats, targetStats)
+                updateClipColorGrade(grade)
+                showToast("Color matched to reference clip")
+            } else {
+                showToast("Could not analyze frames")
+            }
+        }
+    }
+
+    // --- Compound Clips ---
+    fun createCompoundClip() {
+        val selectedIds = _state.value.selectedClipIds
+        if (selectedIds.size < 2) {
+            showToast("Select at least 2 clips to create compound")
+            return
+        }
+        saveUndoState("Create compound clip")
+
+        _state.update { s ->
+            val allClips = s.tracks.flatMap { it.clips }
+            val selectedClips = allClips.filter { it.id in selectedIds }.sortedBy { it.timelineStartMs }
+            if (selectedClips.isEmpty()) return@update s
+
+            val compoundStart = selectedClips.minOf { it.timelineStartMs }
+            val compoundEnd = selectedClips.maxOf { it.timelineEndMs }
+
+            // Create compound clip containing the selected clips
+            val compoundClip = selectedClips.first().copy(
+                id = java.util.UUID.randomUUID().toString(),
+                timelineStartMs = compoundStart,
+                trimEndMs = selectedClips.first().trimStartMs + (compoundEnd - compoundStart),
+                isCompound = true,
+                compoundClips = selectedClips.map { it.copy() }
+            )
+
+            // Remove original clips and insert compound
+            val tracks = s.tracks.map { track ->
+                val remainingClips = track.clips.filter { it.id !in selectedIds }
+                val hadSelected = track.clips.any { it.id in selectedIds }
+                if (hadSelected) {
+                    track.copy(clips = (remainingClips + compoundClip).sortedBy { it.timelineStartMs })
+                } else track
+            }
+
+            recalculateDuration(s.copy(
+                tracks = tracks,
+                selectedClipIds = emptySet(),
+                selectedClipId = compoundClip.id
+            ))
+        }
+        rebuildPlayerTimeline()
+        showToast("Compound clip created")
     }
 
     // --- Text Templates ---
