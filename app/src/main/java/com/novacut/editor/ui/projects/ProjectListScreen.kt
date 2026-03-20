@@ -27,8 +27,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
+import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.SortMode
+import com.novacut.editor.model.Track
+import com.novacut.editor.model.TrackType
 import com.novacut.editor.ui.theme.Mocha
 
 @Composable
@@ -39,6 +42,7 @@ fun ProjectListScreen(
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
+    var showTemplateSheet by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -205,9 +209,7 @@ fun ProjectListScreen(
 
         // FAB
         FloatingActionButton(
-            onClick = {
-                viewModel.createProject { id -> onProjectSelected(id) }
-            },
+            onClick = { showTemplateSheet = true },
             containerColor = Mocha.Mauve,
             contentColor = Mocha.Crust,
             shape = CircleShape,
@@ -216,6 +218,32 @@ fun ProjectListScreen(
                 .padding(24.dp)
         ) {
             Icon(Icons.Default.Add, contentDescription = "New Project")
+        }
+
+        // Template picker
+        if (showTemplateSheet) {
+            val userTemplates = remember { viewModel.getUserTemplates() }
+            ProjectTemplateSheet(
+                onTemplateSelected = { template ->
+                    showTemplateSheet = false
+                    val tracks = template.tracks.mapIndexed { i, type ->
+                        Track(type = type, index = i)
+                    }
+                    viewModel.createProject(
+                        name = if (template.id == "blank") "Untitled" else template.name
+                    ) { id -> onProjectSelected(id) }
+                },
+                onUserTemplateSelected = { userTemplate ->
+                    showTemplateSheet = false
+                    viewModel.createFromTemplate(userTemplate) { id ->
+                        onProjectSelected(id)
+                    }
+                },
+                onDeleteUserTemplate = viewModel::deleteUserTemplate,
+                userTemplates = userTemplates,
+                onDismiss = { showTemplateSheet = false },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }

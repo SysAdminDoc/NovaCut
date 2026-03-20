@@ -17,6 +17,7 @@ import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.SubtitleExporter
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.engine.VoiceoverRecorderEngine
+import com.novacut.editor.engine.TemplateManager
 import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -155,6 +156,7 @@ class EditorViewModel @Inject constructor(
     private val autoSave: ProjectAutoSave,
     private val aiFeatures: AiFeatures,
     private val voiceoverEngine: VoiceoverRecorderEngine,
+    private val templateManager: TemplateManager,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -2244,6 +2246,20 @@ class EditorViewModel @Inject constructor(
     fun deleteWhisperModel() {
         aiFeatures.whisperEngine.deleteModel()
         showToast("Whisper model deleted")
+    }
+
+    fun saveAsTemplate(name: String) {
+        val s = _state.value
+        viewModelScope.launch {
+            templateManager.saveTemplate(
+                name = name,
+                description = "${s.tracks.size} tracks, ${s.textOverlays.size} text overlays",
+                project = s.project,
+                tracks = s.tracks,
+                textOverlays = s.textOverlays
+            )
+            showToast("Saved template: $name")
+        }
     }
 
     fun downloadSegmentationModel() {

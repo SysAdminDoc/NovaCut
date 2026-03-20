@@ -2,10 +2,14 @@ package com.novacut.editor.ui.projects
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ProjectAutoSave
+import com.novacut.editor.engine.TemplateManager
+import com.novacut.editor.engine.UserTemplate
 import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.SortMode
+import com.novacut.editor.model.Track
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -15,7 +19,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ProjectListViewModel @Inject constructor(
     private val projectDao: ProjectDao,
-    private val autoSave: ProjectAutoSave
+    private val autoSave: ProjectAutoSave,
+    private val templateManager: TemplateManager
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -68,6 +73,37 @@ class ProjectListViewModel @Inject constructor(
     fun renameProject(project: Project, newName: String) {
         viewModelScope.launch {
             projectDao.updateProject(project.copy(name = newName, updatedAt = System.currentTimeMillis()))
+        }
+    }
+
+    fun getUserTemplates(): List<UserTemplate> = templateManager.listTemplates()
+
+    fun deleteUserTemplate(id: String) {
+        templateManager.deleteTemplate(id)
+    }
+
+    fun createFromTemplate(template: UserTemplate, onCreated: (String) -> Unit) {
+        val state = templateManager.loadTemplateState(template) ?: return
+        val (tracks, textOverlays) = state
+        val project = Project(
+            name = template.name,
+            aspectRatio = template.aspectRatio,
+            frameRate = template.frameRate,
+            resolution = template.resolution
+        )
+        viewModelScope.launch {
+            projectDao.insertProject(project)
+            // Save the template's tracks/overlays as auto-save state for the new project
+            val autoState = AutoSaveState(
+                projectId = project.id,
+                tracks = tracks.map { track ->
+                    // Clear clip source URIs (media files won't exist in new project)
+                    track.copy(clips = emptyList())
+                },
+                textOverlays = textOverlays
+            )
+            autoSave.saveNow(project.id, autoState)
+            onCreated(project.id)
         }
     }
 

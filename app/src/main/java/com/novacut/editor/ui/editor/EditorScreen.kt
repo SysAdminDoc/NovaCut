@@ -77,7 +77,8 @@ fun EditorScreen(
                 onDelete = viewModel::deleteSelectedClip,
                 onAddMedia = viewModel::showMediaPicker,
                 onAddTrack = viewModel::addTrack,
-                onExport = viewModel::showExportSheet
+                onExport = viewModel::showExportSheet,
+                onSaveTemplate = viewModel::saveAsTemplate
             )
 
             // Preview panel
@@ -931,11 +932,50 @@ private fun EditorTopBar(
     onAddMedia: () -> Unit,
     onAddTrack: (TrackType) -> Unit,
     onExport: () -> Unit,
+    onSaveTemplate: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showOverflow by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    var showSaveTemplateDialog by remember { mutableStateOf(false) }
     var showAddTrackMenu by remember { mutableStateOf(false) }
+
+    if (showSaveTemplateDialog) {
+        var templateName by remember { mutableStateOf("$projectName Template") }
+        AlertDialog(
+            onDismissRequest = { showSaveTemplateDialog = false },
+            title = { Text("Save as Template", color = Mocha.Text) },
+            text = {
+                OutlinedTextField(
+                    value = templateName,
+                    onValueChange = { templateName = it },
+                    singleLine = true,
+                    label = { Text("Template Name") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Mocha.Text,
+                        unfocusedTextColor = Mocha.Text,
+                        cursorColor = Mocha.Mauve,
+                        focusedBorderColor = Mocha.Mauve,
+                        unfocusedBorderColor = Mocha.Surface1,
+                        focusedLabelColor = Mocha.Mauve,
+                        unfocusedLabelColor = Mocha.Subtext0
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (templateName.isNotBlank()) onSaveTemplate(templateName.trim())
+                    showSaveTemplateDialog = false
+                }) { Text("Save", color = Mocha.Mauve) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveTemplateDialog = false }) {
+                    Text("Cancel", color = Mocha.Subtext0)
+                }
+            },
+            containerColor = Mocha.Mantle
+        )
+    }
 
     if (showRenameDialog) {
         var nameText by remember { mutableStateOf(projectName) }
@@ -1090,6 +1130,16 @@ private fun EditorTopBar(
                         },
                         leadingIcon = {
                             Icon(Icons.Default.Edit, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Save as Template") },
+                        onClick = {
+                            showOverflow = false
+                            showSaveTemplateDialog = true
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.SaveAs, contentDescription = null)
                         }
                     )
                 }

@@ -18,8 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.novacut.editor.engine.UserTemplate
 import com.novacut.editor.model.*
 
 private val Surface0 = Color(0xFF313244)
@@ -115,6 +117,9 @@ val projectTemplates = listOf(
 fun ProjectTemplateSheet(
     onTemplateSelected: (ProjectTemplateUI) -> Unit,
     onDismiss: () -> Unit,
+    onUserTemplateSelected: (UserTemplate) -> Unit = {},
+    onDeleteUserTemplate: (String) -> Unit = {},
+    userTemplates: List<UserTemplate> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -143,7 +148,7 @@ fun ProjectTemplateSheet(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 400.dp),
+                .heightIn(max = if (userTemplates.isEmpty()) 400.dp else 300.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -153,6 +158,104 @@ fun ProjectTemplateSheet(
                     onClick = { onTemplateSelected(template) }
                 )
             }
+        }
+
+        // User templates section
+        if (userTemplates.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text("My Templates", color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(8.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(userTemplates, key = { it.id }) { ut ->
+                    UserTemplateCard(
+                        template = ut,
+                        onClick = { onUserTemplateSelected(ut) },
+                        onDelete = { onDeleteUserTemplate(ut.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserTemplateCard(
+    template: UserTemplate,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface0)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Mauve.copy(alpha = 0.15f), Color.Transparent)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Bookmark,
+                template.name,
+                tint = Mauve,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    template.name,
+                    color = TextColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.Close,
+                    "Delete",
+                    tint = Subtext.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clickable(onClick = onDelete)
+                )
+            }
+            Text(
+                "${template.trackTypes.size} tracks${if (template.textOverlayCount > 0) ", ${template.textOverlayCount} texts" else ""}",
+                color = Subtext,
+                fontSize = 9.sp,
+                maxLines = 1
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    template.aspectRatio.label,
+                    color = Mauve,
+                    fontSize = 9.sp,
+                    modifier = Modifier
+                        .background(Mauve.copy(alpha = 0.1f), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                )
+            }
+            Spacer(Modifier.height(2.dp))
         }
     }
 }

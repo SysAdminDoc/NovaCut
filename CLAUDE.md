@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.8.1
+v1.9.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -55,6 +55,8 @@ v1.8.1
   - `engine/whisper/WhisperMel.kt` - 80-channel log-mel spectrogram (FFT, mel filterbank, Whisper preprocessing)
   - `engine/segmentation/SegmentationEngine.kt` - MediaPipe selfie segmenter (model download, per-frame segmentation)
   - `engine/segmentation/SegmentationGlEffect.kt` - Custom GlEffect for export pipeline (GL readback + segmentation + mask shader)
+  - `engine/TemplateManager.kt` - User template save/load/delete (JSON files in filesDir/templates/)
+  - `ui/projects/ProjectTemplateSheet.kt` - Template picker (preset + user templates grid)
   - `ui/editor/ColorGradingPanel.kt` - Lift/gamma/gain color wheels, RGB curves editor, HSL qualifier, LUT import
   - `ui/editor/AudioMixerPanel.kt` - Per-track faders, pan, mute/solo, VU meters, audio effect chain
   - `ui/editor/KeyframeCurveEditor.kt` - Bezier keyframe curve editor with property toggles, diamond handles, presets
@@ -395,7 +397,9 @@ v1.8.1
 - **bg_replace uses segmentation** — `"bg_replace"` AI tool handler now checks `segmentationEngine.isReady()` and uses `BG_REMOVAL` when model available, falls back to chroma key otherwise.
 - **WhisperEngine hardening** — `SessionOptions.close()` after session creation (native memory leak). `NO_SPEECH` token (50362) filtered from text token collection (was decoded as garbled vocabulary text). `Log.e` on corrupt model session creation failure.
 
+- **User template system** — `TemplateManager` saves/loads/deletes user templates as JSON in `filesDir/templates/`. "Save as Template" in editor overflow menu with name dialog. FAB on project list now opens `ProjectTemplateSheet` (preset grid + "My Templates" section). `createFromTemplate()` creates project with template's track layout + text overlays (clips cleared since source URIs won't exist). `UserTemplate` data class with stateJson from `AutoSaveState.serialize()`.
+
 ## Next Steps
-- Template system (save/load project templates)
 - Proper Room migration strategy (replace destructive migration before production)
 - FFmpeg integration for broader codec support
+- Undo/redo for template operations
