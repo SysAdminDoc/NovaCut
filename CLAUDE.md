@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v1.7.0
+v1.8.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -51,6 +51,8 @@ v1.7.0
   - `engine/AudioEffectsEngine.kt` - DSP audio effects (EQ, compressor, limiter, reverb, delay, chorus, flanger, de-esser, noise gate, pitch shift, normalizer, filters) + beat detection + VU metering
   - `engine/LutEngine.kt` - 3D LUT parser (.cube/.3dl) + GPU LUT application via 3D texture
   - `engine/ProxyEngine.kt` - Low-res proxy generation for smooth editing
+  - `engine/whisper/WhisperEngine.kt` - Whisper tiny.en ONNX speech-to-text (model download, PCM decode, inference, token decode)
+  - `engine/whisper/WhisperMel.kt` - 80-channel log-mel spectrogram (FFT, mel filterbank, Whisper preprocessing)
   - `ui/editor/ColorGradingPanel.kt` - Lift/gamma/gain color wheels, RGB curves editor, HSL qualifier, LUT import
   - `ui/editor/AudioMixerPanel.kt` - Per-track faders, pan, mute/solo, VU meters, audio effect chain
   - `ui/editor/KeyframeCurveEditor.kt` - Bezier keyframe curve editor with property toggles, diamond handles, presets
@@ -382,8 +384,9 @@ v1.7.0
 - **Variable speed export via SpeedProvider** — `SpeedChangeEffect` replaced with `EditedMediaItem.Builder.setSpeed(SpeedProvider)`. When a clip has a `SpeedCurve` with bezier control points, the curve is wired as a per-frame `SpeedProvider` in the export pipeline. Constant speed clips also use SpeedProvider (required by 1.9.x API). Speed curves with ramp up/down/pulse presets now exported correctly.
 - **ExoPlayer scrubbing mode** — `VideoEngine.setScrubbingMode(enabled)` wraps `player.setScrubbingModeEnabled()` (Media3 1.8.0+). Enabled during timeline trim drag (`beginTrim()`), disabled on tool change away from TRIM. `beginScrub()`/`endScrub()` exposed for timeline ruler drag. Optimizes seek performance during frequent position changes.
 
+- **Whisper ONNX auto captions** — `WhisperEngine` provides real speech-to-text when model is downloaded (~75MB whisper-tiny.en from HuggingFace). Auto-downloads encoder_model.onnx + decoder_model.onnx + vocab.json to `filesDir/whisper/`. Falls back to energy segmentation when model not available. AiToolsPanel shows model download status card with progress bar. Uses ONNX Runtime Android 1.17.0. Greedy decoding with timestamp tokens (50364+, each = 0.02s). 30-second chunk processing. GPT-2 byte-level BPE vocab decoded via `decodeGpt2Bytes()`. `INTERNET` permission added for model download.
+
 ## Next Steps
-- Integrate Whisper ONNX for real speech-to-text auto captions (current version uses audio energy segmentation)
 - Integrate MediaPipe SelfieSegmentation for pixel-accurate background removal (current version uses chroma key auto-detect)
 - Template system (save/load project templates)
 - Proper Room migration strategy (replace destructive migration before production)

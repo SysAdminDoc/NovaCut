@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 46
-        versionName = "1.7.0"
+        versionCode = 47
+        versionName = "1.8.0"
     }
 
     signingConfigs {
@@ -122,4 +122,7 @@ dependencies {
     // Image loading
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+
+    // ONNX Runtime (Whisper speech-to-text)
+    implementation(libs.onnxruntime.android)
 }

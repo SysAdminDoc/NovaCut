@@ -8,6 +8,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import com.novacut.editor.engine.whisper.WhisperEngine
 import com.novacut.editor.model.TextOverlay
 import com.novacut.editor.model.TextAlignment
 import com.novacut.editor.model.TextAnimation
@@ -38,18 +39,50 @@ import kotlin.math.sqrt
  */
 @Singleton
 class AiFeatures @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    val whisperEngine: WhisperEngine
 ) {
     // ---- Auto Captions ----
 
     /**
-     * Generates timed caption segments by analyzing audio energy patterns.
-     * Detects speech segments via amplitude envelope analysis — splits on silence gaps.
-     * Returns timed entries marking detected speech regions.
+     * Generates timed caption segments. Uses Whisper ONNX for real speech-to-text
+     * when the model is downloaded, otherwise falls back to audio energy segmentation.
      */
     suspend fun generateAutoCaptions(
         videoUri: Uri,
-        languageCode: String = "en"
+        languageCode: String = "en",
+        onProgress: (Float) -> Unit = {}
+    ): List<CaptionEntry> {
+        // Use Whisper when model is available
+        if (whisperEngine.isReady()) {
+            return generateWhisperCaptions(videoUri, onProgress)
+        }
+        // Fallback to energy segmentation
+        return generateEnergyCaptions(videoUri, onProgress)
+    }
+
+    private suspend fun generateWhisperCaptions(
+        videoUri: Uri,
+        onProgress: (Float) -> Unit
+    ): List<CaptionEntry> = withContext(Dispatchers.IO) {
+        try {
+            val segments = whisperEngine.transcribe(videoUri, onProgress)
+            segments.map { seg ->
+                CaptionEntry(
+                    startMs = seg.startMs,
+                    endMs = seg.endMs,
+                    text = seg.text,
+                    confidence = 0.95f
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private suspend fun generateEnergyCaptions(
+        videoUri: Uri,
+        onProgress: (Float) -> Unit
     ): List<CaptionEntry> = withContext(Dispatchers.IO) {
         val extractor = MediaExtractor()
         try {

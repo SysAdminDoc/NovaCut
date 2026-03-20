@@ -37,6 +37,8 @@ fun EditorScreen(
     viewModel: EditorViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val whisperState by viewModel.whisperModelState.collectAsStateWithLifecycle()
+    val whisperProgress by viewModel.whisperDownloadProgress.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val hasOpenPanel = state.showMediaPicker || state.showExportSheet || state.showEffectsPanel ||
@@ -443,7 +445,11 @@ fun EditorScreen(
                 onDisabledToolTapped = { toolName -> viewModel.showToast("Select a clip to use $toolName") },
                 onCancelProcessing = viewModel::cancelAiTool,
                 onClose = viewModel::hideAiToolsPanel,
-                processingTool = state.aiProcessingTool
+                processingTool = state.aiProcessingTool,
+                whisperModelState = whisperState,
+                whisperDownloadProgress = whisperProgress,
+                onDownloadWhisper = viewModel::downloadWhisperModel,
+                onDeleteWhisper = viewModel::deleteWhisperModel
             )
         }
 

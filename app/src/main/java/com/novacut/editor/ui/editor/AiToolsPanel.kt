@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.novacut.editor.engine.whisper.WhisperModelState
 import com.novacut.editor.ui.theme.Mocha
 
 data class AiToolConfig(
@@ -78,6 +79,10 @@ fun AiToolsPanel(
     onCancelProcessing: () -> Unit = {},
     onClose: () -> Unit,
     processingTool: String? = null,
+    whisperModelState: WhisperModelState = WhisperModelState.NOT_DOWNLOADED,
+    whisperDownloadProgress: Float = 0f,
+    onDownloadWhisper: () -> Unit = {},
+    onDeleteWhisper: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -108,12 +113,94 @@ fun AiToolsPanel(
 
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "On-device AI - no internet required",
+            if (whisperModelState == WhisperModelState.READY)
+                "Whisper speech-to-text active"
+            else
+                "On-device AI - no internet required",
             color = Mocha.Subtext0,
             fontSize = 11.sp
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Whisper model status
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Mocha.Surface0)
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.RecordVoiceOver,
+                    contentDescription = null,
+                    tint = when (whisperModelState) {
+                        WhisperModelState.READY -> Mocha.Green
+                        WhisperModelState.DOWNLOADING -> Mocha.Yellow
+                        WhisperModelState.ERROR -> Mocha.Red
+                        else -> Mocha.Surface2
+                    },
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        when (whisperModelState) {
+                            WhisperModelState.READY -> "Whisper (speech-to-text)"
+                            WhisperModelState.DOWNLOADING -> "Downloading model..."
+                            WhisperModelState.ERROR -> "Download failed"
+                            else -> "Whisper model (~75 MB)"
+                        },
+                        color = Mocha.Text,
+                        fontSize = 12.sp
+                    )
+                    if (whisperModelState == WhisperModelState.DOWNLOADING) {
+                        LinearProgressIndicator(
+                            progress = { whisperDownloadProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .height(3.dp),
+                            color = Mocha.Blue,
+                            trackColor = Mocha.Surface2
+                        )
+                    }
+                    if (whisperModelState == WhisperModelState.NOT_DOWNLOADED) {
+                        Text(
+                            "Enables real transcription for captions",
+                            color = Mocha.Subtext0,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                when (whisperModelState) {
+                    WhisperModelState.NOT_DOWNLOADED, WhisperModelState.ERROR -> {
+                        TextButton(
+                            onClick = onDownloadWhisper,
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp), tint = Mocha.Blue)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Get", color = Mocha.Blue, fontSize = 12.sp)
+                        }
+                    }
+                    WhisperModelState.READY -> {
+                        TextButton(
+                            onClick = onDeleteWhisper,
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("Remove", color = Mocha.Subtext0, fontSize = 11.sp)
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Processing indicator
         if (processingTool != null) {

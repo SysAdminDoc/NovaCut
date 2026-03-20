@@ -166,6 +166,10 @@ class EditorViewModel @Inject constructor(
 
     val engine get() = videoEngine
 
+    // Whisper model state (exposed directly from engine for UI binding)
+    val whisperModelState = aiFeatures.whisperEngine.modelState
+    val whisperDownloadProgress = aiFeatures.whisperEngine.downloadProgress
+
     // Stored outside EditorState to avoid recomposition on every resize
     @Volatile
     private var timelineWidthPx: Float = 0f
@@ -2225,6 +2229,19 @@ class EditorViewModel @Inject constructor(
     }
 
     // AI Tools
+    fun downloadWhisperModel() {
+        viewModelScope.launch {
+            showToast("Downloading Whisper speech model...")
+            val success = aiFeatures.whisperEngine.downloadModel()
+            showToast(if (success) "Whisper model ready" else "Model download failed")
+        }
+    }
+
+    fun deleteWhisperModel() {
+        aiFeatures.whisperEngine.deleteModel()
+        showToast("Whisper model deleted")
+    }
+
     fun runAiTool(toolId: String) {
         val clip = getSelectedClip()
         if (clip == null) {
@@ -2282,6 +2299,8 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     "auto_captions" -> {
+                        val useWhisper = aiFeatures.whisperEngine.isReady()
+                        if (useWhisper) showToast("Transcribing with Whisper...")
                         val captions = aiFeatures.generateAutoCaptions(clip.sourceUri)
                         if (captions.isEmpty()) {
                             showToast("No speech detected")
@@ -2290,7 +2309,8 @@ class EditorViewModel @Inject constructor(
                             val overlays = aiFeatures.captionsToOverlays(captions)
                             _state.update { it.copy(textOverlays = it.textOverlays + overlays) }
                             saveProject()
-                            showToast("Added ${captions.size} captions")
+                            val source = if (useWhisper) "Whisper" else "energy detection"
+                            showToast("Added ${captions.size} captions ($source)")
                         }
                     }
                     "smart_crop" -> {
