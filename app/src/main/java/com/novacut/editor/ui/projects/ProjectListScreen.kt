@@ -34,6 +34,7 @@ import com.novacut.editor.ui.theme.Mocha
 @Composable
 fun ProjectListScreen(
     onProjectSelected: (String) -> Unit,
+    onSettings: () -> Unit = {},
     viewModel: ProjectListViewModel = hiltViewModel()
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
@@ -79,6 +80,10 @@ fun ProjectListScreen(
                             color = Mocha.Subtext0,
                             fontSize = 13.sp
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = onSettings, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Settings, "Settings", tint = Mocha.Subtext0, modifier = Modifier.size(20.dp))
+                        }
                     }
 
                     // Search bar

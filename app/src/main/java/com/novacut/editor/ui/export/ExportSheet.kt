@@ -193,6 +193,60 @@ fun ExportSheet(
             return
         }
 
+        // Platform Presets
+        Text("Quick Presets", color = Mocha.Subtext1, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            PlatformPreset.entries.forEach { preset ->
+                val isSelected = config.platformPreset == preset
+                FilterChip(
+                    onClick = {
+                        onConfigChanged(config.copy(
+                            resolution = preset.resolution,
+                            frameRate = preset.frameRate,
+                            codec = preset.codec,
+                            platformPreset = preset
+                        ))
+                    },
+                    label = { Text(preset.displayName, fontSize = 11.sp) },
+                    selected = isSelected,
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Mocha.Surface0,
+                        selectedContainerColor = Mocha.Green.copy(alpha = 0.3f),
+                        selectedLabelColor = Mocha.Green
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Audio Only toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Audio Only", color = Mocha.Text, fontSize = 13.sp)
+            Switch(
+                checked = config.exportAudioOnly,
+                onCheckedChange = { onConfigChanged(config.copy(exportAudioOnly = it)) },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = Mocha.Mauve,
+                    checkedThumbColor = Mocha.Crust,
+                    uncheckedTrackColor = Mocha.Surface1,
+                    uncheckedThumbColor = Mocha.Subtext0
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Resolution
         Text("Resolution", color = Mocha.Subtext1, fontSize = 12.sp)
         Spacer(modifier = Modifier.height(4.dp))

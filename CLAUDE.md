@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v2.0.1
+v2.1.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -407,6 +407,11 @@ v2.0.1
 - **BatchExportPanel wired** — `AnimatedVisibility` block added for `state.showBatchExport` in EditorScreen. `startBatchExport()` exports queue items sequentially via `startExport(cacheDir)` loop.
 - **VideoScopes frame capture** — `scopeFrame: StateFlow<Bitmap?>` in ViewModel. `updateScopeFrame()` extracts 256x144 thumbnail from selected clip at playhead via `extractThumbnail()`. Updated on seek and scope toggle. Scopes now display real histogram/waveform/vectorscope data.
 - **ProxyEngine wired** — Injected into EditorViewModel. `setProxyEnabled()` triggers `generateProxiesForAllClips()` which iterates all clips and calls `ProxyEngine.generateProxy()`. Clears proxies on disable. "Proxy Edit" menu item added to `projectToolsSubMenu`.
+
+- **Settings screen** — `ui/settings/SettingsScreen.kt` with default resolution/frame rate/aspect ratio, auto-save toggle + interval slider, proxy resolution selector, about section (version, engine, AI models). Gear icon in ProjectListScreen header. Navigation route `"settings"`.
+- **Export platform presets** — `PlatformPreset` quick-select chips (YouTube, TikTok, Instagram Feed/Reels/Story, Twitter, LinkedIn) added to ExportSheet. Auto-populates resolution/fps/codec. Audio-only toggle switch added.
+- **Editor onboarding** — Empty project shows centered hint card ("No clips yet — Tap the + button to add media") with VideoLibrary icon. Hides when clips exist or panel is open. Preview panel hidden until clips added.
+- **Timeline zoom controls** — Zoom out (-), fit (reset to 1x), zoom in (+) buttons with percentage label. Added above track headers. Uses 0.75x/1.33x multipliers, clamped to 0.1x-10x range.
 
 ## Next Steps
 - FFmpeg integration for broader codec support

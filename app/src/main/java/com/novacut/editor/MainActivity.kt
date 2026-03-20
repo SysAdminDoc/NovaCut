@@ -17,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.novacut.editor.ui.editor.EditorScreen
 import com.novacut.editor.ui.projects.ProjectListScreen
+import com.novacut.editor.ui.settings.SettingsScreen
 import com.novacut.editor.ui.theme.NovaCutTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -48,8 +49,12 @@ class MainActivity : ComponentActivity() {
                         ProjectListScreen(
                             onProjectSelected = { projectId ->
                                 navController.navigate("editor/$projectId")
-                            }
+                            },
+                            onSettings = { navController.navigate("settings") }
                         )
+                    }
+                    composable("settings") {
+                        SettingsScreen(onBack = { navController.popBackStack() })
                     }
                     composable("editor/{projectId}") {
                         EditorScreen(

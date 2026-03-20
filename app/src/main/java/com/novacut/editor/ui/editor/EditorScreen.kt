@@ -83,8 +83,44 @@ fun EditorScreen(
                 onSaveTemplate = viewModel::saveAsTemplate
             )
 
+            // Empty project onboarding hint
+            val hasClips = state.tracks.any { it.clips.isNotEmpty() }
+            if (!hasClips && !hasOpenPanel) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.45f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Mocha.Surface0.copy(alpha = 0.9f)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.VideoLibrary,
+                                contentDescription = null,
+                                tint = Mocha.Mauve,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text("No clips yet", color = Mocha.Text, fontSize = 16.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Tap the + button or use the menu to add media",
+                                color = Mocha.Subtext0,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
             // Preview panel
-            PreviewPanel(
+            if (hasClips || hasOpenPanel) PreviewPanel(
                 engine = viewModel.engine,
                 playheadMs = state.playheadMs,
                 totalDurationMs = state.totalDurationMs,

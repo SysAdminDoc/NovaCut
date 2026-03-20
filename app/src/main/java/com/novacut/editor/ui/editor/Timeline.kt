@@ -107,6 +107,40 @@ fun Timeline(
             }
         }
 
+        // Zoom controls
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${(zoomLevel * 100).toInt()}%",
+                color = Mocha.Subtext0,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(end = 6.dp)
+            )
+            IconButton(
+                onClick = { onZoomChanged((zoomLevel * 0.75f).coerceAtLeast(0.1f)) },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(Icons.Default.ZoomOut, "Zoom Out", tint = Mocha.Subtext0, modifier = Modifier.size(16.dp))
+            }
+            IconButton(
+                onClick = { onZoomChanged(1f) },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(Icons.Default.FitScreen, "Fit", tint = Mocha.Subtext0, modifier = Modifier.size(16.dp))
+            }
+            IconButton(
+                onClick = { onZoomChanged((zoomLevel * 1.33f).coerceAtMost(10f)) },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(Icons.Default.ZoomIn, "Zoom In", tint = Mocha.Subtext0, modifier = Modifier.size(16.dp))
+            }
+        }
+
         // Track headers + timeline content
         Row(modifier = Modifier.fillMaxWidth()) {
             // Track headers
