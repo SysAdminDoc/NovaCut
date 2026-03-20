@@ -390,6 +390,11 @@ v1.8.1
 
 - **MediaPipe selfie segmentation** — `SegmentationEngine` wraps MediaPipe Tasks Vision `ImageSegmenter` with selfie_segmenter.tflite (~256KB, auto-downloaded from Google storage). `BG_REMOVAL` EffectType added. Per-frame segmentation during export via `SegmentationGlEffect` (GL readback + CPU segmentation + mask texture upload). Falls back to chroma key when model not available. `ByteBufferExtractor.extract()` for MPImage float confidence values. AiToolsPanel shows segmentation model card. Threshold slider (0.1-0.9) via EffectAdjustment panel.
 
+- **SegmentationGlEffect FBO safety** — `drawFrame()` saves/restores `GL_FRAMEBUFFER_BINDING` around readback. Copies input to intermediate texture via pass-through shader before `glReadPixels` (avoids GLES feedback loop of sampling and FBO-attaching same texture). Uses separate `copyProgram` and `copyTexture`.
+- **BG_REMOVAL skipped in preview** — `applyPreviewEffects` filters out `EffectType.BG_REMOVAL` to prevent per-frame CPU segmentation during live playback (would cause ANR). Only runs during export.
+- **bg_replace uses segmentation** — `"bg_replace"` AI tool handler now checks `segmentationEngine.isReady()` and uses `BG_REMOVAL` when model available, falls back to chroma key otherwise.
+- **WhisperEngine hardening** — `SessionOptions.close()` after session creation (native memory leak). `NO_SPEECH` token (50362) filtered from text token collection (was decoded as garbled vocabulary text). `Log.e` on corrupt model session creation failure.
+
 ## Next Steps
 - Template system (save/load project templates)
 - Proper Room migration strategy (replace destructive migration before production)
