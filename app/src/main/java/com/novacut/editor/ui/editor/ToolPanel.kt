@@ -57,7 +57,8 @@ val clipTabs = listOf(
 
 // Project mode — Text tab sub-menu
 private val textSubMenu = listOf(
-    SubMenuItem("add_text", Icons.Default.Title, "Add Text")
+    SubMenuItem("add_text", Icons.Default.Title, "Add Text"),
+    SubMenuItem("captions", Icons.Default.ClosedCaption, "Captions")
 )
 
 // Clip mode — Edit tab sub-menu
@@ -113,7 +114,10 @@ private val projectToolsSubMenu = listOf(
     SubMenuItem("auto_duck", Icons.Default.RecordVoiceOver, "Auto\nDuck"),
     SubMenuItem("adjustment_layer", Icons.Default.Tune, "Adj\nLayer"),
     SubMenuItem("scopes", Icons.Default.Insights, "Video\nScopes"),
+    SubMenuItem("chapters", Icons.Default.Bookmarks, "Chapters"),
     SubMenuItem("snapshot", Icons.Default.Save, "Snapshot"),
+    SubMenuItem("history", Icons.Default.History, "Version\nHistory"),
+    SubMenuItem("export_srt", Icons.Default.Subtitles, "Export\nSRT"),
     SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport")
 )
 

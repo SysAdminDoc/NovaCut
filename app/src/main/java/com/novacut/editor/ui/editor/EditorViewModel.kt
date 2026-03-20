@@ -13,6 +13,7 @@ import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.ProjectAutoSave
+import com.novacut.editor.engine.SubtitleExporter
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.engine.VoiceoverRecorderEngine
 import com.novacut.editor.engine.db.ProjectDao
@@ -88,6 +89,13 @@ data class EditorState(
     val showChromaKey: Boolean = false,
     val showScopes: Boolean = false,
     val activeScopeType: com.novacut.editor.ui.editor.ScopeType = com.novacut.editor.ui.editor.ScopeType.HISTOGRAM,
+    val showCaptionEditor: Boolean = false,
+    val showChapterMarkers: Boolean = false,
+    val showSnapshotHistory: Boolean = false,
+    // Chapter markers
+    val chapterMarkers: List<ChapterMarker> = emptyList(),
+    // Multi-select
+    val selectedClipIds: Set<String> = emptySet(),
     // Mask state
     val selectedMaskId: String? = null,
     // Keyframe state
@@ -860,6 +868,9 @@ class EditorViewModel @Inject constructor(
         showBatchExport = false,
         showPipPresets = false,
         showChromaKey = false,
+        showCaptionEditor = false,
+        showChapterMarkers = false,
+        showSnapshotHistory = false,
         selectedEffectId = null,
         editingTextOverlayId = null,
         selectedMaskId = null
@@ -1330,6 +1341,114 @@ class EditorViewModel @Inject constructor(
     // --- Proxy ---
     fun setProxyEnabled(enabled: Boolean) {
         _state.update { it.copy(proxySettings = it.proxySettings.copy(enabled = enabled)) }
+    }
+
+    // --- Captions ---
+    fun showCaptionEditor() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showCaptionEditor = true) } }
+    fun hideCaptionEditor() { _state.update { it.copy(showCaptionEditor = false) } }
+
+    fun generateAutoCaption() {
+        val clipId = _state.value.selectedClipId ?: return
+        viewModelScope.launch {
+            showToast("Generating captions...")
+            runAiTool("auto_captions")
+        }
+    }
+
+    // --- Chapter Markers ---
+    fun showChapterMarkers() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showChapterMarkers = true) } }
+    fun hideChapterMarkers() { _state.update { it.copy(showChapterMarkers = false) } }
+
+    fun addChapterMarker(marker: ChapterMarker) {
+        _state.update { s ->
+            val updated = (s.chapterMarkers + marker).sortedBy { it.timeMs }
+            s.copy(chapterMarkers = updated)
+        }
+        showToast("Chapter added at ${formatTime(marker.timeMs)}")
+    }
+
+    fun updateChapterMarker(index: Int, marker: ChapterMarker) {
+        _state.update { s ->
+            if (index in s.chapterMarkers.indices) {
+                val updated = s.chapterMarkers.toMutableList()
+                updated[index] = marker
+                s.copy(chapterMarkers = updated)
+            } else s
+        }
+    }
+
+    fun deleteChapterMarker(index: Int) {
+        _state.update { s ->
+            if (index in s.chapterMarkers.indices) {
+                s.copy(chapterMarkers = s.chapterMarkers.toMutableList().also { it.removeAt(index) })
+            } else s
+        }
+    }
+
+    private fun formatTime(ms: Long): String {
+        val s = ms / 1000
+        val m = s / 60
+        return "%d:%02d".format(m, s % 60)
+    }
+
+    // --- Snapshot History ---
+    fun showSnapshotHistory() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showSnapshotHistory = true) } }
+    fun hideSnapshotHistory() { _state.update { it.copy(showSnapshotHistory = false) } }
+
+    fun deleteSnapshot(snapshotId: String) {
+        _state.update { it.copy(projectSnapshots = it.projectSnapshots.filter { s -> s.id != snapshotId }) }
+    }
+
+    // --- Multi-select ---
+    fun toggleClipMultiSelect(clipId: String) {
+        _state.update { s ->
+            val current = s.selectedClipIds
+            val updated = if (clipId in current) current - clipId else current + clipId
+            s.copy(selectedClipIds = updated)
+        }
+    }
+
+    fun clearMultiSelect() {
+        _state.update { it.copy(selectedClipIds = emptySet()) }
+    }
+
+    fun deleteMultiSelectedClips() {
+        val clipIds = _state.value.selectedClipIds
+        if (clipIds.isEmpty()) return
+        saveUndoState("Delete ${clipIds.size} clips")
+        _state.update { s ->
+            val tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.filter { it.id !in clipIds })
+            }
+            recalculateDuration(s.copy(
+                tracks = tracks,
+                selectedClipIds = emptySet(),
+                selectedClipId = null,
+                selectedTrackId = null
+            ))
+        }
+        rebuildPlayerTimeline()
+        showToast("Deleted ${clipIds.size} clips")
+    }
+
+    // --- Subtitle Export ---
+    fun exportSubtitles(format: SubtitleFormat) {
+        val captions = _state.value.tracks.flatMap { it.clips }.flatMap { it.captions }
+        if (captions.isEmpty()) {
+            showToast("No captions to export")
+            return
+        }
+        viewModelScope.launch {
+            val dir = java.io.File(appContext.getExternalFilesDir(null), "subtitles")
+            dir.mkdirs()
+            val file = java.io.File(dir, "${_state.value.project.name}.${format.extension}")
+            val success = SubtitleExporter.export(captions, format, file)
+            if (success) {
+                showToast("Exported to ${file.name}")
+            } else {
+                showToast("Export failed")
+            }
+        }
     }
 
     // --- PiP ---

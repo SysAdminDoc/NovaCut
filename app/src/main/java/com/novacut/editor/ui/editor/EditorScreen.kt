@@ -45,7 +45,8 @@ fun EditorScreen(
         state.showVoiceoverRecorder || state.selectedEffectId != null || state.editingTextOverlayId != null ||
         state.showColorGrading || state.showAudioMixer || state.showKeyframeEditor ||
         state.showSpeedCurveEditor || state.showMaskEditor || state.showBlendModeSelector ||
-        state.showBatchExport || state.showPipPresets || state.showChromaKey
+        state.showBatchExport || state.showPipPresets || state.showChromaKey ||
+        state.showCaptionEditor || state.showChapterMarkers || state.showSnapshotHistory
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -160,6 +161,13 @@ fun EditorScreen(
                         "beat_detect" -> viewModel.detectBeats()
                         "adjustment_layer" -> viewModel.addAdjustmentLayer()
                         "snapshot" -> viewModel.createSnapshot()
+                        "captions" -> viewModel.showCaptionEditor()
+                        "captions_disabled" -> viewModel.showToast("Select a clip for captions")
+                        "chapters" -> viewModel.showChapterMarkers()
+                        "history" -> viewModel.showSnapshotHistory()
+                        "export_srt" -> viewModel.exportSubtitles(SubtitleFormat.SRT)
+                        "export_vtt" -> viewModel.exportSubtitles(SubtitleFormat.VTT)
+                        "multi_delete" -> viewModel.deleteMultiSelectedClips()
                         "batch_export" -> viewModel.showBatchExport()
                         // AI tools
                         "auto_captions" -> viewModel.runAiTool("auto_captions")
@@ -666,6 +674,75 @@ fun EditorScreen(
                     onRotationChanged = { r -> state.selectedClipId?.let { viewModel.setClipTransform(it, rotation = r) } },
                     onAnchorChanged = viewModel::setClipAnchor,
                     onTransformStarted = viewModel::beginEffectAdjust,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
+
+        // Caption Editor
+        AnimatedVisibility(
+            visible = state.showCaptionEditor,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            CaptionEditorPanel(
+                captions = clip?.captions ?: emptyList(),
+                playheadMs = (state.playheadMs - (clip?.timelineStartMs ?: 0L)).coerceAtLeast(0L),
+                clipDurationMs = clip?.durationMs ?: 0L,
+                onAddCaption = viewModel::addCaption,
+                onUpdateCaption = viewModel::updateCaption,
+                onDeleteCaption = viewModel::removeCaption,
+                onGenerateAutoCaption = viewModel::generateAutoCaption,
+                onClose = viewModel::hideCaptionEditor
+            )
+        }
+
+        // Chapter Markers
+        AnimatedVisibility(
+            visible = state.showChapterMarkers,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            ChapterMarkerPanel(
+                chapters = state.chapterMarkers,
+                playheadMs = state.playheadMs,
+                onAddChapter = viewModel::addChapterMarker,
+                onUpdateChapter = viewModel::updateChapterMarker,
+                onDeleteChapter = viewModel::deleteChapterMarker,
+                onJumpTo = viewModel::seekTo,
+                onClose = viewModel::hideChapterMarkers
+            )
+        }
+
+        // Snapshot History
+        AnimatedVisibility(
+            visible = state.showSnapshotHistory,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            SnapshotHistoryPanel(
+                snapshots = state.projectSnapshots,
+                onCreateSnapshot = viewModel::createSnapshot,
+                onRestoreSnapshot = viewModel::restoreSnapshot,
+                onDeleteSnapshot = viewModel::deleteSnapshot,
+                onClose = viewModel::hideSnapshotHistory
+            )
+        }
+
+        // Motion path overlay on preview (when keyframe editor is open and position keyframes exist)
+        if (state.showKeyframeEditor && state.selectedClipId != null) {
+            val clip = state.tracks.flatMap { it.clips }.find { it.id == state.selectedClipId }
+            if (clip != null && clip.keyframes.any { it.property == KeyframeProperty.POSITION_X || it.property == KeyframeProperty.POSITION_Y }) {
+                MotionPathOverlay(
+                    keyframes = clip.keyframes,
+                    clipDurationMs = clip.durationMs,
+                    currentTimeMs = (state.playheadMs - clip.timelineStartMs).coerceAtLeast(0L),
+                    previewWidth = 400f,
+                    previewHeight = 225f,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
