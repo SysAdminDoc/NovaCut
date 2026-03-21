@@ -251,10 +251,15 @@ class VideoEngine @Inject constructor(
         _exportProgress.value = 0f
 
         try {
-            val videoTrack = tracks.firstOrNull { it.type == TrackType.VIDEO && it.isVisible }
-            if (videoTrack == null || videoTrack.clips.isEmpty()) {
+            // Collect all visible video tracks (VIDEO + OVERLAY types) into one merged clip list
+            val visibleVideoTracks = tracks.filter {
+                (it.type == TrackType.VIDEO || it.type == TrackType.OVERLAY) && it.isVisible && it.clips.isNotEmpty()
+            }
+            if (visibleVideoTracks.isEmpty()) {
                 throw IllegalStateException("No video clips to export")
             }
+            // Use primary video track for main sequence; overlay tracks contribute clips appended in order
+            val videoTrack = visibleVideoTracks.first()
             val videoMuted = videoTrack.isMuted
 
             val (targetW, targetH) = config.resolution.forAspect(config.aspectRatio)
@@ -317,9 +322,11 @@ class VideoEngine @Inject constructor(
                         }
                     }
 
-                    // Masks (rectangle/ellipse)
+                    // Masks (rectangle/ellipse) — use clip midpoint for static mask position
+                    // (keyframed masks would need per-frame GlEffect, using midpoint as best static approximation)
+                    val maskTimeMs = clip.durationMs / 2
                     for (mask in clip.masks) {
-                        val points = KeyframeEngine.interpolateMaskPoints(mask, 0L)
+                        val points = KeyframeEngine.interpolateMaskPoints(mask, maskTimeMs)
                         when (mask.type) {
                             com.novacut.editor.model.MaskType.RECTANGLE -> {
                                 if (points.size >= 2) {
@@ -544,12 +551,12 @@ class VideoEngine @Inject constructor(
 
             val videoSequence = EditedMediaItemSequence.Builder(editedItems).build()
 
-            // Build audio track sequence (background music, voiceovers, etc.)
-            val audioTrack = tracks.firstOrNull { it.type == TrackType.AUDIO && it.isVisible }
+            // Build audio track sequences (background music, voiceovers, etc.) — supports multiple audio tracks
+            val audioTracks = tracks.filter { it.type == TrackType.AUDIO && it.isVisible && !it.isMuted && it.clips.isNotEmpty() }
             val sequences = buildList {
                 add(videoSequence)
-                if (audioTrack != null && !audioTrack.isMuted && audioTrack.clips.isNotEmpty()) {
-                    val audioItems = audioTrack.clips.map { clip ->
+                for (at in audioTracks) {
+                    val audioItems = at.clips.map { clip ->
                         val mediaItem = MediaItem.Builder()
                             .setUri(clip.sourceUri)
                             .setClippingConfiguration(
@@ -582,9 +589,11 @@ class VideoEngine @Inject constructor(
                 }
             }
 
-            val hasAudioTrack = audioTrack != null && !audioTrack.isMuted && audioTrack.clips.isNotEmpty()
+            val hasAudioTracks = audioTracks.isNotEmpty()
+            // When video track is muted AND no audio tracks, transmux to pass through;
+            // when there are audio tracks, don't transmux so the processor pipeline runs
             val composition = Composition.Builder(sequences)
-                .setTransmuxAudio(!hasAudioTrack)
+                .setTransmuxAudio(!hasAudioTracks && !videoMuted)
                 .build()
 
             val mimeType = when (config.codec) {

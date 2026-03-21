@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +42,7 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.ArrowBack, "Back", tint = Mocha.Text)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Mocha.Text)
             }
             Spacer(Modifier.width(12.dp))
             Text("Settings", color = Mocha.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)

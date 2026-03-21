@@ -21,18 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.*
+import com.novacut.editor.ui.theme.Mocha
 import kotlin.math.abs
 
-private val Surface0 = Color(0xFF313244)
-private val Surface1 = Color(0xFF45475A)
-private val TextColor = Color(0xFFCDD6F4)
-private val Subtext = Color(0xFFA6ADC8)
-private val Mauve = Color(0xFFCBA6F7)
-private val Red = Color(0xFFF38BA8)
-private val Green = Color(0xFFA6E3A1)
-private val Yellow = Color(0xFFF9E2AF)
-private val Peach = Color(0xFFFAB387)
-private val Crust = Color(0xFF11111B)
 
 @Composable
 fun SpeedCurveEditor(
@@ -51,7 +42,7 @@ fun SpeedCurveEditor(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Mocha.Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(12.dp)
     ) {
         // Header
@@ -60,9 +51,9 @@ fun SpeedCurveEditor(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Speed", color = TextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Speed", color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Close", tint = Subtext, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -72,7 +63,7 @@ fun SpeedCurveEditor(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Surface0, RoundedCornerShape(8.dp))
+                .background(Mocha.Surface0, RoundedCornerShape(8.dp))
                 .padding(2.dp)
         ) {
             listOf("Constant" to false, "Speed Ramp" to true).forEach { (label, isCurve) ->
@@ -80,7 +71,7 @@ fun SpeedCurveEditor(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (curveMode == isCurve) Mauve.copy(alpha = 0.2f) else Color.Transparent)
+                        .background(if (curveMode == isCurve) Mocha.Mauve.copy(alpha = 0.2f) else Color.Transparent)
                         .clickable {
                             curveMode = isCurve
                             if (isCurve && speedCurve == null) {
@@ -94,7 +85,7 @@ fun SpeedCurveEditor(
                 ) {
                     Text(
                         label,
-                        color = if (curveMode == isCurve) Mauve else Subtext,
+                        color = if (curveMode == isCurve) Mocha.Mauve else Mocha.Subtext0,
                         fontSize = 12.sp
                     )
                 }
@@ -105,7 +96,7 @@ fun SpeedCurveEditor(
 
         if (curveMode) {
             // Presets
-            Text("Presets", color = Subtext, fontSize = 11.sp)
+            Text("Presets", color = Mocha.Subtext0, fontSize = 11.sp)
             Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier
@@ -126,7 +117,7 @@ fun SpeedCurveEditor(
                         onClick = { onSpeedCurveChanged(preset) },
                         label = { Text(label, fontSize = 10.sp) },
                         modifier = Modifier.height(28.dp),
-                        colors = FilterChipDefaults.filterChipColors(labelColor = TextColor)
+                        colors = FilterChipDefaults.filterChipColors(labelColor = Mocha.Text)
                     )
                 }
             }
@@ -141,11 +132,11 @@ fun SpeedCurveEditor(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
-                    .background(Surface0, RoundedCornerShape(8.dp))
+                    .background(Mocha.Surface0, RoundedCornerShape(8.dp))
             )
         } else {
             // Constant speed controls
-            Text("Speed: ${String.format("%.2f", constantSpeed)}x", color = TextColor, fontSize = 14.sp)
+            Text("Speed: ${String.format("%.2f", constantSpeed)}x", color = Mocha.Text, fontSize = 14.sp)
             Spacer(Modifier.height(4.dp))
 
             // Quick presets
@@ -163,9 +154,9 @@ fun SpeedCurveEditor(
                         label = { Text("${speed}x", fontSize = 10.sp) },
                         modifier = Modifier.height(28.dp),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Mauve.copy(alpha = 0.2f),
-                            selectedLabelColor = Mauve,
-                            labelColor = Subtext
+                            selectedContainerColor = Mocha.Mauve.copy(alpha = 0.2f),
+                            selectedLabelColor = Mocha.Mauve,
+                            labelColor = Mocha.Subtext0
                         )
                     )
                 }
@@ -173,16 +164,22 @@ fun SpeedCurveEditor(
 
             Spacer(Modifier.height(8.dp))
 
-            // Fine control slider
+            // Fine control slider (logarithmic mapping for perceptually uniform speed control)
+            val logMin = kotlin.math.ln(0.1f)
+            val logMax = kotlin.math.ln(16f)
+            val sliderPosition = (kotlin.math.ln(constantSpeed.coerceIn(0.1f, 16f)) - logMin) / (logMax - logMin)
             Slider(
-                value = constantSpeed,
-                onValueChange = onConstantSpeedChanged,
-                valueRange = 0.1f..16f,
+                value = sliderPosition,
+                onValueChange = { pos ->
+                    val logSpeed = logMin + pos * (logMax - logMin)
+                    val newSpeed = kotlin.math.exp(logSpeed).coerceIn(0.1f, 16f)
+                    onConstantSpeedChanged(newSpeed)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Mauve,
-                    activeTrackColor = Mauve.copy(alpha = 0.6f),
-                    inactiveTrackColor = Surface1
+                    thumbColor = Mocha.Mauve,
+                    activeTrackColor = Mocha.Mauve.copy(alpha = 0.6f),
+                    inactiveTrackColor = Mocha.Surface1
                 )
             )
         }
@@ -194,7 +191,7 @@ fun SpeedCurveEditor(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(Surface0)
+                .background(Mocha.Surface0)
                 .clickable { onReversedChanged(!isReversed) }
                 .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,13 +201,13 @@ fun SpeedCurveEditor(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.SwapHoriz, "Reverse", tint = if (isReversed) Peach else Subtext, modifier = Modifier.size(20.dp))
-                Text("Reverse Playback", color = TextColor, fontSize = 13.sp)
+                Icon(Icons.Default.SwapHoriz, "Reverse", tint = if (isReversed) Mocha.Peach else Mocha.Subtext0, modifier = Modifier.size(20.dp))
+                Text("Reverse Playback", color = Mocha.Text, fontSize = 13.sp)
             }
             Switch(
                 checked = isReversed,
                 onCheckedChange = onReversedChanged,
-                colors = SwitchDefaults.colors(checkedTrackColor = Peach)
+                colors = SwitchDefaults.colors(checkedTrackColor = Mocha.Peach)
             )
         }
     }
@@ -298,13 +295,13 @@ private fun SpeedCurveCanvas(
             val y = (1f - (speed - minSpeed) / speedRange) * h
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawPath(path, Peach, style = Stroke(2.5f))
+        drawPath(path, Mocha.Peach, style = Stroke(2.5f))
 
         // Draw control points
         curve.points.forEach { point ->
             val px = point.position * w
             val py = (1f - (point.speed - minSpeed) / speedRange) * h
-            drawCircle(Peach, 8f, Offset(px, py))
+            drawCircle(Mocha.Peach, 8f, Offset(px, py))
             drawCircle(Color.White, 5f, Offset(px, py))
         }
     }

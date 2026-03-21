@@ -5,6 +5,7 @@ import android.net.Uri
 import com.novacut.editor.model.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.cancel
 import org.json.JSONArray
 import org.json.JSONObject
 import android.util.Log
@@ -109,6 +110,11 @@ class ProjectAutoSave @Inject constructor(
     fun stop() {
         autoSaveJob?.cancel()
         autoSaveJob = null
+    }
+
+    fun release() {
+        autoSaveJob?.cancel()
+        scope.cancel()
     }
 
     private fun saveState(projectId: String, state: AutoSaveState) {

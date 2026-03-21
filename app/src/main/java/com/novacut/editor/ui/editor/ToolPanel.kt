@@ -59,7 +59,9 @@ val clipTabs = listOf(
 private val textSubMenu = listOf(
     SubMenuItem("add_text", Icons.Default.Title, "Add Text"),
     SubMenuItem("text_templates", Icons.Default.Dashboard, "Templates"),
-    SubMenuItem("captions", Icons.Default.ClosedCaption, "Captions")
+    SubMenuItem("captions", Icons.Default.ClosedCaption, "Captions"),
+    SubMenuItem("caption_styles", Icons.Default.Subtitles, "Caption\nStyles"),
+    SubMenuItem("tts", Icons.Default.RecordVoiceOver, "Text to Speech")
 )
 
 // Clip mode — Edit tab sub-menu
@@ -72,7 +74,8 @@ private val clipEditSubMenu = listOf(
     SubMenuItem("copy_fx", Icons.Default.FileCopy, "Copy\nEffects"),
     SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects"),
     SubMenuItem("unlink_av", Icons.Default.LinkOff, "Unlink\nA/V"),
-    SubMenuItem("compound", Icons.Default.ViewModule, "Compound\nClip")
+    SubMenuItem("compound", Icons.Default.ViewModule, "Compound\nClip"),
+    SubMenuItem("speed_presets", Icons.Default.Speed, "Speed\nPresets")
 )
 
 // Clip mode — Motion tab sub-menu (replaces simple Transform panel)
@@ -108,7 +111,9 @@ private val clipAiSubMenu = listOf(
     SubMenuItem("style_transfer", Icons.Default.Style, "Style\nTransfer"),
     SubMenuItem("object_remove", Icons.Default.HideImage, "Object\nRemove"),
     SubMenuItem("upscale", Icons.Default.ZoomIn, "Upscale\n4K"),
-    SubMenuItem("frame_interp", Icons.Default.SlowMotionVideo, "Frame\nInterp")
+    SubMenuItem("frame_interp", Icons.Default.SlowMotionVideo, "Frame\nInterp"),
+    SubMenuItem("filler_removal", Icons.Default.ContentCut, "Remove\nFillers"),
+    SubMenuItem("noise_reduction", Icons.Default.GraphicEq, "Reduce\nNoise")
 )
 
 // Project mode — Tools tab sub-menu
@@ -127,7 +132,10 @@ private val projectToolsSubMenu = listOf(
     SubMenuItem("cloud_backup", Icons.Default.Cloud, "Cloud\nBackup"),
     SubMenuItem("archive", Icons.Default.Archive, "Project\nArchive"),
     SubMenuItem("batch_export", Icons.Default.DynamicFeed, "Batch\nExport"),
-    SubMenuItem("proxy_toggle", Icons.Default.Speed, "Proxy\nEdit")
+    SubMenuItem("proxy_toggle", Icons.Default.Speed, "Proxy\nEdit"),
+    SubMenuItem("beat_sync", Icons.Default.MusicNote, "Beat\nSync"),
+    SubMenuItem("auto_edit", Icons.Default.AutoFixHigh, "Auto\nEdit"),
+    SubMenuItem("smart_reframe", Icons.Default.Crop, "Smart\nReframe")
 )
 
 // --- Bottom tool area (tab bar + contextual sub-menu grids) ---
@@ -140,10 +148,20 @@ fun BottomToolArea(
     onAction: (String) -> Unit,
     onEditTextOverlay: (String) -> Unit = {},
     onDeleteTextOverlay: (String) -> Unit = {},
+    editorMode: EditorMode = EditorMode.PRO,
     modifier: Modifier = Modifier
 ) {
     val isClipMode = selectedClipId != null
-    val tabs = if (isClipMode) clipTabs else projectTabs
+
+    val visibleProjectTabs = if (editorMode == EditorMode.EASY) {
+        projectTabs.filter { it.id in setOf("edit", "audio", "text", "effects") }
+    } else projectTabs
+
+    val visibleClipTabs = if (editorMode == EditorMode.EASY) {
+        clipTabs.filter { it.id in setOf("back", "edit", "speed", "effects", "transition") }
+    } else clipTabs
+
+    val tabs = if (isClipMode) visibleClipTabs else visibleProjectTabs
     var activeTabId by remember { mutableStateOf<String?>(null) }
 
     // Reset active tab when switching between project/clip mode

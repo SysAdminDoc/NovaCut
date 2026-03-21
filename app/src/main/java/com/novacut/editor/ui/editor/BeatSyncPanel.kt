@@ -1,0 +1,195 @@
+package com.novacut.editor.ui.editor
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.novacut.editor.ui.theme.Mocha
+
+@Composable
+fun BeatSyncPanel(
+    beatMarkers: List<Long>,
+    totalDurationMs: Long,
+    isAnalyzing: Boolean,
+    onAnalyze: () -> Unit,
+    onApplyBeatSync: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hasBeats = beatMarkers.isNotEmpty()
+    val avgBpm = remember(beatMarkers) {
+        if (beatMarkers.size < 2) 0.0
+        else {
+            val intervals = beatMarkers.zipWithNext { a, b -> b - a }
+            val avgIntervalMs = intervals.average()
+            if (avgIntervalMs > 0) 60_000.0 / avgIntervalMs else 0.0
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            .background(Mocha.Mantle)
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        // Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = Mocha.Peach,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Beat Sync",
+                color = Mocha.Text,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close beat sync",
+                    tint = Mocha.Subtext0,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Detect Beats button
+        Button(
+            onClick = onAnalyze,
+            enabled = !isAnalyzing,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Mocha.Surface0,
+                contentColor = Mocha.Text,
+                disabledContainerColor = Mocha.Surface0.copy(alpha = 0.5f),
+                disabledContentColor = Mocha.Subtext0
+            ),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isAnalyzing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = Mocha.Peach
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Analyzing...", fontSize = 13.sp)
+            } else {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Detect Beats", fontSize = 13.sp)
+            }
+        }
+
+        // Beat info & visualization
+        if (hasBeats) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Stats row
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "${beatMarkers.size}",
+                        color = Mocha.Peach,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Beats",
+                        color = Mocha.Subtext0,
+                        fontSize = 11.sp
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "%.0f".format(avgBpm),
+                        color = Mocha.Peach,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "BPM",
+                        color = Mocha.Subtext0,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Beat timeline visualization
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Mocha.Base)
+            ) {
+                if (totalDurationMs > 0) {
+                    beatMarkers.forEach { beatMs ->
+                        val x = (beatMs.toFloat() / totalDurationMs) * size.width
+                        drawLine(
+                            color = Mocha.Peach,
+                            start = Offset(x, 0f),
+                            end = Offset(x, size.height),
+                            strokeWidth = 2f
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Apply button
+            Button(
+                onClick = onApplyBeatSync,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Mocha.Mauve,
+                    contentColor = Mocha.Crust
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Apply Beat Sync",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}

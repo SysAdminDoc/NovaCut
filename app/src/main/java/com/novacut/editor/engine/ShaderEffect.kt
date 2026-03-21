@@ -66,7 +66,12 @@ private class ShaderProgram(
 
     private fun setupGl() {
         val vs = compile(GLES30.GL_VERTEX_SHADER, VERT)
-        val fs = compile(GLES30.GL_FRAGMENT_SHADER, fragmentShaderSource)
+        val fs = try {
+            compile(GLES30.GL_FRAGMENT_SHADER, fragmentShaderSource)
+        } catch (e: RuntimeException) {
+            android.util.Log.e("ShaderEffect", "Fragment shader compile failed, using passthrough", e)
+            compile(GLES30.GL_FRAGMENT_SHADER, FRAG_PASSTHROUGH)
+        }
         glProgram = GLES30.glCreateProgram()
         GLES30.glAttachShader(glProgram, vs)
         GLES30.glAttachShader(glProgram, fs)
@@ -89,11 +94,15 @@ private class ShaderProgram(
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
         GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, quad.size * 4, buf, GLES30.GL_STATIC_DRAW)
         val p = GLES30.glGetAttribLocation(glProgram, "aPosition")
-        GLES30.glEnableVertexAttribArray(p)
-        GLES30.glVertexAttribPointer(p, 2, GLES30.GL_FLOAT, false, 16, 0)
+        if (p >= 0) {
+            GLES30.glEnableVertexAttribArray(p)
+            GLES30.glVertexAttribPointer(p, 2, GLES30.GL_FLOAT, false, 16, 0)
+        }
         val t = GLES30.glGetAttribLocation(glProgram, "aTexCoord")
-        GLES30.glEnableVertexAttribArray(t)
-        GLES30.glVertexAttribPointer(t, 2, GLES30.GL_FLOAT, false, 16, 8)
+        if (t >= 0) {
+            GLES30.glEnableVertexAttribArray(t)
+            GLES30.glVertexAttribPointer(t, 2, GLES30.GL_FLOAT, false, 16, 8)
+        }
         GLES30.glBindVertexArray(0)
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
     }
@@ -124,6 +133,11 @@ private class ShaderProgram(
         private const val VERT = "#version 300 es\n" +
             "in vec4 aPosition;\nin vec2 aTexCoord;\nout vec2 vTexCoord;\n" +
             "void main() { gl_Position = aPosition; vTexCoord = aTexCoord; }"
+
+        private const val FRAG_PASSTHROUGH = "#version 300 es\n" +
+            "precision mediump float;\n" +
+            "uniform sampler2D uTexSampler;\nin vec2 vTexCoord;\nout vec4 fragColor;\n" +
+            "void main() { fragColor = texture(uTexSampler, vTexCoord); }"
     }
 }
 
@@ -796,88 +810,95 @@ object EffectShaders {
         "  fragColor = texture(uTexSampler, vTexCoord);\n" +
         "  fragColor.a *= uOpacity;\n}"
 
+    // Blend modes use mid-gray (0.5) as the virtual "blend layer" since Media3
+    // single-texture pipeline doesn't support dual-texture compositing.
+    // This gives each mode a distinct, useful visual character.
+
     private const val FRAG_BLEND_MULTIPLY = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = c.rgb * c.rgb;\n" +
+        "  vec3 result = c.rgb * 0.5;\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_SCREEN = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = 1.0 - (1.0 - c.rgb) * (1.0 - c.rgb);\n" +
+        "  vec3 result = 1.0 - (1.0 - c.rgb) * 0.5;\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_OVERLAY = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
         "  vec3 result;\n" +
-        "  result.r = c.r < 0.5 ? 2.0 * c.r * c.r : 1.0 - 2.0 * (1.0 - c.r) * (1.0 - c.r);\n" +
-        "  result.g = c.g < 0.5 ? 2.0 * c.g * c.g : 1.0 - 2.0 * (1.0 - c.g) * (1.0 - c.g);\n" +
-        "  result.b = c.b < 0.5 ? 2.0 * c.b * c.b : 1.0 - 2.0 * (1.0 - c.b) * (1.0 - c.b);\n" +
+        "  result.r = c.r < 0.5 ? 2.0 * c.r * 0.5 : 1.0 - 2.0 * (1.0 - c.r) * 0.5;\n" +
+        "  result.g = c.g < 0.5 ? 2.0 * c.g * 0.5 : 1.0 - 2.0 * (1.0 - c.g) * 0.5;\n" +
+        "  result.b = c.b < 0.5 ? 2.0 * c.b * 0.5 : 1.0 - 2.0 * (1.0 - c.b) * 0.5;\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_DARKEN = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = min(c.rgb, c.rgb);\n" +
+        "  vec3 result = min(c.rgb, vec3(0.5));\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_LIGHTEN = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = max(c.rgb, c.rgb);\n" +
+        "  vec3 result = max(c.rgb, vec3(0.5));\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_COLOR_DODGE = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = clamp(c.rgb / max(1.0 - c.rgb, 0.001), 0.0, 1.0);\n" +
+        "  vec3 result = clamp(c.rgb / max(vec3(0.5), vec3(0.001)), 0.0, 1.0);\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_COLOR_BURN = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = clamp(1.0 - (1.0 - c.rgb) / max(c.rgb, 0.001), 0.0, 1.0);\n" +
+        "  vec3 result = clamp(1.0 - (1.0 - c.rgb) / max(vec3(0.5), vec3(0.001)), 0.0, 1.0);\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_HARD_LIGHT = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  vec3 blend = vec3(0.5);\n" +
         "  vec3 result;\n" +
-        "  result.r = c.r > 0.5 ? 1.0 - 2.0 * (1.0 - c.r) * (1.0 - c.r) : 2.0 * c.r * c.r;\n" +
-        "  result.g = c.g > 0.5 ? 1.0 - 2.0 * (1.0 - c.g) * (1.0 - c.g) : 2.0 * c.g * c.g;\n" +
-        "  result.b = c.b > 0.5 ? 1.0 - 2.0 * (1.0 - c.b) * (1.0 - c.b) : 2.0 * c.b * c.b;\n" +
+        "  result.r = blend.r > 0.5 ? 1.0 - 2.0 * (1.0 - c.r) * (1.0 - blend.r) : 2.0 * c.r * blend.r;\n" +
+        "  result.g = blend.g > 0.5 ? 1.0 - 2.0 * (1.0 - c.g) * (1.0 - blend.g) : 2.0 * c.g * blend.g;\n" +
+        "  result.b = blend.b > 0.5 ? 1.0 - 2.0 * (1.0 - c.b) * (1.0 - blend.b) : 2.0 * c.b * blend.b;\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_SOFT_LIGHT = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = (1.0 - 2.0 * c.rgb) * c.rgb * c.rgb + 2.0 * c.rgb * c.rgb;\n" +
+        "  vec3 blend = vec3(0.5);\n" +
+        "  vec3 result = (1.0 - 2.0 * blend) * c.rgb * c.rgb + 2.0 * blend * c.rgb;\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_DIFFERENCE = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = abs(c.rgb - 0.5);\n" +
+        "  vec3 result = abs(c.rgb - vec3(0.5));\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_EXCLUSION = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = c.rgb + c.rgb - 2.0 * c.rgb * c.rgb;\n" +
+        "  vec3 blend = vec3(0.5);\n" +
+        "  vec3 result = c.rgb + blend - 2.0 * c.rgb * blend;\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_ADD = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = clamp(c.rgb + c.rgb, 0.0, 1.0);\n" +
+        "  vec3 result = clamp(c.rgb + vec3(0.5), 0.0, 1.0);\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     private const val FRAG_BLEND_SUBTRACT = BH +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  vec3 result = clamp(c.rgb - c.rgb, 0.0, 1.0);\n" +
+        "  vec3 result = clamp(c.rgb - vec3(0.5), 0.0, 1.0);\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
 
     // ─── Mask fragment shaders ───────────────────────────────────────

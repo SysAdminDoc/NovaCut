@@ -1,0 +1,157 @@
+package com.novacut.editor.ui.editor
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.novacut.editor.engine.TtsEngine
+import com.novacut.editor.ui.theme.Mocha
+
+@Composable
+fun TtsPanel(
+    isAvailable: Boolean,
+    isSynthesizing: Boolean,
+    onSynthesize: (String, TtsEngine.VoiceStyle) -> Unit,
+    onPreview: (String, TtsEngine.VoiceStyle) -> Unit,
+    onStopPreview: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var text by remember { mutableStateOf("") }
+    var selectedStyle by remember { mutableStateOf(TtsEngine.VoiceStyle.NARRATOR) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Mocha.Mantle, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .padding(16.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Text to Speech", color = Mocha.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            IconButton(onClick = { onStopPreview(); onClose() }) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Mocha.Subtext0)
+            }
+        }
+
+        if (!isAvailable) {
+            Text(
+                "TTS not available on this device",
+                color = Mocha.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            return@Column
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Text input
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = { Text("Enter text to speak...", color = Mocha.Overlay0) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 80.dp, max = 120.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Mocha.Mauve,
+                unfocusedBorderColor = Mocha.Surface1,
+                cursorColor = Mocha.Mauve,
+                focusedTextColor = Mocha.Text,
+                unfocusedTextColor = Mocha.Text
+            ),
+            maxLines = 4
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Voice style selector
+        Text("Voice Style", color = Mocha.Subtext0, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(TtsEngine.VoiceStyle.entries.toList()) { style ->
+                val isSelected = style == selectedStyle
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) Mocha.Mauve else Mocha.Surface0)
+                        .clickable { selectedStyle = style }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            style.displayName,
+                            color = if (isSelected) Mocha.Base else Mocha.Text,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                        Text(
+                            "%.1fx".format(style.rate),
+                            color = if (isSelected) Mocha.Mantle else Mocha.Subtext0,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Preview button
+            OutlinedButton(
+                onClick = { if (text.isNotBlank()) onPreview(text, selectedStyle) },
+                enabled = text.isNotBlank() && !isSynthesizing,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Mauve),
+                border = BorderStroke(1.dp, if (text.isNotBlank()) Mocha.Mauve else Mocha.Surface1)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Preview", fontSize = 13.sp)
+            }
+
+            // Generate button
+            Button(
+                onClick = { if (text.isNotBlank()) onSynthesize(text, selectedStyle) },
+                enabled = text.isNotBlank() && !isSynthesizing,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve, contentColor = Mocha.Base)
+            ) {
+                if (isSynthesizing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Mocha.Base,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Generating...", fontSize = 13.sp)
+                } else {
+                    Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add to Timeline", fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}

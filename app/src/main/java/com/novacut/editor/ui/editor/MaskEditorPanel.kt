@@ -22,17 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.*
+import com.novacut.editor.ui.theme.Mocha
 
-private val Surface0 = Color(0xFF313244)
-private val Surface1 = Color(0xFF45475A)
-private val TextColor = Color(0xFFCDD6F4)
-private val Subtext = Color(0xFFA6ADC8)
-private val Mauve = Color(0xFFCBA6F7)
-private val Red = Color(0xFFF38BA8)
-private val Green = Color(0xFFA6E3A1)
-private val Yellow = Color(0xFFF9E2AF)
-private val Peach = Color(0xFFFAB387)
-private val Crust = Color(0xFF11111B)
 
 @Composable
 fun MaskEditorPanel(
@@ -50,7 +41,7 @@ fun MaskEditorPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Mocha.Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(12.dp)
     ) {
         // Header
@@ -59,12 +50,12 @@ fun MaskEditorPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Masks", color = TextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Masks", color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Row {
                 var showAddMenu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Add, "Add Mask", tint = Green, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Add, "Add Mask", tint = Mocha.Green, modifier = Modifier.size(18.dp))
                     }
                     DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                         MaskType.entries.forEach { type ->
@@ -79,7 +70,7 @@ fun MaskEditorPanel(
                     }
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, "Close", tint = Subtext, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -88,7 +79,7 @@ fun MaskEditorPanel(
 
         // Mask list
         if (masks.isEmpty()) {
-            Text("No masks. Tap + to add one.", color = Subtext, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
+            Text("No masks. Tap + to add one.", color = Mocha.Subtext0, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
         } else {
             Row(
                 modifier = Modifier
@@ -134,17 +125,17 @@ fun MaskEditorPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Surface0)
+                    .background(Mocha.Surface0)
                     .clickable { onMaskUpdated(mask.copy(inverted = !mask.inverted)) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Invert Mask", color = TextColor, fontSize = 13.sp)
+                Text("Invert Mask", color = Mocha.Text, fontSize = 13.sp)
                 Switch(
                     checked = mask.inverted,
                     onCheckedChange = { onMaskUpdated(mask.copy(inverted = it)) },
-                    colors = SwitchDefaults.colors(checkedTrackColor = Mauve)
+                    colors = SwitchDefaults.colors(checkedTrackColor = Mocha.Mauve)
                 )
             }
 
@@ -155,17 +146,17 @@ fun MaskEditorPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Surface0)
+                    .background(Mocha.Surface0)
                     .clickable { onMaskUpdated(mask.copy(trackToMotion = !mask.trackToMotion)) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Track to Motion", color = TextColor, fontSize = 13.sp)
+                Text("Track to Motion", color = Mocha.Text, fontSize = 13.sp)
                 Switch(
                     checked = mask.trackToMotion,
                     onCheckedChange = { onMaskUpdated(mask.copy(trackToMotion = it)) },
-                    colors = SwitchDefaults.colors(checkedTrackColor = Yellow)
+                    colors = SwitchDefaults.colors(checkedTrackColor = Mocha.Yellow)
                 )
             }
         }
@@ -182,7 +173,7 @@ private fun MaskChip(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) Mauve.copy(alpha = 0.2f) else Surface0)
+            .background(if (isSelected) Mocha.Mauve.copy(alpha = 0.2f) else Mocha.Surface0)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -197,21 +188,21 @@ private fun MaskChip(
                 MaskType.RADIAL_GRADIENT -> Icons.Default.BlurCircular
             },
             mask.type.displayName,
-            tint = if (isSelected) Mauve else Subtext,
+            tint = if (isSelected) Mocha.Mauve else Mocha.Subtext0,
             modifier = Modifier.size(16.dp)
         )
         Text(
             mask.type.displayName,
-            color = if (isSelected) Mauve else TextColor,
+            color = if (isSelected) Mocha.Mauve else Mocha.Text,
             fontSize = 11.sp
         )
         if (mask.inverted) {
-            Text("INV", color = Yellow, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Text("INV", color = Mocha.Yellow, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
         Icon(
             Icons.Default.Close,
             "Delete",
-            tint = Subtext.copy(alpha = 0.5f),
+            tint = Mocha.Subtext0.copy(alpha = 0.5f),
             modifier = Modifier
                 .size(14.dp)
                 .clickable(onClick = onDelete)
@@ -233,7 +224,7 @@ private fun MaskSlider(
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = Subtext, fontSize = 11.sp, modifier = Modifier.width(70.dp))
+        Text(label, color = Mocha.Subtext0, fontSize = 11.sp, modifier = Modifier.width(70.dp))
         Slider(
             value = value,
             onValueChange = onChanged,
@@ -242,14 +233,14 @@ private fun MaskSlider(
                 .weight(1f)
                 .height(24.dp),
             colors = SliderDefaults.colors(
-                thumbColor = Mauve,
-                activeTrackColor = Mauve.copy(alpha = 0.6f),
-                inactiveTrackColor = Surface1
+                thumbColor = Mocha.Mauve,
+                activeTrackColor = Mocha.Mauve.copy(alpha = 0.6f),
+                inactiveTrackColor = Mocha.Surface1
             )
         )
         Text(
             "%.1f".format(value),
-            color = Subtext,
+            color = Mocha.Subtext0,
             fontSize = 10.sp,
             modifier = Modifier.width(36.dp)
         )
@@ -315,7 +306,7 @@ fun MaskPreviewOverlay(
     ) {
         masks.forEach { mask ->
             val isSelected = mask.id == selectedMaskId
-            val color = if (isSelected) Mauve else Mauve.copy(alpha = 0.3f)
+            val color = if (isSelected) Mocha.Mauve else Mocha.Mauve.copy(alpha = 0.3f)
 
             when (mask.type) {
                 MaskType.RECTANGLE -> {
@@ -420,7 +411,7 @@ fun MaskPreviewOverlay(
             drawingPoints.forEachIndexed { idx, pt ->
                 if (idx == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
             }
-            drawPath(path, Mauve, style = Stroke(2f))
+            drawPath(path, Mocha.Mauve, style = Stroke(2f))
         }
     }
 }

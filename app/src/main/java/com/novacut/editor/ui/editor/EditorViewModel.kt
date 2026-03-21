@@ -125,8 +125,49 @@ data class EditorState(
     // Project snapshots
     val projectSnapshots: List<ProjectSnapshot> = emptyList(),
     // Proxy
-    val proxySettings: ProxySettings = ProxySettings()
+    val proxySettings: ProxySettings = ProxySettings(),
+    // First-run tutorial
+    val showTutorial: Boolean = false,
+    // Auto-save indicator
+    val saveIndicator: com.novacut.editor.model.SaveIndicatorState = com.novacut.editor.model.SaveIndicatorState.HIDDEN,
+    // Undo history
+    val showUndoHistory: Boolean = false,
+    val undoHistoryEntries: List<com.novacut.editor.model.UndoHistoryEntry> = emptyList(),
+    // Caption style gallery
+    val showCaptionStyleGallery: Boolean = false,
+    // Beat sync
+    val showBeatSync: Boolean = false,
+    val isAnalyzingBeats: Boolean = false,
+    // Smart reframe
+    val showSmartReframe: Boolean = false,
+    val isReframing: Boolean = false,
+    // Speed presets
+    val showSpeedPresets: Boolean = false,
+    // Filler removal
+    val showFillerRemoval: Boolean = false,
+    val isAnalyzingFillers: Boolean = false,
+    val fillerRegions: List<com.novacut.editor.ai.RemovalRegion> = emptyList(),
+    // Auto-edit
+    val showAutoEdit: Boolean = false,
+    val isAutoEditing: Boolean = false,
+    // Editor mode
+    val editorMode: EditorMode = EditorMode.PRO,
+    // Timeline collapsed
+    val isTimelineCollapsed: Boolean = false,
+    // TTS
+    val showTts: Boolean = false,
+    val isSynthesizingTts: Boolean = false,
+    val isTtsAvailable: Boolean = false,
+    // Effect sharing
+    val showEffectLibrary: Boolean = false,
+    // Noise reduction
+    val showNoiseReduction: Boolean = false,
+    val isAnalyzingNoise: Boolean = false
 )
+
+enum class EditorMode(val label: String) {
+    EASY("Easy"), PRO("Pro")
+}
 
 enum class EditorTool(val displayName: String) {
     NONE(""),
@@ -161,6 +202,8 @@ class EditorViewModel @Inject constructor(
     private val templateManager: TemplateManager,
     private val proxyEngine: ProxyEngine,
     private val settingsRepo: SettingsRepository,
+    private val ttsEngine: com.novacut.editor.engine.TtsEngine,
+    private val effectShareEngine: com.novacut.editor.engine.EffectShareEngine,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -266,7 +309,7 @@ class EditorViewModel @Inject constructor(
             var lastClipIndex = -1
             while (isActive) {
                 delay(33)
-                val player = videoEngine.getPlayer()
+                val player = videoEngine.getPlayer() ?: continue
                 if (player.isPlaying) {
                     val currentMs = videoEngine.getAbsolutePositionMs()
                     _state.update { s ->
@@ -330,13 +373,19 @@ class EditorViewModel @Inject constructor(
                             projectId ?: _state.value.project.id,
                             intervalMs = settings.autoSaveIntervalSec * 1000L
                         ) {
+                            showSaveIndicator(com.novacut.editor.model.SaveIndicatorState.SAVING)
                             val s = _state.value
-                            AutoSaveState(
+                            val state = AutoSaveState(
                                 projectId = s.project.id,
                                 tracks = s.tracks,
                                 textOverlays = s.textOverlays,
                                 playheadMs = s.playheadMs
                             )
+                            viewModelScope.launch {
+                                delay(500)
+                                showSaveIndicator(com.novacut.editor.model.SaveIndicatorState.SAVED)
+                            }
+                            state
                         }
                     } else {
                         autoSave.stop()
@@ -972,6 +1021,18 @@ class EditorViewModel @Inject constructor(
         showAudioNorm = false,
         showRenderPreview = false,
         showCloudBackup = false,
+        showScopes = false,
+        showTutorial = false,
+        showUndoHistory = false,
+        showCaptionStyleGallery = false,
+        showBeatSync = false,
+        showSmartReframe = false,
+        showSpeedPresets = false,
+        showFillerRemoval = false,
+        showAutoEdit = false,
+        showTts = false,
+        showEffectLibrary = false,
+        showNoiseReduction = false,
         selectedEffectId = null,
         editingTextOverlayId = null,
         selectedMaskId = null
@@ -1017,9 +1078,12 @@ class EditorViewModel @Inject constructor(
     fun showColorGrading() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showColorGrading = true) } }
     fun hideColorGrading() { _state.update { it.copy(showColorGrading = false) } }
 
+    fun beginColorGradeAdjust() {
+        saveUndoState("Color grade")
+    }
+
     fun updateClipColorGrade(colorGrade: ColorGrade) {
         val clipId = _state.value.selectedClipId ?: return
-        saveUndoState("Color grade")
         _state.update { s ->
             s.copy(tracks = s.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
@@ -1346,17 +1410,31 @@ class EditorViewModel @Inject constructor(
             return
         }
         hideBatchExport()
-        // Export sequentially: take first item, export, then continue
+        // Export sequentially with per-item status updates
         viewModelScope.launch {
+            val outputDir = appContext.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+                ?: appContext.filesDir
             for ((index, item) in queue.withIndex()) {
+                // Update item status to IN_PROGRESS
+                _state.update { s ->
+                    s.copy(batchExportQueue = s.batchExportQueue.map {
+                        if (it.id == item.id) it.copy(status = BatchExportStatus.IN_PROGRESS) else it
+                    })
+                }
                 showToast("Exporting ${index + 1}/${queue.size}: ${item.outputName}")
                 _state.update { it.copy(exportConfig = item.config) }
-                startExport(appContext.cacheDir)
+                startExport(outputDir)
                 // Wait for export to complete
-                videoEngine.exportState.first { it != ExportState.EXPORTING }
+                val result = videoEngine.exportState.first { it != ExportState.EXPORTING }
+                val newStatus = if (result == ExportState.COMPLETE) BatchExportStatus.COMPLETED else BatchExportStatus.FAILED
+                _state.update { s ->
+                    s.copy(batchExportQueue = s.batchExportQueue.map {
+                        if (it.id == item.id) it.copy(status = newStatus) else it
+                    })
+                }
             }
-            showToast("Batch export complete (${queue.size} items)")
-            _state.update { it.copy(batchExportQueue = emptyList()) }
+            val completed = queue.size
+            showToast("Batch export complete ($completed items)")
         }
     }
 
@@ -1526,6 +1604,424 @@ class EditorViewModel @Inject constructor(
     // --- Cloud Backup ---
     fun showCloudBackup() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showCloudBackup = true) } }
     fun hideCloudBackup() { _state.update { it.copy(showCloudBackup = false) } }
+
+    // --- Tutorial ---
+    fun showTutorial() { _state.update { it.copy(showTutorial = true) } }
+    fun hideTutorial() { _state.update { it.copy(showTutorial = false) } }
+
+    // --- Auto-save indicator ---
+    private var saveIndicatorJob: Job? = null
+    fun showSaveIndicator(state: com.novacut.editor.model.SaveIndicatorState) {
+        saveIndicatorJob?.cancel()
+        _state.update { it.copy(saveIndicator = state) }
+        if (state == com.novacut.editor.model.SaveIndicatorState.SAVED) {
+            saveIndicatorJob = viewModelScope.launch {
+                delay(2000)
+                _state.update { it.copy(saveIndicator = com.novacut.editor.model.SaveIndicatorState.HIDDEN) }
+            }
+        }
+    }
+
+    // --- Undo History ---
+    fun showUndoHistory() {
+        pauseIfPlaying()
+        val entries = _state.value.undoStack.mapIndexed { i, a ->
+            com.novacut.editor.model.UndoHistoryEntry(i, a.description)
+        }.reversed()
+        _state.update { dismissedPanelState(it).copy(showUndoHistory = true, undoHistoryEntries = entries) }
+    }
+    fun hideUndoHistory() { _state.update { it.copy(showUndoHistory = false) } }
+    fun jumpToUndoState(index: Int) {
+        val stack = _state.value.undoStack
+        if (index < 0 || index >= stack.size) return
+        val target = stack[index]
+        _state.update { it.copy(
+            tracks = target.tracks,
+            textOverlays = target.textOverlays,
+            undoStack = stack.take(index),
+            redoStack = stack.drop(index + 1).reversed() + listOf(UndoAction("Current", it.tracks, it.textOverlays))
+        ) }
+        rebuildTimeline()
+        showToast("Restored: ${target.description}")
+    }
+
+    // --- Caption Style Gallery ---
+    fun showCaptionStyleGallery() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showCaptionStyleGallery = true) } }
+    fun hideCaptionStyleGallery() { _state.update { it.copy(showCaptionStyleGallery = false) } }
+    fun applyCaptionStyle(template: com.novacut.editor.model.CaptionStyleTemplate) {
+        hideCaptionStyleGallery()
+        showToast("Caption style applied: ${template.type.displayName}")
+        _state.update { it.copy(showCaptionStyleGallery = false) }
+    }
+
+    // --- Beat Sync ---
+    fun showBeatSync() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showBeatSync = true) } }
+    fun hideBeatSync() { _state.update { it.copy(showBeatSync = false) } }
+    fun analyzeBeats() {
+        val audioClip = _state.value.tracks
+            .filter { it.type == TrackType.AUDIO }
+            .flatMap { it.clips }
+            .firstOrNull() ?: run {
+            showToast("Add an audio track first")
+            return
+        }
+        _state.update { it.copy(isAnalyzingBeats = true) }
+        viewModelScope.launch {
+            try {
+                // Extract waveform at reasonable resolution for beat detection
+                val waveform = audioEngine.extractWaveform(audioClip.sourceUri, 4000)
+                val pcm = ShortArray(waveform.size) { (waveform[it] * 32767).toInt().toShort() }
+                // Waveform is mono (1 channel) at ~4000 samples, estimate effective sample rate
+                val clipDurationSec = audioClip.sourceDurationMs / 1000.0
+                val effectiveSampleRate = if (clipDurationSec > 0) (waveform.size / clipDurationSec).toInt().coerceAtLeast(1) else 4000
+                val beats = com.novacut.editor.engine.AudioEffectsEngine.detectBeats(pcm, effectiveSampleRate, 1)
+                _state.update { it.copy(beatMarkers = beats, isAnalyzingBeats = false) }
+                showToast("Detected ${beats.size} beats")
+            } catch (e: Exception) {
+                _state.update { it.copy(isAnalyzingBeats = false) }
+                showToast("Beat detection failed")
+            }
+        }
+    }
+    fun applyBeatSync() {
+        val beats = _state.value.beatMarkers
+        if (beats.isEmpty()) {
+            showToast("Detect beats first")
+            return
+        }
+        saveUndoState("Beat sync")
+        var splitCount = 0
+        for (beat in beats.sortedDescending()) {
+            // Re-read clips each iteration since splits modify state
+            val currentClips = _state.value.tracks
+                .filter { it.type == TrackType.VIDEO }
+                .flatMap { it.clips }
+            val clip = currentClips.firstOrNull { beat > it.timelineStartMs && beat < it.timelineEndMs }
+            if (clip != null) {
+                splitClipAt(clip.id, beat)
+                splitCount++
+            }
+        }
+        rebuildTimeline()
+        showToast("Split $splitCount clips at beat markers")
+        hideBeatSync()
+    }
+
+    // --- Smart Reframe ---
+    fun showSmartReframe() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showSmartReframe = true) } }
+    fun hideSmartReframe() { _state.update { it.copy(showSmartReframe = false) } }
+    fun applySmartReframe(targetAspect: AspectRatio) {
+        _state.update { it.copy(isReframing = true) }
+        viewModelScope.launch {
+            try {
+                val project = _state.value.project.copy(aspectRatio = targetAspect)
+                _state.update { it.copy(
+                    project = project,
+                    exportConfig = it.exportConfig.copy(aspectRatio = targetAspect),
+                    isReframing = false
+                ) }
+                showToast("Reframed to ${targetAspect.label}")
+                hideSmartReframe()
+            } catch (e: Exception) {
+                _state.update { it.copy(isReframing = false) }
+                showToast("Reframe failed")
+            }
+        }
+    }
+
+    // --- Speed Presets ---
+    fun showSpeedPresets() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showSpeedPresets = true) } }
+    fun hideSpeedPresets() { _state.update { it.copy(showSpeedPresets = false) } }
+    fun applySpeedPreset(curve: SpeedCurve) {
+        val clipId = _state.value.selectedClipId ?: return
+        saveUndoState("Speed preset")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(speedCurve = curve) else clip
+                })
+            })
+        }
+        rebuildTimeline()
+        showToast("Speed preset applied")
+        hideSpeedPresets()
+    }
+
+    // --- Filler/Silence Removal ---
+    fun showFillerRemoval() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showFillerRemoval = true) } }
+    fun hideFillerRemoval() { _state.update { it.copy(showFillerRemoval = false) } }
+
+    fun analyzeFillers() {
+        val clip = getSelectedClip() ?: return
+        _state.update { it.copy(isAnalyzingFillers = true) }
+        viewModelScope.launch {
+            try {
+                val regions = aiFeatures.detectFillerAndSilence(clip.sourceUri)
+                _state.update { it.copy(
+                    isAnalyzingFillers = false,
+                    fillerRegions = regions
+                ) }
+                showToast("Found ${regions.size} filler/silence regions")
+            } catch (e: Exception) {
+                _state.update { it.copy(isAnalyzingFillers = false) }
+                showToast("Analysis failed")
+            }
+        }
+    }
+
+    fun applyFillerRemoval() {
+        val regions = _state.value.fillerRegions
+        if (regions.isEmpty()) { showToast("No regions to remove"); return }
+        val clip = getSelectedClip() ?: return
+        saveUndoState("Remove fillers")
+        // Convert source-relative times to timeline positions and split+remove in reverse
+        for (region in regions.sortedByDescending { it.startMs }) {
+            val timelinePos = clip.timelineStartMs + ((region.startMs - clip.trimStartMs) / clip.speed.coerceAtLeast(0.01f)).toLong()
+            if (timelinePos <= clip.timelineStartMs || timelinePos >= clip.timelineEndMs) continue
+            splitClipAt(clip.id, timelinePos)
+            val clips = _state.value.tracks.flatMap { it.clips }
+            val fillerClip = clips.find { it.timelineStartMs == timelinePos }
+            if (fillerClip != null) {
+                _state.update { s ->
+                    s.copy(tracks = s.tracks.map { track ->
+                        track.copy(clips = track.clips.filter { it.id != fillerClip.id })
+                    })
+                }
+            }
+        }
+        rebuildTimeline()
+        showToast("Removed ${regions.size} filler regions")
+        hideFillerRemoval()
+    }
+
+    // --- Auto-Edit ---
+    fun showAutoEdit() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showAutoEdit = true) } }
+    fun hideAutoEdit() { _state.update { it.copy(showAutoEdit = false) } }
+
+    fun runAutoEdit() {
+        val clips = _state.value.tracks
+            .filter { it.type == TrackType.VIDEO }
+            .flatMap { it.clips }
+        if (clips.isEmpty()) { showToast("Add video clips first"); return }
+
+        _state.update { it.copy(isAutoEditing = true) }
+        viewModelScope.launch {
+            try {
+                val autoClips = clips.map { com.novacut.editor.ai.AutoEditClip(it.sourceUri, it.sourceDurationMs) }
+                val musicUri = _state.value.tracks
+                    .filter { it.type == TrackType.AUDIO }
+                    .flatMap { it.clips }
+                    .firstOrNull()?.sourceUri
+                val targetMs = 60_000L // 1 minute highlight reel
+
+                val result = aiFeatures.generateAutoEdit(autoClips, musicUri, targetMs)
+
+                if (result.segments.isNotEmpty()) {
+                    saveUndoState("Auto edit")
+                    // Build new video track from auto-edit segments
+                    val newClips = result.segments.map { seg ->
+                        val sourceClip = clips[seg.clipIndex]
+                        sourceClip.copy(
+                            id = java.util.UUID.randomUUID().toString(),
+                            trimStartMs = seg.trimStartMs,
+                            trimEndMs = seg.trimEndMs,
+                            timelineStartMs = seg.timelineStartMs
+                        )
+                    }
+                    _state.update { s ->
+                        val videoTrack = s.tracks.first { it.type == TrackType.VIDEO }
+                        s.copy(tracks = s.tracks.map { track ->
+                            if (track.id == videoTrack.id) track.copy(clips = newClips) else track
+                        }, isAutoEditing = false)
+                    }
+                    rebuildTimeline()
+                    showToast("Auto-edit created ${result.segments.size} segments")
+                } else {
+                    _state.update { it.copy(isAutoEditing = false) }
+                    showToast("Could not generate auto-edit")
+                }
+                hideAutoEdit()
+            } catch (e: Exception) {
+                _state.update { it.copy(isAutoEditing = false) }
+                showToast("Auto-edit failed")
+            }
+        }
+    }
+
+    // --- TTS ---
+    fun showTts() {
+        pauseIfPlaying()
+        if (!ttsEngine.isAvailable()) ttsEngine.initialize { _state.update { it.copy(isTtsAvailable = true) } }
+        _state.update { dismissedPanelState(it).copy(showTts = true, isTtsAvailable = ttsEngine.isAvailable()) }
+    }
+    fun hideTts() { ttsEngine.stopPreview(); _state.update { it.copy(showTts = false) } }
+
+    fun synthesizeTts(text: String, style: com.novacut.editor.engine.TtsEngine.VoiceStyle) {
+        _state.update { it.copy(isSynthesizingTts = true) }
+        viewModelScope.launch {
+            val file = ttsEngine.synthesize(text, style)
+            _state.update { it.copy(isSynthesizingTts = false) }
+            if (file != null) {
+                val uri = android.net.Uri.fromFile(file)
+                val durationMs = 3000L // Approximate, will be corrected on load
+                addClipToTrack(uri, durationMs, TrackType.AUDIO)
+                showToast("Voice added to audio track")
+                hideTts()
+            } else {
+                showToast("TTS synthesis failed")
+            }
+        }
+    }
+
+    fun previewTts(text: String, style: com.novacut.editor.engine.TtsEngine.VoiceStyle) {
+        ttsEngine.preview(text, style)
+    }
+
+    fun stopTtsPreview() { ttsEngine.stopPreview() }
+
+    // --- Effect Library ---
+    fun showEffectLibrary() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showEffectLibrary = true) } }
+    fun hideEffectLibrary() { _state.update { it.copy(showEffectLibrary = false) } }
+
+    fun exportClipEffects(name: String) {
+        val clip = getSelectedClip() ?: return
+        viewModelScope.launch {
+            val file = effectShareEngine.exportEffects(name, clip.effects, clip.colorGrade, clip.audioEffects)
+            if (file != null) {
+                showToast("Effects exported: ${file.name}")
+            } else {
+                showToast("Export failed")
+            }
+        }
+    }
+
+    fun importEffects(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val imported = effectShareEngine.importEffects(uri)
+            if (imported != null) {
+                val clipId = _state.value.selectedClipId ?: return@launch
+                saveUndoState("Import effects")
+                _state.update { s ->
+                    s.copy(tracks = s.tracks.map { track ->
+                        track.copy(clips = track.clips.map { clip ->
+                            if (clip.id == clipId) {
+                                clip.copy(
+                                    effects = clip.effects + imported.effects,
+                                    colorGrade = imported.colorGrade ?: clip.colorGrade
+                                )
+                            } else clip
+                        })
+                    })
+                }
+                showToast("Imported: ${imported.name}")
+                updatePreview()
+            } else {
+                showToast("Import failed — invalid .ncfx file")
+            }
+        }
+    }
+
+    // --- Noise Reduction ---
+    fun showNoiseReduction() { pauseIfPlaying(); _state.update { dismissedPanelState(it).copy(showNoiseReduction = true) } }
+    fun hideNoiseReduction() { _state.update { it.copy(showNoiseReduction = false) } }
+
+    fun analyzeAndReduceNoise() {
+        val clip = getSelectedClip() ?: return
+        _state.update { it.copy(isAnalyzingNoise = true) }
+        viewModelScope.launch {
+            try {
+                val profile = aiFeatures.analyzeNoiseProfile(clip.sourceUri)
+                if (profile.recommendedEffects.isNotEmpty()) {
+                    saveUndoState("Noise reduction")
+                    _state.update { s ->
+                        s.copy(
+                            isAnalyzingNoise = false,
+                            tracks = s.tracks.map { track ->
+                                track.copy(clips = track.clips.map { c ->
+                                    if (c.id == clip.id) {
+                                        val newEffects = profile.recommendedEffects.map { rec ->
+                                            com.novacut.editor.model.AudioEffect(type = rec.type, params = rec.params)
+                                        }
+                                        c.copy(audioEffects = c.audioEffects + newEffects)
+                                    } else c
+                                })
+                            }
+                        )
+                    }
+                    showToast("Applied ${profile.noiseType.name.lowercase()} noise reduction")
+                } else {
+                    _state.update { it.copy(isAnalyzingNoise = false) }
+                    showToast("Audio is clean — no noise reduction needed")
+                }
+                hideNoiseReduction()
+            } catch (e: Exception) {
+                _state.update { it.copy(isAnalyzingNoise = false) }
+                showToast("Noise analysis failed")
+            }
+        }
+    }
+
+    // Helper: add clip to a track by type
+    private fun addClipToTrack(uri: android.net.Uri, durationMs: Long, trackType: TrackType) {
+        val track = _state.value.tracks.firstOrNull { it.type == trackType } ?: return
+        val timelineStart = track.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
+        val clip = Clip(
+            sourceUri = uri,
+            sourceDurationMs = durationMs,
+            timelineStartMs = timelineStart,
+            trimEndMs = durationMs
+        )
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { t ->
+                if (t.id == track.id) t.copy(clips = t.clips + clip) else t
+            })
+        }
+    }
+
+    // --- Editor Mode ---
+    fun toggleEditorMode() {
+        _state.update { it.copy(
+            editorMode = if (it.editorMode == EditorMode.EASY) EditorMode.PRO else EditorMode.EASY
+        ) }
+    }
+
+    // --- Timeline Collapse ---
+    fun toggleTimelineCollapse() {
+        _state.update { it.copy(isTimelineCollapsed = !it.isTimelineCollapsed) }
+    }
+
+    // Helper for beat sync splitting
+    private fun splitClipAt(clipId: String, positionMs: Long) {
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+                if (clipIndex < 0) return@map track
+                val clip = track.clips[clipIndex]
+                val relativePos = positionMs - clip.timelineStartMs
+                val sourcePos = clip.trimStartMs + (relativePos * clip.speed).toLong()
+                if (sourcePos <= clip.trimStartMs + 100 || sourcePos >= clip.trimEndMs - 100) return@map track
+                val clip1 = clip.copy(trimEndMs = sourcePos)
+                val clip2 = clip.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    trimStartMs = sourcePos,
+                    timelineStartMs = clip.timelineStartMs + clip1.durationMs,
+                    transition = null
+                )
+                val newClips = track.clips.toMutableList()
+                newClips[clipIndex] = clip1
+                newClips.add(clipIndex + 1, clip2)
+                track.copy(clips = newClips)
+            })
+        }
+    }
+
+    private fun rebuildTimeline() {
+        videoEngine.prepareTimeline(_state.value.tracks)
+        updatePreview()
+        _state.update { s ->
+            s.copy(totalDurationMs = s.tracks.maxOfOrNull { t -> t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L } ?: 0L)
+        }
+    }
 
     // --- Slip/Slide Edit ---
     fun slipClip(clipId: String, slipAmountMs: Long) {

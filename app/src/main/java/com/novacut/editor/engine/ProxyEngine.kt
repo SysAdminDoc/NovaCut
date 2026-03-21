@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -16,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -29,14 +31,20 @@ class ProxyEngine @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val proxyDir = File(context.cacheDir, "proxies").also { it.mkdirs() }
-    private val proxyMap = mutableMapOf<String, Uri>() // sourceUri hash -> proxy Uri
+    private val proxyMap = ConcurrentHashMap<String, Uri>()
+
+    private fun keyFor(sourceUri: Uri): String {
+        // Use both hashCode and string length to reduce collision risk
+        val str = sourceUri.toString()
+        return "${str.hashCode()}_${str.length}"
+    }
 
     fun getProxyUri(sourceUri: Uri): Uri? {
-        return proxyMap[sourceUri.toString().hashCode().toString()]
+        return proxyMap[keyFor(sourceUri)]
     }
 
     fun hasProxy(sourceUri: Uri): Boolean {
-        val key = sourceUri.toString().hashCode().toString()
+        val key = keyFor(sourceUri)
         val file = File(proxyDir, "proxy_$key.mp4")
         return file.exists().also { if (it) proxyMap[key] = Uri.fromFile(file) }
     }
@@ -47,7 +55,7 @@ class ProxyEngine @Inject constructor(
         resolution: ProxyResolution,
         onProgress: (Float) -> Unit = {}
     ): Uri? = withContext(Dispatchers.Main) {
-        val key = sourceUri.toString().hashCode().toString()
+        val key = keyFor(sourceUri)
         val outFile = File(proxyDir, "proxy_$key.mp4")
 
         if (outFile.exists()) {
@@ -58,8 +66,14 @@ class ProxyEngine @Inject constructor(
         try {
             suspendCancellableCoroutine { cont ->
                 val mediaItem = MediaItem.fromUri(sourceUri)
+
+                // Downscale to proxy resolution using scale factor
+                // HALF = 540p, QUARTER = 270p, EIGHTH = 135p (based on 1080p source)
+                val targetHeight = (1080 * resolution.scale).toInt().coerceAtLeast(120)
+                val presentation = Presentation.createForHeight(targetHeight)
+
                 val editedItem = EditedMediaItem.Builder(mediaItem)
-                    .setEffects(Effects.EMPTY)
+                    .setEffects(Effects(emptyList(), listOf(presentation)))
                     .build()
 
                 val transformer = Transformer.Builder(context)

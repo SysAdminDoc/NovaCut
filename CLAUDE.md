@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v2.3.0
+v2.8.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -421,7 +421,138 @@ v2.3.0
 - **ProjectAutoSave accepts interval** — `startAutoSave(projectId, intervalMs)` parameter added. Interval clamped to 10s-600s.
 - **README rewritten** — Full feature list matching v2.3.0, accurate tech stack table, build instructions, AI tool descriptions updated (Whisper needs internet for model download).
 
+## v2.4.0 Bug Audit & Fixes
+
+### Critical Engine Fixes
+- **Blend mode shaders fixed** — All 13 blend modes were self-blending no-ops (e.g., `min(c.rgb, c.rgb)` = no-op). Now use mid-gray (0.5) as virtual blend layer since Media3 doesn't support dual-texture compositing. Each mode now produces a distinct visual effect.
+- **Proxy engine now actually downscales** — `ProxyEngine.generateProxy()` was creating full-resolution copies (no `Presentation` applied). Now adds `Presentation.createForHeight()` based on `ProxyResolution.scale`. HALF=540p, QUARTER=270p, EIGHTH=135p.
+- **ProxyEngine thread-safe map** — Replaced plain `mutableMapOf` with `ConcurrentHashMap` to prevent `ConcurrentModificationException`. Also improved key generation to reduce hash collision risk (`hashCode_length` instead of just `hashCode`).
+- **AudioEffectsEngine massive boxing eliminated** — `pcm.map { }.toFloatArray()` replaced with `FloatArray(size) { }` constructor (avoids boxing millions of Float objects). Same for output conversion.
+- **Compressor attack/release coefficients were swapped** — Attack should cause fast envelope rise (needs low coeff for fast tracking), release should cause slow decay (needs high coeff). Was reversed.
+- **ZCR speech detection cross-channel bug** — `detectSpeechRegions()` was comparing adjacent samples across channel boundaries in stereo. Now steps by `channels` count.
+- **ColorMatchEngine MediaMetadataRetriever leak** — `retriever.release()` was inside `try` before `catch`, so exceptions during `getFrameAtTime()` would leak the native resource. Moved to `finally` block.
+- **Mask animations no longer frozen at t=0** — `interpolateMaskPoints(mask, 0L)` was hardcoded. Now uses clip midpoint time as best static approximation for mask position during export.
+- **Multi-track export** — Was only exporting first VIDEO and first AUDIO track, silently dropping overlays and additional audio. Now collects all visible video tracks (VIDEO + OVERLAY) and all audio tracks.
+- **transmuxAudio fix** — When video track was muted, `setTransmuxAudio(true)` was bypassing the VolumeAudioProcessor that enforced the mute. Now correctly sets transmux based on both audio track presence and video mute state.
+- **ShaderEffect crash protection** — Fragment shader compile failure now falls back to passthrough shader instead of crashing the Transformer pipeline. GL attribute location -1 check added to prevent undefined behavior on some GPU drivers.
+
+### UI Fixes
+- **Playhead sync NPE** — `videoEngine.getPlayer()` could return null during initialization; playhead sync loop now uses `?: continue` guard.
+- **Color grading undo debounce** — Was calling `saveUndoState()` on every drag event, flooding undo stack. Now uses `beginColorGradeAdjust()` pattern: undo saved once when drag starts. Wired through `ColorGradingPanel.onDragStarted` -> color wheels and curve editor.
+- **BackHandler now dismisses scopes** — `showScopes` was missing from `hasOpenPanel` check. Also added to `dismissedPanelState()`.
+- **TextEditorSheet stroke controls removed** — Non-functional stroke width/color UI (SpannableString has no native stroke support) was still present despite being documented as removed. Now removed.
+- **Batch export improvements** — Items now properly update status to IN_PROGRESS/COMPLETED/FAILED. Output directory changed from `cacheDir` (subject to system cleanup) to `getExternalFilesDir(DIRECTORY_MOVIES)`.
+
+### Known Remaining Issues
+- Blend modes use mid-gray as virtual blend layer (not true dual-texture compositing). Proper compositing requires Media3 Compositor API.
+- SmartRenderEngine analysis results not used for actual export (smart render bypass not implemented).
+- ProjectArchive.importArchive() not implemented (export-only).
+- Speed curve clips don't correctly affect timeline duration calculation (`Clip.durationMs` uses constant speed only).
+
+## v2.5.0 Feature Expansion (Competitor-Inspired)
+
+### New AI Engine Features (AiFeatures.kt)
+- **Filler word / silence removal** — `detectFillerAndSilence()` uses Whisper for word-level detection of "um", "uh", "like", "you know", etc. Falls back to energy-based silence detection (< -40dB, > 500ms). Returns `RemovalRegion` list.
+- **Beat sync automation** — `generateBeatSyncEdits()` uses `AudioEffectsEngine.detectBeats()` to find beats, maps clips across beat positions. Returns `BeatSyncCut` list.
+- **Enhanced smart reframe** — `smartReframe()` samples frames at 500ms, uses saliency analysis to find subject center, generates pan/zoom keyframes for aspect conversion. Smooths with moving average.
+- **AI auto-edit / highlight reel** — `generateAutoEdit()` analyzes clips for sharpness (Laplacian), motion, face presence (skin-tone). Ranks by quality, optionally syncs to beats. Selects best segments for target duration.
+- **AI noise reduction analysis** — `analyzeNoiseProfile()` extracts audio, computes DFT, classifies noise as HISS/HUM/BROADBAND/CLEAN. Recommends DSP effect params.
+
+### New UI Panels
+- **CaptionStyleGallery.kt** — 15 pre-built caption templates (karaoke, word-by-word, bounce, glow, neon, etc.) in 2-column grid with visual previews
+- **SpeedPresets.kt** — 10 named speed presets (Bullet Time, Hero Time, Montage, Jump Cut, etc.) with mini Canvas curve previews
+- **BeatSyncPanel.kt** — Detect beats button, beat count/BPM stats, visual beat timeline, "Apply Beat Sync" one-tap
+- **SmartReframePanel.kt** — 5 aspect ratio cards with platform labels (YouTube, TikTok, Instagram), visual ratio previews
+- **AutoSaveIndicator.kt** — Non-intrusive save status indicator (Saving.../Saved/Error) with auto-fade
+- **UndoHistoryPanel.kt** — Visual undo history list (like Photoshop), jump-to-state, relative timestamps
+- **FirstRunTutorial.kt** — 4-step guided overlay (Add Media, Timeline, Edit & Enhance, Export & Share)
+
+### New Data Models (Project.kt)
+- `CaptionTemplateType` enum (15 styles), `CaptionStyleTemplate` data class
+- `SpeedPresetType` enum (10 named presets)
+- `SaveIndicatorState` enum (HIDDEN/SAVING/SAVED/ERROR)
+- `TutorialStep`, `TutorialHighlight`, `UndoHistoryEntry`
+
+### ViewModel & Wiring
+- 16 new state fields in `EditorState` (panels, modes, analysis states)
+- `EditorMode` enum (EASY/PRO) for progressive disclosure
+- `isTimelineCollapsed` for collapsible timeline
+- All new panels wired via AnimatedVisibility in EditorScreen
+- Action dispatch for 7 new actions (beat_sync, auto_edit, smart_reframe, caption_styles, speed_presets, filler_removal, undo_history)
+- ToolPanel sub-menus updated with new entries
+- Beat sync analyzes audio and auto-splits clips at beat markers
+- Smart reframe changes project aspect ratio one-tap
+- Speed presets generate SpeedCurve with proper bezier control points
+
+## v2.5.0 UI Wiring Fixes
+- **Easy/Pro mode toggle** — Chip in EditorTopBar between project name and export button. Calls `viewModel.toggleEditorMode()`. Shows mode label colored Mauve (Pro) or Green (Easy).
+- **Collapsible timeline** — Toggle row above Timeline with "Timeline" label and expand/collapse icon. AnimatedVisibility wraps Timeline with expandVertically/shrinkVertically. State via `isTimelineCollapsed`.
+- **Auto-save indicator wired** — Auto-save getState lambda now triggers `showSaveIndicator(SAVING)` before state capture and `showSaveIndicator(SAVED)` after 500ms delay.
+- **Frame step uses project frame rate** — PreviewPanel accepts `frameRate: Int` parameter, computes `frameStepMs = 1000L / frameRate`. Previous/next frame buttons use dynamic step instead of hardcoded 33ms.
+- **Timeline track key() calls** — Track headers and main timeline content area use `for (track in tracks) { key(track.id) { ... } }` instead of bare `forEach` for proper Compose recomposition identity.
+- **Easy mode tool filtering** — BottomToolArea accepts `editorMode` parameter. In EASY mode, project tabs filtered to edit/audio/text/effects; clip tabs filtered to back/edit/speed/effects/transition. Hides advanced tools (AI, transform, color, aspect, etc.).
+
+## v2.6.0 UX Polish + New Engines
+
+### Easy/Pro Mode & Collapsible Timeline
+- **Easy/Pro mode toggle** in EditorTopBar. Easy mode hides advanced tools (AI, transform, color grading, aspect ratio). Shows only edit/audio/text/effects/speed/transition.
+- **Collapsible timeline** with expand/collapse toggle row. AnimatedVisibility with expandVertically/shrinkVertically.
+- **Auto-save indicator wired** to real save events. Shows "Saving..." then auto-fades to "Saved" after 500ms.
+- **Frame step uses project fps** instead of hardcoded 33ms.
+- **Timeline key() calls** for proper Compose recomposition identity.
+
+### New Engines
+- **EffectShareEngine** (`engine/EffectShareEngine.kt`) — Export/import effect chains + color grades + audio effects as `.ncfx` JSON files. Includes `ImportedEffects` data class.
+- **TtsEngine** (`engine/TtsEngine.kt`) — Android TTS wrapper with 8 voice styles (Narrator, Casual, Energetic, Deep, Soft, Fast, Slow, Dramatic). Synthesize to WAV file or preview via speaker.
+- **TtsPanel** (`ui/editor/TtsPanel.kt`) — Text input, voice style selector chips, preview button, "Add to Timeline" with progress.
+- **FillerRemovalPanel** (`ui/editor/FillerRemovalPanel.kt`) — Detect fillers/silence button, region count display, "Remove All" action.
+- **AutoEditPanel** (`ui/editor/AutoEditPanel.kt`) — AI auto-edit highlight reel generator. Shows clip/music/target info cards, generate button.
+- **NoiseReductionPanel** (`ui/editor/NoiseReductionPanel.kt`) — AI noise profile analysis + auto-apply DSP filters.
+
+### Wiring (v2.6.0)
+- **TTS fully wired** — TtsEngine + EffectShareEngine injected into EditorViewModel. `showTts()`/`hideTts()`/`synthesizeTts()`/`previewTts()`/`stopTtsPreview()` methods added. TtsPanel AnimatedVisibility in EditorScreen. "tts" action in ToolPanel textSubMenu.
+- **Filler removal wired** — `analyzeFillers()` calls `AiFeatures.detectFillerAndSilence()`. `applyFillerRemoval()` splits + removes detected regions. FillerRemovalPanel in EditorScreen.
+- **Auto edit wired** — `runAutoEdit()` calls `AiFeatures.generateAutoEdit()`, rebuilds video track. AutoEditPanel in EditorScreen.
+- **Noise reduction wired** — `analyzeAndReduceNoise()` calls `AiFeatures.analyzeNoiseProfile()`, applies recommended DSP effects. NoiseReductionPanel in EditorScreen.
+- **Effect library wired** — `showEffectLibrary()`/`hideEffectLibrary()`/`exportClipEffects()`/`importEffects()` methods. "effect_library" action dispatched.
+- **New EditorState fields** — `showTts`, `isSynthesizingTts`, `isTtsAvailable`, `showEffectLibrary`, `showNoiseReduction`, `isAnalyzingNoise` added. All included in `dismissedPanelState()` and `hasOpenPanel`.
+
+### Audit Fixes
+- **ProjectArchive import** — `importArchive()` extracts .novacut ZIP to target directory, remaps URIs.
+- **SubtitleExporter error logging** — Silent catch now logs `Log.e`.
+- **SettingsRepository frame rate validation** — `coerceIn(1, 120)`.
+- **SettingsScreen deprecated icon** — `Icons.AutoMirrored.Filled.ArrowBack`.
+
+## v2.7.0 Full Wiring + Pro Features + Engine Fixes
+
+### All Features Now Wired
+- **TTS fully wired** — TtsEngine injected into ViewModel. synthesizeTts/previewTts/stopTtsPreview. TtsPanel in EditorScreen. "tts" in textSubMenu.
+- **Filler removal wired** — analyzeFillers() -> detectFillerAndSilence(). applyFillerRemoval() splits + removes. FillerRemovalPanel with detect/apply flow.
+- **Auto-edit wired** — runAutoEdit() -> generateAutoEdit(). Rebuilds video track with quality-ranked segments. AutoEditPanel with clip/music/target cards.
+- **Noise reduction wired** — analyzeAndReduceNoise() -> analyzeNoiseProfile(). Auto-applies recommended DSP. NoiseReductionPanel.
+- **Effect library wired** — exportClipEffects/importEffects via EffectShareEngine .ncfx format.
+
+### New Pro Engines
+- **MultiCamEngine** — Audio waveform cross-correlation sync. Downsamples to 8kHz mono, normalizes, searches +/- maxOffset. `findSyncOffset()` + `syncMultipleClips()`.
+- **EdlExporter** — CMX 3600 EDL + FCPXML 1.10 export. Speed effects (M2 lines), transitions, source comments, asset resources. Desktop import for Premiere/Resolve/FCPX.
+
+### Engine Bug Fixes
+- **Clip.durationMs speed curve support** — 20-point average speed sampling when speedCurve exists.
+- **ProjectAutoSave.release()** — Cancels scope to prevent leaked coroutines.
+- **Timeline thumbnail semaphore** — Max 3 concurrent extractions (was unbounded).
+- **SpeedCurveEditor logarithmic slider** — Equal physical distance for 0.1x-1x and 1x-16x ranges.
+
+### New UI Panels
+- **FillerRemovalPanel.kt** — Detect + remove flow with region count.
+- **AutoEditPanel.kt** — Info cards (clips/music/target) + generate button.
+- **NoiseReductionPanel.kt** — Analyze + auto-fix button with progress.
+
 ## Next Steps
 - FFmpeg integration for broader codec support
 - Frame interpolation AI tool (requires optical flow model)
 - Object removal AI tool (requires inpainting model)
+- True dual-texture blend mode compositing via Media3 Compositor API
+- Community template gallery / sharing
+- Multi-camera sync (audio waveform alignment)
+- EDL/XML project export for desktop continuity
+- EDL/XML project export for desktop continuity

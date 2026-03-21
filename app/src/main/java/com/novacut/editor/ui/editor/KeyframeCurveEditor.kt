@@ -22,34 +22,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.*
+import com.novacut.editor.ui.theme.Mocha
 import kotlin.math.abs
 
-private val Surface0 = Color(0xFF313244)
-private val Surface1 = Color(0xFF45475A)
-private val TextColor = Color(0xFFCDD6F4)
-private val Subtext = Color(0xFFA6ADC8)
-private val Mauve = Color(0xFFCBA6F7)
-private val Red = Color(0xFFF38BA8)
-private val Green = Color(0xFFA6E3A1)
-private val Blue = Color(0xFF89B4FA)
-private val Yellow = Color(0xFFF9E2AF)
-private val Peach = Color(0xFFFAB387)
-private val Teal = Color(0xFF94E2D5)
-private val Crust = Color(0xFF11111B)
 
 private val PROPERTY_COLORS = mapOf(
-    KeyframeProperty.POSITION_X to Red,
-    KeyframeProperty.POSITION_Y to Green,
-    KeyframeProperty.SCALE_X to Blue,
-    KeyframeProperty.SCALE_Y to Teal,
-    KeyframeProperty.ROTATION to Yellow,
-    KeyframeProperty.OPACITY to Mauve,
-    KeyframeProperty.VOLUME to Peach,
-    KeyframeProperty.ANCHOR_X to Red.copy(alpha = 0.5f),
-    KeyframeProperty.ANCHOR_Y to Green.copy(alpha = 0.5f),
-    KeyframeProperty.MASK_FEATHER to Teal.copy(alpha = 0.5f),
-    KeyframeProperty.MASK_EXPANSION to Blue.copy(alpha = 0.5f),
-    KeyframeProperty.MASK_OPACITY to Mauve.copy(alpha = 0.5f)
+    KeyframeProperty.POSITION_X to Mocha.Red,
+    KeyframeProperty.POSITION_Y to Mocha.Green,
+    KeyframeProperty.SCALE_X to Mocha.Blue,
+    KeyframeProperty.SCALE_Y to Mocha.Teal,
+    KeyframeProperty.ROTATION to Mocha.Yellow,
+    KeyframeProperty.OPACITY to Mocha.Mauve,
+    KeyframeProperty.VOLUME to Mocha.Peach,
+    KeyframeProperty.ANCHOR_X to Mocha.Red.copy(alpha = 0.5f),
+    KeyframeProperty.ANCHOR_Y to Mocha.Green.copy(alpha = 0.5f),
+    KeyframeProperty.MASK_FEATHER to Mocha.Teal.copy(alpha = 0.5f),
+    KeyframeProperty.MASK_EXPANSION to Mocha.Blue.copy(alpha = 0.5f),
+    KeyframeProperty.MASK_OPACITY to Mocha.Mauve.copy(alpha = 0.5f)
 )
 
 @Composable
@@ -71,7 +60,7 @@ fun KeyframeCurveEditor(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Mocha.Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(12.dp)
     ) {
         // Header
@@ -80,13 +69,13 @@ fun KeyframeCurveEditor(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Keyframes", color = TextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Keyframes", color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Row {
                 // Preset button
                 var showPresets by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { showPresets = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.AutoAwesome, "Presets", tint = Yellow, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.AutoAwesome, "Presets", tint = Mocha.Yellow, modifier = Modifier.size(18.dp))
                     }
                     DropdownMenu(expanded = showPresets, onDismissRequest = { showPresets = false }) {
                         listOf(
@@ -121,7 +110,7 @@ fun KeyframeCurveEditor(
                     }
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, "Close", tint = Subtext, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -143,7 +132,7 @@ fun KeyframeCurveEditor(
             )
             coreProperties.forEach { prop ->
                 val active = prop in activeProperties
-                val color = PROPERTY_COLORS[prop] ?: TextColor
+                val color = PROPERTY_COLORS[prop] ?: Mocha.Text
                 FilterChip(
                     selected = active,
                     onClick = { onPropertyToggled(prop) },
@@ -152,7 +141,7 @@ fun KeyframeCurveEditor(
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = color.copy(alpha = 0.2f),
                         selectedLabelColor = color,
-                        labelColor = Subtext
+                        labelColor = Mocha.Subtext0
                     ),
                     leadingIcon = if (active) {
                         {
@@ -192,7 +181,7 @@ fun KeyframeCurveEditor(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(180.dp)
-                .background(Surface0, RoundedCornerShape(8.dp))
+                .background(Mocha.Surface0, RoundedCornerShape(8.dp))
         )
 
         // Selected keyframe controls
@@ -201,7 +190,7 @@ fun KeyframeCurveEditor(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Surface0, RoundedCornerShape(8.dp))
+                    .background(Mocha.Surface0, RoundedCornerShape(8.dp))
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -209,12 +198,12 @@ fun KeyframeCurveEditor(
                 Column {
                     Text(
                         "${kf.property.name}: %.2f".format(kf.value),
-                        color = PROPERTY_COLORS[kf.property] ?: TextColor,
+                        color = PROPERTY_COLORS[kf.property] ?: Mocha.Text,
                         fontSize = 12.sp
                     )
                     Text(
                         "@ ${kf.timeOffsetMs}ms",
-                        color = Subtext,
+                        color = Mocha.Subtext0,
                         fontSize = 10.sp
                     )
                 }
@@ -226,7 +215,7 @@ fun KeyframeCurveEditor(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (selected) Mauve.copy(alpha = 0.2f) else Surface1)
+                                .background(if (selected) Mocha.Mauve.copy(alpha = 0.2f) else Mocha.Surface1)
                                 .clickable {
                                     val updated = keyframes.toMutableList()
                                     val idx = updated.indexOf(kf)
@@ -240,7 +229,7 @@ fun KeyframeCurveEditor(
                         ) {
                             Text(
                                 interp.name.take(3),
-                                color = if (selected) Mauve else Subtext,
+                                color = if (selected) Mocha.Mauve else Mocha.Subtext0,
                                 fontSize = 9.sp
                             )
                         }
@@ -254,7 +243,7 @@ fun KeyframeCurveEditor(
                         },
                         modifier = Modifier.size(24.dp)
                     ) {
-                        Icon(Icons.Default.Delete, "Delete", tint = Red, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Delete, "Delete", tint = Mocha.Red, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -348,7 +337,7 @@ private fun CurveCanvas(
             val propKfs = keyframes.filter { it.property == prop }.sortedBy { it.timeOffsetMs }
             if (propKfs.size < 2) return@forEach
 
-            val color = PROPERTY_COLORS[prop] ?: TextColor
+            val color = PROPERTY_COLORS[prop] ?: Mocha.Text
             val range = getPropertyRange(prop)
             val rangeSpan = range.second - range.first
 
@@ -368,7 +357,7 @@ private fun CurveCanvas(
         // Draw keyframe diamonds
         keyframes.forEach { kf ->
             if (kf.property !in activeProperties) return@forEach
-            val color = PROPERTY_COLORS[kf.property] ?: TextColor
+            val color = PROPERTY_COLORS[kf.property] ?: Mocha.Text
             val range = getPropertyRange(kf.property)
             val x = (kf.timeOffsetMs.toFloat() / clipDurationMs) * w
             val y = (1f - (kf.value - range.first) / (range.second - range.first)) * h

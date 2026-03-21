@@ -30,15 +30,15 @@ object ColorMatchEngine {
         uri: Uri,
         timeMs: Long
     ): ColorStats? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
         try {
-            val retriever = MediaMetadataRetriever()
             retriever.setDataSource(context, uri)
             val bitmap = retriever.getFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST)
-            retriever.release()
-
             bitmap?.let { analyzeBitmap(it) }
         } catch (e: Exception) {
             null
+        } finally {
+            try { retriever.release() } catch (_: Exception) { }
         }
     }
 

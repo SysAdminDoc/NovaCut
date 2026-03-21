@@ -23,7 +23,7 @@ object AudioEffectsEngine {
         channels: Int,
         effects: List<AudioEffect>
     ): ShortArray {
-        var buffer = pcm.map { it.toFloat() / 32768f }.toFloatArray()
+        var buffer = FloatArray(pcm.size) { pcm[it].toFloat() / 32768f }
 
         for (effect in effects) {
             if (!effect.enabled) continue
@@ -46,7 +46,7 @@ object AudioEffectsEngine {
             }
         }
 
-        return buffer.map { (it.coerceIn(-1f, 1f) * 32767f).toInt().toShort() }.toShortArray()
+        return ShortArray(buffer.size) { (buffer[it].coerceIn(-1f, 1f) * 32767f).toInt().toShort() }
     }
 
     // --- Biquad filter foundation ---
@@ -178,7 +178,8 @@ object AudioEffectsEngine {
                 peak = maxOf(peak, abs(buffer[i + ch]))
             }
 
-            val coeff = if (peak > envelope) attackCoeff else releaseCoeff
+            // Attack = fast rise (low coeff), Release = slow decay (high coeff)
+            val coeff = if (peak > envelope) releaseCoeff else attackCoeff
             envelope = coeff * envelope + (1f - coeff) * peak
 
             val gain = if (envelope <= threshold) {
@@ -555,12 +556,12 @@ object AudioEffectsEngine {
             }
             energy /= (end - start)
 
-            // Zero crossing rate (speech has moderate ZCR)
+            // Zero crossing rate (speech has moderate ZCR) — step by channels to avoid cross-channel comparison
             var zcr = 0
-            for (i in start + 1 until end) {
-                if ((pcm[i] >= 0) != (pcm[i - 1] >= 0)) zcr++
+            for (i in start + channels until end step channels) {
+                if ((pcm[i] >= 0) != (pcm[i - channels] >= 0)) zcr++
             }
-            val zcrRate = zcr.toFloat() / (end - start)
+            val zcrRate = zcr.toFloat() / ((end - start) / channels)
 
             val isSpeech = energy > 0.001f && zcrRate > 0.01f && zcrRate < 0.3f
 

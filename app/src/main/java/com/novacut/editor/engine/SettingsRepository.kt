@@ -57,7 +57,8 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun updateFrameRate(value: Int) {
-        context.dataStore.edit { it[Keys.FRAME_RATE] = value }
+        val validated = value.coerceIn(1, 120)
+        context.dataStore.edit { it[Keys.FRAME_RATE] = validated }
     }
 
     suspend fun updateAspectRatio(value: AspectRatio) {

@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +25,7 @@ import android.content.Intent
 import android.util.Log
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.*
+import com.novacut.editor.model.SaveIndicatorState
 import com.novacut.editor.ui.export.BatchExportPanel
 import com.novacut.editor.ui.export.ExportSheet
 import com.novacut.editor.ui.mediapicker.MediaPickerSheet
@@ -54,7 +56,11 @@ fun EditorScreen(
         state.showBatchExport || state.showPipPresets || state.showChromaKey ||
         state.showCaptionEditor || state.showChapterMarkers || state.showSnapshotHistory ||
         state.showTextTemplates || state.showMediaManager || state.showAudioNorm ||
-        state.showRenderPreview || state.showCloudBackup
+        state.showRenderPreview || state.showCloudBackup || state.showScopes ||
+        state.showTutorial || state.showUndoHistory || state.showCaptionStyleGallery ||
+        state.showBeatSync || state.showSmartReframe || state.showSpeedPresets ||
+        state.showFillerRemoval || state.showAutoEdit ||
+        state.showTts || state.showEffectLibrary || state.showNoiseReduction
 
     BackHandler(enabled = hasOpenPanel || state.currentTool != EditorTool.NONE || state.selectedClipId != null) {
         when {
@@ -80,7 +86,9 @@ fun EditorScreen(
                 onAddMedia = viewModel::showMediaPicker,
                 onAddTrack = viewModel::addTrack,
                 onExport = viewModel::showExportSheet,
-                onSaveTemplate = viewModel::saveAsTemplate
+                onSaveTemplate = viewModel::saveAsTemplate,
+                editorMode = state.editorMode,
+                onToggleEditorMode = viewModel::toggleEditorMode
             )
 
             // Empty project onboarding hint
@@ -127,6 +135,7 @@ fun EditorScreen(
                 isPlaying = state.isPlaying,
                 isLooping = state.isLooping,
                 aspectRatio = state.project.aspectRatio,
+                frameRate = state.project.frameRate,
                 onTogglePlayback = viewModel::togglePlayback,
                 onToggleLoop = viewModel::toggleLoop,
                 onSeek = viewModel::seekTo,
@@ -161,32 +170,57 @@ fun EditorScreen(
                 }
             }
 
+            // Timeline collapse toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.toggleTimelineCollapse() }
+                    .background(Mocha.Mantle)
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Timeline", color = Mocha.Subtext0, fontSize = 11.sp)
+                Icon(
+                    if (state.isTimelineCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                    contentDescription = "Toggle timeline",
+                    tint = Mocha.Subtext0,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
             // Timeline
-            Timeline(
-                tracks = state.tracks,
-                playheadMs = state.playheadMs,
-                totalDurationMs = state.totalDurationMs,
-                zoomLevel = state.zoomLevel,
-                scrollOffsetMs = state.scrollOffsetMs,
-                selectedClipId = state.selectedClipId,
-                isTrimMode = state.currentTool == EditorTool.TRIM,
-                waveforms = state.waveforms,
-                onClipSelected = viewModel::selectClip,
-                onPlayheadMoved = viewModel::seekTo,
-                onZoomChanged = viewModel::setZoomLevel,
-                onScrollChanged = viewModel::setScrollOffset,
-                onTrimChanged = viewModel::trimClip,
-                onTrimDragStarted = viewModel::beginTrim,
-                onTimelineWidthChanged = viewModel::setTimelineWidth,
-                onToggleTrackMute = viewModel::toggleTrackMute,
-                onToggleTrackVisible = viewModel::toggleTrackVisibility,
-                onToggleTrackLock = viewModel::toggleTrackLock,
-                beatMarkers = state.beatMarkers,
-                selectedClipIds = state.selectedClipIds,
-                onClipLongPress = viewModel::toggleClipMultiSelect,
-                engine = viewModel.engine,
-                modifier = Modifier.weight(0.55f)
-            )
+            AnimatedVisibility(
+                visible = !state.isTimelineCollapsed,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Timeline(
+                    tracks = state.tracks,
+                    playheadMs = state.playheadMs,
+                    totalDurationMs = state.totalDurationMs,
+                    zoomLevel = state.zoomLevel,
+                    scrollOffsetMs = state.scrollOffsetMs,
+                    selectedClipId = state.selectedClipId,
+                    isTrimMode = state.currentTool == EditorTool.TRIM,
+                    waveforms = state.waveforms,
+                    onClipSelected = viewModel::selectClip,
+                    onPlayheadMoved = viewModel::seekTo,
+                    onZoomChanged = viewModel::setZoomLevel,
+                    onScrollChanged = viewModel::setScrollOffset,
+                    onTrimChanged = viewModel::trimClip,
+                    onTrimDragStarted = viewModel::beginTrim,
+                    onTimelineWidthChanged = viewModel::setTimelineWidth,
+                    onToggleTrackMute = viewModel::toggleTrackMute,
+                    onToggleTrackVisible = viewModel::toggleTrackVisibility,
+                    onToggleTrackLock = viewModel::toggleTrackLock,
+                    beatMarkers = state.beatMarkers,
+                    selectedClipIds = state.selectedClipIds,
+                    onClipLongPress = viewModel::toggleClipMultiSelect,
+                    engine = viewModel.engine,
+                    modifier = Modifier.weight(0.55f)
+                )
+            }
 
             // Bottom tool area (PowerDirector-style tab bar + sub-menu grids)
             BottomToolArea(
@@ -194,6 +228,7 @@ fun EditorScreen(
                 hasCopiedEffects = state.copiedEffects.isNotEmpty(),
                 textOverlays = state.textOverlays,
                 onEditTextOverlay = { id -> viewModel.editTextOverlay(id) },
+                editorMode = state.editorMode,
                 onDeleteTextOverlay = { id ->
                     viewModel.removeTextOverlay(id)
                 },
@@ -254,6 +289,16 @@ fun EditorScreen(
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
                         "batch_export" -> viewModel.showBatchExport()
                         "proxy_toggle" -> viewModel.setProxyEnabled(!state.proxySettings.enabled)
+                        "beat_sync" -> viewModel.showBeatSync()
+                        "auto_edit" -> viewModel.showAutoEdit()
+                        "smart_reframe" -> viewModel.showSmartReframe()
+                        "caption_styles" -> viewModel.showCaptionStyleGallery()
+                        "speed_presets" -> viewModel.showSpeedPresets()
+                        "filler_removal" -> viewModel.showFillerRemoval()
+                        "tts" -> viewModel.showTts()
+                        "noise_reduction" -> viewModel.showNoiseReduction()
+                        "effect_library" -> viewModel.showEffectLibrary()
+                        "undo_history" -> viewModel.showUndoHistory()
                         // AI tools
                         "auto_captions" -> viewModel.runAiTool("auto_captions")
                         "scene_detect" -> viewModel.runAiTool("scene_detect")
@@ -269,7 +314,7 @@ fun EditorScreen(
                         "frame_interp" -> viewModel.runAiTool("frame_interp")
                         "object_remove" -> viewModel.runAiTool("object_remove")
                         "bg_replace" -> viewModel.runAiTool("bg_replace")
-                        "smart_reframe" -> viewModel.runAiTool("smart_reframe")
+                        // smart_reframe handled above via showSmartReframe()
                         else -> Log.w("EditorScreen", "Unknown action: $actionId")
                     }
                 }
@@ -569,6 +614,7 @@ fun EditorScreen(
             ColorGradingPanel(
                 colorGrade = clip?.colorGrade ?: ColorGrade(),
                 onColorGradeChanged = viewModel::updateClipColorGrade,
+                onDragStarted = viewModel::beginColorGradeAdjust,
                 onLutImport = viewModel::importLut,
                 onClose = viewModel::hideColorGrading
             )
@@ -914,6 +960,161 @@ fun EditorScreen(
             )
         }
 
+        // Beat Sync
+        AnimatedVisibility(
+            visible = state.showBeatSync,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            BeatSyncPanel(
+                beatMarkers = state.beatMarkers,
+                totalDurationMs = state.totalDurationMs,
+                isAnalyzing = state.isAnalyzingBeats,
+                onAnalyze = viewModel::analyzeBeats,
+                onApplyBeatSync = viewModel::applyBeatSync,
+                onClose = viewModel::hideBeatSync
+            )
+        }
+
+        // Caption Style Gallery
+        AnimatedVisibility(
+            visible = state.showCaptionStyleGallery,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            CaptionStyleGallery(
+                onStyleSelected = viewModel::applyCaptionStyle,
+                onClose = viewModel::hideCaptionStyleGallery
+            )
+        }
+
+        // Speed Presets
+        AnimatedVisibility(
+            visible = state.showSpeedPresets,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            SpeedPresetsPanel(
+                onPresetSelected = viewModel::applySpeedPreset,
+                onClose = viewModel::hideSpeedPresets
+            )
+        }
+
+        // Smart Reframe
+        AnimatedVisibility(
+            visible = state.showSmartReframe,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            SmartReframePanel(
+                currentAspect = state.project.aspectRatio,
+                isProcessing = state.isReframing,
+                onReframe = viewModel::applySmartReframe,
+                onClose = viewModel::hideSmartReframe
+            )
+        }
+
+        // Undo History
+        AnimatedVisibility(
+            visible = state.showUndoHistory,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            UndoHistoryPanel(
+                currentIndex = state.undoStack.size,
+                entries = state.undoHistoryEntries,
+                onJumpTo = viewModel::jumpToUndoState,
+                onClose = viewModel::hideUndoHistory
+            )
+        }
+
+        // TTS Panel
+        AnimatedVisibility(
+            visible = state.showTts,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            TtsPanel(
+                isAvailable = state.isTtsAvailable,
+                isSynthesizing = state.isSynthesizingTts,
+                onSynthesize = viewModel::synthesizeTts,
+                onPreview = viewModel::previewTts,
+                onStopPreview = viewModel::stopTtsPreview,
+                onClose = viewModel::hideTts
+            )
+        }
+
+        // Filler Removal
+        AnimatedVisibility(
+            visible = state.showFillerRemoval,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            FillerRemovalPanel(
+                regionCount = state.fillerRegions.size,
+                isAnalyzing = state.isAnalyzingFillers,
+                onAnalyze = viewModel::analyzeFillers,
+                onApply = viewModel::applyFillerRemoval,
+                onClose = viewModel::hideFillerRemoval
+            )
+        }
+
+        // Auto Edit
+        AnimatedVisibility(
+            visible = state.showAutoEdit,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            AutoEditPanel(
+                clipCount = state.tracks.filter { it.type == com.novacut.editor.model.TrackType.VIDEO }.flatMap { it.clips }.size,
+                hasAudio = state.tracks.any { it.type == com.novacut.editor.model.TrackType.AUDIO && it.clips.isNotEmpty() },
+                isProcessing = state.isAutoEditing,
+                onGenerate = viewModel::runAutoEdit,
+                onClose = viewModel::hideAutoEdit
+            )
+        }
+
+        // Noise Reduction
+        AnimatedVisibility(
+            visible = state.showNoiseReduction,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            NoiseReductionPanel(
+                isAnalyzing = state.isAnalyzingNoise,
+                onAnalyze = viewModel::analyzeAndReduceNoise,
+                onClose = viewModel::hideNoiseReduction
+            )
+        }
+
+        // First Run Tutorial
+        AnimatedVisibility(
+            visible = state.showTutorial,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            FirstRunTutorial(
+                onComplete = viewModel::hideTutorial
+            )
+        }
+
+        // Auto-save indicator (top-end overlay)
+        AutoSaveIndicator(
+            state = state.saveIndicator,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 48.dp, end = 8.dp)
+        )
+
         // Export progress floating overlay
         ExportProgressOverlay(
             exportState = state.exportState,
@@ -1016,6 +1217,8 @@ private fun EditorTopBar(
     onAddTrack: (TrackType) -> Unit,
     onExport: () -> Unit,
     onSaveTemplate: (String) -> Unit = {},
+    editorMode: EditorMode = EditorMode.PRO,
+    onToggleEditorMode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showOverflow by remember { mutableStateOf(false) }
@@ -1153,6 +1356,18 @@ private fun EditorTopBar(
                     .weight(1f)
                     .padding(horizontal = 8.dp)
                     .clickable { showRenameDialog = true }
+            )
+
+            // Mode toggle
+            Text(
+                text = editorMode.label,
+                color = if (editorMode == EditorMode.PRO) Mocha.Mauve else Mocha.Green,
+                fontSize = 10.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Mocha.Surface0)
+                    .clickable { onToggleEditorMode() }
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             )
 
             if (selectedClipId != null) {

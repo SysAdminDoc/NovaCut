@@ -22,21 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.*
+import com.novacut.editor.ui.theme.Mocha
 import kotlin.math.*
-
-// Catppuccin Mocha colors
-private val Surface0 = Color(0xFF313244)
-private val Surface1 = Color(0xFF45475A)
-private val Surface2 = Color(0xFF585B70)
-private val Text = Color(0xFFCDD6F4)
-private val Subtext = Color(0xFFA6ADC8)
-private val Mauve = Color(0xFFCBA6F7)
-private val Red = Color(0xFFF38BA8)
-private val Green = Color(0xFFA6E3A1)
-private val Blue = Color(0xFF89B4FA)
-private val Peach = Color(0xFFFAB387)
-private val Yellow = Color(0xFFF9E2AF)
-private val Crust = Color(0xFF11111B)
 
 enum class ColorGradingTab(val label: String) {
     WHEELS("Wheels"),
@@ -49,6 +36,7 @@ enum class ColorGradingTab(val label: String) {
 fun ColorGradingPanel(
     colorGrade: ColorGrade,
     onColorGradeChanged: (ColorGrade) -> Unit,
+    onDragStarted: () -> Unit = {},
     onLutImport: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -58,7 +46,7 @@ fun ColorGradingPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Mocha.Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(12.dp)
     ) {
         // Header
@@ -67,15 +55,15 @@ fun ColorGradingPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Color Grading", color = Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Color Grading", color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Row {
                 IconButton(onClick = {
                     onColorGradeChanged(ColorGrade())
                 }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Refresh, "Reset", tint = Peach, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Refresh, "Reset", tint = Mocha.Peach, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, "Close", tint = Subtext, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -86,7 +74,7 @@ fun ColorGradingPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Surface0, RoundedCornerShape(8.dp))
+                .background(Mocha.Surface0, RoundedCornerShape(8.dp))
                 .padding(2.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
@@ -96,14 +84,14 @@ fun ColorGradingPanel(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (selected) Mauve.copy(alpha = 0.2f) else Color.Transparent)
+                        .background(if (selected) Mocha.Mauve.copy(alpha = 0.2f) else Color.Transparent)
                         .clickable { activeTab = tab }
                         .padding(vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         tab.label,
-                        color = if (selected) Mauve else Subtext,
+                        color = if (selected) Mocha.Mauve else Mocha.Subtext0,
                         fontSize = 12.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
@@ -121,9 +109,9 @@ fun ColorGradingPanel(
                 .verticalScroll(rememberScrollState())
         ) {
             when (activeTab) {
-                ColorGradingTab.WHEELS -> ColorWheelsContent(colorGrade, onColorGradeChanged)
-                ColorGradingTab.CURVES -> CurvesContent(colorGrade, onColorGradeChanged)
-                ColorGradingTab.HSL -> HslContent(colorGrade, onColorGradeChanged)
+                ColorGradingTab.WHEELS -> ColorWheelsContent(colorGrade, onColorGradeChanged, onDragStarted)
+                ColorGradingTab.CURVES -> CurvesContent(colorGrade, onColorGradeChanged, onDragStarted)
+                ColorGradingTab.HSL -> HslContent(colorGrade, onColorGradeChanged, onDragStarted)
                 ColorGradingTab.LUT -> LutContent(colorGrade, onColorGradeChanged, onLutImport)
             }
         }
@@ -133,7 +121,8 @@ fun ColorGradingPanel(
 @Composable
 private fun ColorWheelsContent(
     grade: ColorGrade,
-    onChange: (ColorGrade) -> Unit
+    onChange: (ColorGrade) -> Unit,
+    onDragStarted: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Three color wheels: Lift, Gamma, Gain
@@ -145,18 +134,21 @@ private fun ColorWheelsContent(
                 label = "Lift",
                 r = grade.liftR, g = grade.liftG, b = grade.liftB,
                 onChanged = { r, g, b -> onChange(grade.copy(liftR = r, liftG = g, liftB = b)) },
+                onDragStarted = onDragStarted,
                 modifier = Modifier.weight(1f)
             )
             ColorWheel(
                 label = "Gamma",
                 r = grade.gammaR - 1f, g = grade.gammaG - 1f, b = grade.gammaB - 1f,
                 onChanged = { r, g, b -> onChange(grade.copy(gammaR = r + 1f, gammaG = g + 1f, gammaB = b + 1f)) },
+                onDragStarted = onDragStarted,
                 modifier = Modifier.weight(1f)
             )
             ColorWheel(
                 label = "Gain",
                 r = grade.gainR - 1f, g = grade.gainG - 1f, b = grade.gainB - 1f,
                 onChanged = { r, g, b -> onChange(grade.copy(gainR = r + 1f, gainG = g + 1f, gainB = b + 1f)) },
+                onDragStarted = onDragStarted,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -164,10 +156,10 @@ private fun ColorWheelsContent(
         Spacer(Modifier.height(12.dp))
 
         // Offset sliders
-        Text("Offset", color = Subtext, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp))
-        GradingSlider("R", grade.offsetR, -0.5f, 0.5f, Red) { onChange(grade.copy(offsetR = it)) }
-        GradingSlider("G", grade.offsetG, -0.5f, 0.5f, Green) { onChange(grade.copy(offsetG = it)) }
-        GradingSlider("B", grade.offsetB, -0.5f, 0.5f, Blue) { onChange(grade.copy(offsetB = it)) }
+        Text("Offset", color = Mocha.Subtext0, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp))
+        GradingSlider("R", grade.offsetR, -0.5f, 0.5f, Mocha.Red) { onChange(grade.copy(offsetR = it)) }
+        GradingSlider("G", grade.offsetG, -0.5f, 0.5f, Mocha.Green) { onChange(grade.copy(offsetG = it)) }
+        GradingSlider("B", grade.offsetB, -0.5f, 0.5f, Mocha.Blue) { onChange(grade.copy(offsetB = it)) }
     }
 }
 
@@ -176,20 +168,21 @@ private fun ColorWheel(
     label: String,
     r: Float, g: Float, b: Float,
     onChanged: (Float, Float, Float) -> Unit,
+    onDragStarted: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier.padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(label, color = Subtext, fontSize = 10.sp)
+        Text(label, color = Mocha.Subtext0, fontSize = 10.sp)
         Spacer(Modifier.height(4.dp))
 
         Box(
             modifier = Modifier
                 .size(90.dp)
                 .clip(CircleShape)
-                .background(Surface0)
+                .background(Mocha.Surface0)
                 .drawBehind {
                     // Draw color wheel background
                     val center = Offset(size.width / 2, size.height / 2)
@@ -218,7 +211,9 @@ private fun ColorWheel(
                     drawCircle(Color.White, 6f, Offset(dotX, dotY), style = Stroke(2f))
                 }
                 .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
+                    detectDragGestures(
+                        onDragStart = { onDragStarted() }
+                    ) { change, _ ->
                         val cx = size.width / 2f
                         val cy = size.height / 2f
                         val dx = ((change.position.x - cx) / cx).coerceIn(-0.5f, 0.5f)
@@ -232,7 +227,7 @@ private fun ColorWheel(
         // Reset button
         Text(
             "Reset",
-            color = Peach.copy(alpha = 0.7f),
+            color = Mocha.Peach.copy(alpha = 0.7f),
             fontSize = 9.sp,
             modifier = Modifier
                 .clickable { onChanged(0f, 0f, 0f) }
@@ -267,12 +262,12 @@ private fun GradingSlider(
             colors = SliderDefaults.colors(
                 thumbColor = color,
                 activeTrackColor = color.copy(alpha = 0.6f),
-                inactiveTrackColor = Surface1
+                inactiveTrackColor = Mocha.Surface1
             )
         )
         Text(
             "%.2f".format(value),
-            color = Subtext,
+            color = Mocha.Subtext0,
             fontSize = 10.sp,
             modifier = Modifier.width(36.dp)
         )
@@ -282,7 +277,8 @@ private fun GradingSlider(
 @Composable
 private fun CurvesContent(
     grade: ColorGrade,
-    onChange: (ColorGrade) -> Unit
+    onChange: (ColorGrade) -> Unit,
+    onDragStarted: () -> Unit = {}
 ) {
     var activeCurve by remember { mutableStateOf("master") }
     val curves = grade.curves
@@ -293,7 +289,7 @@ private fun CurvesContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            listOf("master" to Text, "red" to Red, "green" to Green, "blue" to Blue).forEach { (id, color) ->
+            listOf("master" to Mocha.Text, "red" to Mocha.Red, "green" to Mocha.Green, "blue" to Mocha.Blue).forEach { (id, color) ->
                 val selected = activeCurve == id
                 Box(
                     modifier = Modifier
@@ -304,7 +300,7 @@ private fun CurvesContent(
                 ) {
                     Text(
                         id.replaceFirstChar { it.uppercase() },
-                        color = if (selected) color else Subtext,
+                        color = if (selected) color else Mocha.Subtext0,
                         fontSize = 11.sp
                     )
                 }
@@ -321,15 +317,16 @@ private fun CurvesContent(
             else -> curves.master
         }
         val curveColor = when (activeCurve) {
-            "red" -> Red
-            "green" -> Green
-            "blue" -> Blue
-            else -> Text
+            "red" -> Mocha.Red
+            "green" -> Mocha.Green
+            "blue" -> Mocha.Blue
+            else -> Mocha.Text
         }
 
         CurveEditor(
             points = points,
             color = curveColor,
+            onDragStarted = onDragStarted,
             onPointsChanged = { newPoints ->
                 val newCurves = when (activeCurve) {
                     "red" -> curves.copy(red = newPoints)
@@ -342,7 +339,7 @@ private fun CurvesContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp)
-                .background(Surface0, RoundedCornerShape(8.dp))
+                .background(Mocha.Surface0, RoundedCornerShape(8.dp))
         )
     }
 }
@@ -352,6 +349,7 @@ private fun CurveEditor(
     points: List<CurvePoint>,
     color: Color,
     onPointsChanged: (List<CurvePoint>) -> Unit,
+    onDragStarted: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var dragIndex by remember { mutableIntStateOf(-1) }
@@ -361,6 +359,7 @@ private fun CurveEditor(
             .pointerInput(points) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        onDragStarted()
                         val x = offset.x / size.width
                         val y = 1f - offset.y / size.height
                         // Find nearest point or create new one
@@ -400,12 +399,12 @@ private fun CurveEditor(
         // Grid lines
         for (i in 1..3) {
             val pos = i / 4f
-            drawLine(Surface2, Offset(pos * w, 0f), Offset(pos * w, h), 1f)
-            drawLine(Surface2, Offset(0f, pos * h), Offset(w, pos * h), 1f)
+            drawLine(Mocha.Surface2, Offset(pos * w, 0f), Offset(pos * w, h), 1f)
+            drawLine(Mocha.Surface2, Offset(0f, pos * h), Offset(w, pos * h), 1f)
         }
 
         // Diagonal reference line
-        drawLine(Surface1, Offset(0f, h), Offset(w, 0f), 1f)
+        drawLine(Mocha.Surface1, Offset(0f, h), Offset(w, 0f), 1f)
 
         // Draw curve
         if (points.size >= 2) {
@@ -461,7 +460,8 @@ private fun evaluateCurveSmooth(points: List<CurvePoint>, x: Float): Float {
 @Composable
 private fun HslContent(
     grade: ColorGrade,
-    onChange: (ColorGrade) -> Unit
+    onChange: (ColorGrade) -> Unit,
+    onDragStarted: () -> Unit = {}
 ) {
     val hsl = grade.hslQualifier ?: HslQualifier()
 
@@ -471,50 +471,50 @@ private fun HslContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("HSL Qualifier", color = Text, fontSize = 13.sp)
+            Text("HSL Qualifier", color = Mocha.Text, fontSize = 13.sp)
             Switch(
                 checked = grade.hslQualifier != null,
                 onCheckedChange = { enabled ->
                     onChange(grade.copy(hslQualifier = if (enabled) HslQualifier() else null))
                 },
-                colors = SwitchDefaults.colors(checkedTrackColor = Mauve)
+                colors = SwitchDefaults.colors(checkedTrackColor = Mocha.Mauve)
             )
         }
 
         if (grade.hslQualifier != null) {
             Spacer(Modifier.height(8.dp))
-            Text("Selection", color = Subtext, fontSize = 11.sp)
-            GradingSlider("Hue", hsl.hueCenter, 0f, 360f, Yellow) {
+            Text("Selection", color = Mocha.Subtext0, fontSize = 11.sp)
+            GradingSlider("Hue", hsl.hueCenter, 0f, 360f, Mocha.Yellow) {
                 onChange(grade.copy(hslQualifier = hsl.copy(hueCenter = it)))
             }
-            GradingSlider("Width", hsl.hueWidth, 1f, 180f, Yellow) {
+            GradingSlider("Width", hsl.hueWidth, 1f, 180f, Mocha.Yellow) {
                 onChange(grade.copy(hslQualifier = hsl.copy(hueWidth = it)))
             }
-            GradingSlider("Sat Min", hsl.satMin, 0f, 1f, Mauve) {
+            GradingSlider("Sat Min", hsl.satMin, 0f, 1f, Mocha.Mauve) {
                 onChange(grade.copy(hslQualifier = hsl.copy(satMin = it)))
             }
-            GradingSlider("Sat Max", hsl.satMax, 0f, 1f, Mauve) {
+            GradingSlider("Sat Max", hsl.satMax, 0f, 1f, Mocha.Mauve) {
                 onChange(grade.copy(hslQualifier = hsl.copy(satMax = it)))
             }
-            GradingSlider("Lum Min", hsl.lumMin, 0f, 1f, Text) {
+            GradingSlider("Lum Min", hsl.lumMin, 0f, 1f, Mocha.Text) {
                 onChange(grade.copy(hslQualifier = hsl.copy(lumMin = it)))
             }
-            GradingSlider("Lum Max", hsl.lumMax, 0f, 1f, Text) {
+            GradingSlider("Lum Max", hsl.lumMax, 0f, 1f, Mocha.Text) {
                 onChange(grade.copy(hslQualifier = hsl.copy(lumMax = it)))
             }
-            GradingSlider("Soft", hsl.softness, 0f, 0.5f, Peach) {
+            GradingSlider("Soft", hsl.softness, 0f, 0.5f, Mocha.Peach) {
                 onChange(grade.copy(hslQualifier = hsl.copy(softness = it)))
             }
 
             Spacer(Modifier.height(8.dp))
-            Text("Adjustment", color = Subtext, fontSize = 11.sp)
-            GradingSlider("Hue", hsl.adjustHue, -180f, 180f, Yellow) {
+            Text("Adjustment", color = Mocha.Subtext0, fontSize = 11.sp)
+            GradingSlider("Hue", hsl.adjustHue, -180f, 180f, Mocha.Yellow) {
                 onChange(grade.copy(hslQualifier = hsl.copy(adjustHue = it)))
             }
-            GradingSlider("Sat", hsl.adjustSat, -1f, 1f, Mauve) {
+            GradingSlider("Sat", hsl.adjustSat, -1f, 1f, Mocha.Mauve) {
                 onChange(grade.copy(hslQualifier = hsl.copy(adjustSat = it)))
             }
-            GradingSlider("Lum", hsl.adjustLum, -1f, 1f, Text) {
+            GradingSlider("Lum", hsl.adjustLum, -1f, 1f, Mocha.Text) {
                 onChange(grade.copy(hslQualifier = hsl.copy(adjustLum = it)))
             }
         }
@@ -535,26 +535,26 @@ private fun LutContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Active LUT", color = Text, fontSize = 13.sp)
+                    Text("Active LUT", color = Mocha.Text, fontSize = 13.sp)
                     Text(
                         grade.lutPath.substringAfterLast("/"),
-                        color = Subtext,
+                        color = Mocha.Subtext0,
                         fontSize = 11.sp
                     )
                 }
                 IconButton(onClick = {
                     onChange(grade.copy(lutPath = null, lutIntensity = 1f))
                 }) {
-                    Icon(Icons.Default.Delete, "Remove LUT", tint = Red)
+                    Icon(Icons.Default.Delete, "Remove LUT", tint = Mocha.Red)
                 }
             }
 
             Spacer(Modifier.height(8.dp))
-            GradingSlider("Intensity", grade.lutIntensity, 0f, 1f, Mauve) {
+            GradingSlider("Intensity", grade.lutIntensity, 0f, 1f, Mocha.Mauve) {
                 onChange(grade.copy(lutIntensity = it))
             }
         } else {
-            Text("No LUT loaded", color = Subtext, fontSize = 13.sp)
+            Text("No LUT loaded", color = Mocha.Subtext0, fontSize = 13.sp)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -562,12 +562,12 @@ private fun LutContent(
         Button(
             onClick = onLutImport,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Mauve.copy(alpha = 0.2f)),
+            colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve.copy(alpha = 0.2f)),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Icon(Icons.Default.FileOpen, "Import", tint = Mauve, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.FileOpen, "Import", tint = Mocha.Mauve, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Import LUT (.cube / .3dl)", color = Mauve)
+            Text("Import LUT (.cube / .3dl)", color = Mocha.Mauve)
         }
     }
 }

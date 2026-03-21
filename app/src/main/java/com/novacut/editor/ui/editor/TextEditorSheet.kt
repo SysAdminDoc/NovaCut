@@ -35,8 +35,6 @@ fun TextEditorSheet(
     var italic by remember { mutableStateOf(existingOverlay?.italic ?: false) }
     var alignment by remember { mutableStateOf(existingOverlay?.alignment ?: TextAlignment.CENTER) }
     var selectedColor by remember { mutableLongStateOf(existingOverlay?.color ?: 0xFFFFFFFF) }
-    var strokeWidth by remember { mutableFloatStateOf(existingOverlay?.strokeWidth ?: 0f) }
-    var strokeColor by remember { mutableLongStateOf(existingOverlay?.strokeColor ?: 0xFF000000) }
     var animIn by remember { mutableStateOf(existingOverlay?.animationIn ?: TextAnimation.FADE) }
     var animOut by remember { mutableStateOf(existingOverlay?.animationOut ?: TextAnimation.FADE) }
     var fontFamily by remember { mutableStateOf(existingOverlay?.fontFamily ?: "sans-serif") }
@@ -93,8 +91,8 @@ fun TextEditorSheet(
                             bold = bold,
                             italic = italic,
                             alignment = alignment,
-                            strokeWidth = strokeWidth,
-                            strokeColor = strokeColor,
+                            strokeWidth = 0f,
+                            strokeColor = 0xFF000000,
                             startTimeMs = existingOverlay?.startTimeMs ?: playheadMs,
                             endTimeMs = (existingOverlay?.startTimeMs ?: playheadMs) + duration.toLong(),
                             animationIn = animIn,
@@ -283,31 +281,6 @@ fun TextEditorSheet(
                         selectedContainerColor = Mocha.Mauve.copy(alpha = 0.3f),
                         selectedLabelColor = Mocha.Mauve
                     )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // --- Stroke ---
-        Text("Stroke", color = Mocha.Subtext1, fontSize = 12.sp)
-        EffectSlider("Stroke Width", strokeWidth, 0f, 10f) { strokeWidth = it }
-        Text("Stroke Color", color = Mocha.Subtext1, fontSize = 12.sp)
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(vertical = 4.dp)
-        ) {
-            items(colorOptions) { color ->
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(Color(color))
-                        .then(
-                            if (strokeColor == color) Modifier.border(2.dp, Mocha.Mauve, CircleShape)
-                            else Modifier.border(1.dp, Mocha.Surface1, CircleShape)
-                        )
-                        .clickable { strokeColor = color }
                 )
             }
         }

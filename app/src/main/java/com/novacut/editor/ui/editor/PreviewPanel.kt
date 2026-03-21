@@ -30,6 +30,7 @@ fun PreviewPanel(
     isPlaying: Boolean,
     isLooping: Boolean = false,
     aspectRatio: AspectRatio = AspectRatio.RATIO_16_9,
+    frameRate: Int = 30,
     onTogglePlayback: () -> Unit,
     onToggleLoop: () -> Unit = {},
     onSeek: (Long) -> Unit,
@@ -38,6 +39,7 @@ fun PreviewPanel(
     onToggleScopes: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val frameStepMs = (1000L / frameRate.coerceAtLeast(1))
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -140,7 +142,7 @@ fun PreviewPanel(
 
             // Previous frame
             IconButton(
-                onClick = { onSeek((playheadMs - 33).coerceAtLeast(0)) },
+                onClick = { onSeek((playheadMs - frameStepMs).coerceAtLeast(0)) },
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
@@ -170,7 +172,7 @@ fun PreviewPanel(
 
             // Next frame
             IconButton(
-                onClick = { onSeek((playheadMs + 33).coerceAtMost(totalDurationMs)) },
+                onClick = { onSeek((playheadMs + frameStepMs).coerceAtMost(totalDurationMs)) },
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(

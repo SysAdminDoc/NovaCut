@@ -107,7 +107,23 @@ data class Clip(
     val motionTrackingData: MotionTrackingData? = null,
     val captions: List<Caption> = emptyList()
 ) {
-    val durationMs: Long get() = ((trimEndMs - trimStartMs) / speed.coerceAtLeast(0.01f)).toLong()
+    val durationMs: Long get() {
+        val trimRange = trimEndMs - trimStartMs
+        if (trimRange <= 0) return 0L
+        val effectiveSpeed = if (speedCurve != null && speedCurve.points.size >= 2) {
+            // Average speed across curve sample points
+            val samples = 20
+            var sumSpeed = 0f
+            for (i in 0 until samples) {
+                val t = i.toLong() * trimRange / samples
+                sumSpeed += speedCurve.getSpeedAt(t, trimRange).coerceAtLeast(0.01f)
+            }
+            (sumSpeed / samples).coerceAtLeast(0.01f)
+        } else {
+            speed.coerceAtLeast(0.01f)
+        }
+        return (trimRange / effectiveSpeed).toLong()
+    }
     val timelineEndMs: Long get() = timelineStartMs + durationMs
 
     fun getEffectiveSpeed(timeOffsetMs: Long): Float {
@@ -870,3 +886,83 @@ enum class SortMode(val label: String) {
     NAME_DESC("Z-A"),
     DURATION_DESC("Longest")
 }
+
+// --- Caption Style Templates ---
+
+enum class CaptionTemplateType(val displayName: String) {
+    CLASSIC("Classic"),
+    KARAOKE("Karaoke"),
+    WORD_BY_WORD("Word by Word"),
+    BOUNCE("Bounce"),
+    GLOW("Glow"),
+    OUTLINE("Outline"),
+    SHADOW_POP("Shadow Pop"),
+    GRADIENT("Gradient"),
+    TYPEWRITER("Typewriter"),
+    NEON("Neon"),
+    COMIC("Comic"),
+    MINIMAL("Minimal"),
+    BOLD_CENTER("Bold Center"),
+    LOWER_THIRD("Lower Third"),
+    SUBTITLE("Subtitle")
+}
+
+data class CaptionStyleTemplate(
+    val id: String = UUID.randomUUID().toString(),
+    val type: CaptionTemplateType,
+    val fontFamily: String = "sans-serif",
+    val fontSize: Float = 24f,
+    val textColor: Long = 0xFFFFFFFF,
+    val backgroundColor: Long = 0x80000000,
+    val outlineColor: Long = 0xFF000000,
+    val outlineWidth: Float = 0f,
+    val shadowColor: Long = 0x80000000,
+    val shadowOffsetX: Float = 2f,
+    val shadowOffsetY: Float = 2f,
+    val positionY: Float = 0.85f,
+    val animation: TextAnimation = TextAnimation.FADE,
+    val highlightColor: Long = 0xFFFFD700,
+    val wordByWord: Boolean = false
+)
+
+// --- Speed Curve Named Presets ---
+
+enum class SpeedPresetType(val displayName: String, val description: String) {
+    BULLET_TIME("Bullet Time", "Dramatic slow-mo with speed ramp"),
+    HERO_TIME("Hero Time", "Slow entrance, normal exit"),
+    MONTAGE("Montage", "Fast cuts with brief pauses"),
+    JUMP_CUT("Jump Cut", "Instant speed changes"),
+    SMOOTH_RAMP_UP("Smooth Ramp Up", "Gradually accelerate"),
+    SMOOTH_RAMP_DOWN("Smooth Ramp Down", "Gradually decelerate"),
+    PULSE("Pulse", "Rhythmic speed oscillation"),
+    FLASH("Flash", "Brief fast forward"),
+    DREAMY("Dreamy", "Slow with gentle waves"),
+    REWIND("Rewind", "Fast reverse feel")
+}
+
+// --- Auto-save indicator ---
+
+enum class SaveIndicatorState {
+    HIDDEN, SAVING, SAVED, ERROR
+}
+
+// --- First-run tutorial ---
+
+data class TutorialStep(
+    val id: String,
+    val title: String,
+    val description: String,
+    val highlightArea: TutorialHighlight
+)
+
+enum class TutorialHighlight {
+    TIMELINE, PREVIEW, TOOL_BAR, ADD_MEDIA, EXPORT, EFFECTS
+}
+
+// --- Undo history entry for visual display ---
+
+data class UndoHistoryEntry(
+    val index: Int,
+    val description: String,
+    val timestamp: Long = System.currentTimeMillis()
+)

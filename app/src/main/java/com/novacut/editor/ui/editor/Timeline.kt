@@ -68,6 +68,7 @@ fun Timeline(
     // Thumbnail cache — quantize zoom to prevent unbounded cache growth
     val thumbnails = remember { mutableStateMapOf<String, List<Bitmap>>() }
     val quantizedZoom = (zoomLevel * 4).toInt() / 4f // quantize to 0.25 steps
+    val thumbnailSemaphore = remember { kotlinx.coroutines.sync.Semaphore(3) }
 
     // Load thumbnails for visible clips — evict stale zoom levels to prevent OOM
     LaunchedEffect(tracks, quantizedZoom) {
@@ -78,9 +79,14 @@ fun Timeline(
                 val key = "${clip.id}_${quantizedZoom}"
                 if (!thumbnails.containsKey(key)) {
                     launch {
-                        val count = ((clip.durationMs * pixelsPerMs) / 80f).toInt().coerceIn(1, 20)
-                        val strip = engine.extractThumbnailStrip(clip.sourceUri, count)
-                        thumbnails[key] = strip
+                        thumbnailSemaphore.acquire()
+                        try {
+                            val count = ((clip.durationMs * pixelsPerMs) / 80f).toInt().coerceIn(1, 20)
+                            val strip = engine.extractThumbnailStrip(clip.sourceUri, count)
+                            thumbnails[key] = strip
+                        } finally {
+                            thumbnailSemaphore.release()
+                        }
                     }
                 }
             }
@@ -154,57 +160,59 @@ fun Timeline(
                 // Ruler spacer
                 Spacer(modifier = Modifier.height(rulerHeight))
 
-                tracks.forEach { track ->
-                    val trackColor = when (track.type) {
-                        TrackType.VIDEO -> Mocha.Blue
-                        TrackType.AUDIO -> Mocha.Green
-                        TrackType.OVERLAY -> Mocha.Peach
-                        TrackType.TEXT -> Mocha.Mauve
-                        TrackType.ADJUSTMENT -> Mocha.Yellow
-                    }
-                    Column(
-                        modifier = Modifier
-                            .height(trackHeight)
-                            .fillMaxWidth()
-                            .background(Mocha.Crust)
-                            .border(0.5.dp, Mocha.Surface0),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = when (track.type) {
-                                TrackType.VIDEO -> Icons.Default.Videocam
-                                TrackType.AUDIO -> Icons.Default.MusicNote
-                                TrackType.OVERLAY -> Icons.Default.Layers
-                                TrackType.TEXT -> Icons.Default.Title
-                                TrackType.ADJUSTMENT -> Icons.Default.Tune
-                            },
-                            contentDescription = track.type.name,
-                            tint = if (track.isVisible) trackColor else Mocha.Surface2,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Row(
-                            modifier = Modifier.padding(top = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(1.dp)
+                for (track in tracks) {
+                    key(track.id) {
+                        val trackColor = when (track.type) {
+                            TrackType.VIDEO -> Mocha.Blue
+                            TrackType.AUDIO -> Mocha.Green
+                            TrackType.OVERLAY -> Mocha.Peach
+                            TrackType.TEXT -> Mocha.Mauve
+                            TrackType.ADJUSTMENT -> Mocha.Yellow
+                        }
+                        Column(
+                            modifier = Modifier
+                                .height(trackHeight)
+                                .fillMaxWidth()
+                                .background(Mocha.Crust)
+                                .border(0.5.dp, Mocha.Surface0),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                if (track.isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                contentDescription = if (track.isMuted) "Unmute" else "Mute",
-                                tint = if (track.isMuted) Mocha.Red.copy(alpha = 0.7f) else Mocha.Surface2,
-                                modifier = Modifier.size(11.dp).clickable { onToggleTrackMute(track.id) }
+                                imageVector = when (track.type) {
+                                    TrackType.VIDEO -> Icons.Default.Videocam
+                                    TrackType.AUDIO -> Icons.Default.MusicNote
+                                    TrackType.OVERLAY -> Icons.Default.Layers
+                                    TrackType.TEXT -> Icons.Default.Title
+                                    TrackType.ADJUSTMENT -> Icons.Default.Tune
+                                },
+                                contentDescription = track.type.name,
+                                tint = if (track.isVisible) trackColor else Mocha.Surface2,
+                                modifier = Modifier.size(14.dp)
                             )
-                            Icon(
-                                if (track.isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = if (track.isVisible) "Hide" else "Show",
-                                tint = if (!track.isVisible) Mocha.Red.copy(alpha = 0.7f) else Mocha.Surface2,
-                                modifier = Modifier.size(11.dp).clickable { onToggleTrackVisible(track.id) }
-                            )
-                            Icon(
-                                if (track.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                contentDescription = if (track.isLocked) "Unlock" else "Lock",
-                                tint = if (track.isLocked) Mocha.Peach.copy(alpha = 0.7f) else Mocha.Surface2,
-                                modifier = Modifier.size(11.dp).clickable { onToggleTrackLock(track.id) }
-                            )
+                            Row(
+                                modifier = Modifier.padding(top = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(1.dp)
+                            ) {
+                                Icon(
+                                    if (track.isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                    contentDescription = if (track.isMuted) "Unmute" else "Mute",
+                                    tint = if (track.isMuted) Mocha.Red.copy(alpha = 0.7f) else Mocha.Surface2,
+                                    modifier = Modifier.size(11.dp).clickable { onToggleTrackMute(track.id) }
+                                )
+                                Icon(
+                                    if (track.isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (track.isVisible) "Hide" else "Show",
+                                    tint = if (!track.isVisible) Mocha.Red.copy(alpha = 0.7f) else Mocha.Surface2,
+                                    modifier = Modifier.size(11.dp).clickable { onToggleTrackVisible(track.id) }
+                                )
+                                Icon(
+                                    if (track.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                    contentDescription = if (track.isLocked) "Unlock" else "Lock",
+                                    tint = if (track.isLocked) Mocha.Peach.copy(alpha = 0.7f) else Mocha.Surface2,
+                                    modifier = Modifier.size(11.dp).clickable { onToggleTrackLock(track.id) }
+                                )
+                            }
                         }
                     }
                 }
@@ -268,7 +276,8 @@ fun Timeline(
                     }
 
                     // Tracks
-                    tracks.forEach { track ->
+                    for (track in tracks) {
+                    key(track.id) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -615,7 +624,7 @@ fun Timeline(
                             }
                         }
                     }
-                }
+                    }
 
                 // Playhead indicator on ruler
                 val playheadPx = ((playheadMs - scrollOffsetMs) * pixelsPerMs)
@@ -637,6 +646,7 @@ fun Timeline(
                 }
             }
         }
+    }
     }
 }
 

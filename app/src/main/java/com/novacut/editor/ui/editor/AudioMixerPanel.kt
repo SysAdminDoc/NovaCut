@@ -24,19 +24,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.*
+import com.novacut.editor.ui.theme.Mocha
 
-private val Surface0 = Color(0xFF313244)
-private val Surface1 = Color(0xFF45475A)
-private val Surface2 = Color(0xFF585B70)
-private val TextColor = Color(0xFFCDD6F4)
-private val Subtext = Color(0xFFA6ADC8)
-private val Mauve = Color(0xFFCBA6F7)
-private val Red = Color(0xFFF38BA8)
-private val Green = Color(0xFFA6E3A1)
-private val Blue = Color(0xFF89B4FA)
-private val Yellow = Color(0xFFF9E2AF)
-private val Peach = Color(0xFFFAB387)
-private val Crust = Color(0xFF11111B)
 
 @Composable
 fun AudioMixerPanel(
@@ -58,7 +47,7 @@ fun AudioMixerPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Mocha.Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(12.dp)
     ) {
         // Header
@@ -67,9 +56,9 @@ fun AudioMixerPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Audio Mixer", color = TextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Audio Mixer", color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Close", tint = Subtext, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -118,7 +107,7 @@ fun AudioMixerPanel(
                         .fillMaxWidth()
                         .padding(top = 8.dp)
                 ) {
-                    Divider(color = Surface1, thickness = 1.dp)
+                    Divider(color = Mocha.Surface1, thickness = 1.dp)
                     Spacer(Modifier.height(8.dp))
 
                     // Effect chain
@@ -129,13 +118,13 @@ fun AudioMixerPanel(
                     ) {
                         Text(
                             "Effects: ${track.type.name} Track ${tracks.indexOf(track) + 1}",
-                            color = TextColor, fontSize = 13.sp
+                            color = Mocha.Text, fontSize = 13.sp
                         )
                         // Add effect dropdown
                         var showAddMenu by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Add, "Add Effect", tint = Green, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Add, "Add Effect", tint = Mocha.Green, modifier = Modifier.size(18.dp))
                             }
                             DropdownMenu(
                                 expanded = showAddMenu,
@@ -158,7 +147,7 @@ fun AudioMixerPanel(
 
                     // Effect chain list
                     if (track.audioEffects.isEmpty()) {
-                        Text("No effects", color = Subtext, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
+                        Text("No effects", color = Mocha.Subtext0, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
                     } else {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -216,13 +205,13 @@ private fun ChannelStrip(
         modifier = Modifier
             .width(56.dp)
             .fillMaxHeight()
-            .background(Surface0, RoundedCornerShape(8.dp))
+            .background(Mocha.Surface0, RoundedCornerShape(8.dp))
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         // Track label
-        Text(trackLabel, color = TextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(trackLabel, color = Mocha.Text, fontSize = 10.sp, fontWeight = FontWeight.Bold)
 
         // VU Meter
         VUMeter(
@@ -237,7 +226,7 @@ private fun ChannelStrip(
         // Volume value
         Text(
             "${(track.volume * 100).toInt()}%",
-            color = Subtext,
+            color = Mocha.Subtext0,
             fontSize = 9.sp
         )
 
@@ -246,7 +235,7 @@ private fun ChannelStrip(
             modifier = Modifier
                 .size(24.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Surface1)
+                .background(Mocha.Surface1)
                 .clickable { onPanChanged(0f) }, // double-click to reset
             contentAlignment = Alignment.Center
         ) {
@@ -256,7 +245,7 @@ private fun ChannelStrip(
                     track.pan > 0.1f -> "R"
                     else -> "C"
                 },
-                color = Subtext,
+                color = Mocha.Subtext0,
                 fontSize = 9.sp
             )
         }
@@ -268,11 +257,11 @@ private fun ChannelStrip(
             modifier = Modifier
                 .size(24.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(if (track.isMuted) Red.copy(alpha = 0.3f) else Surface1)
+                .background(if (track.isMuted) Mocha.Red.copy(alpha = 0.3f) else Mocha.Surface1)
                 .clickable { onMuteToggled() },
             contentAlignment = Alignment.Center
         ) {
-            Text("M", color = if (track.isMuted) Red else Subtext, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("M", color = if (track.isMuted) Mocha.Red else Mocha.Subtext0, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
 
         // Solo button
@@ -280,11 +269,11 @@ private fun ChannelStrip(
             modifier = Modifier
                 .size(24.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(if (track.isSolo) Yellow.copy(alpha = 0.3f) else Surface1)
+                .background(if (track.isSolo) Mocha.Yellow.copy(alpha = 0.3f) else Mocha.Surface1)
                 .clickable { onSoloToggled() },
             contentAlignment = Alignment.Center
         ) {
-            Text("S", color = if (track.isSolo) Yellow else Subtext, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("S", color = if (track.isSolo) Mocha.Yellow else Mocha.Subtext0, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
 
         // FX button
@@ -292,13 +281,13 @@ private fun ChannelStrip(
             modifier = Modifier
                 .size(24.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(if (isEffectsExpanded) Mauve.copy(alpha = 0.3f) else Surface1)
+                .background(if (isEffectsExpanded) Mocha.Mauve.copy(alpha = 0.3f) else Mocha.Surface1)
                 .clickable { onEffectsClicked() },
             contentAlignment = Alignment.Center
         ) {
             Text(
                 "FX",
-                color = if (track.audioEffects.isNotEmpty()) Mauve else Subtext,
+                color = if (track.audioEffects.isNotEmpty()) Mocha.Mauve else Mocha.Subtext0,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -319,14 +308,14 @@ private fun VUMeter(
         val gap = w * 0.1f
 
         // Background
-        drawRoundRect(Surface1, cornerRadius = CornerRadius(2f, 2f))
+        drawRoundRect(Mocha.Surface1, cornerRadius = CornerRadius(2f, 2f))
 
         // Left bar
         val leftHeight = h * left.coerceIn(0f, 1f)
         val leftColor = when {
-            left > 0.9f -> Red
-            left > 0.7f -> Yellow
-            else -> Green
+            left > 0.9f -> Mocha.Red
+            left > 0.7f -> Mocha.Yellow
+            else -> Mocha.Green
         }
         drawRect(
             leftColor,
@@ -337,9 +326,9 @@ private fun VUMeter(
         // Right bar
         val rightHeight = h * right.coerceIn(0f, 1f)
         val rightColor = when {
-            right > 0.9f -> Red
-            right > 0.7f -> Yellow
-            else -> Green
+            right > 0.9f -> Mocha.Red
+            right > 0.7f -> Mocha.Yellow
+            else -> Mocha.Green
         }
         drawRect(
             rightColor,
@@ -350,7 +339,7 @@ private fun VUMeter(
         // Tick marks
         for (i in 0..4) {
             val y = h * i / 4f
-            drawLine(Surface2, Offset(0f, y), Offset(w, y), 0.5f)
+            drawLine(Mocha.Surface2, Offset(0f, y), Offset(w, y), 0.5f)
         }
     }
 }
@@ -361,15 +350,15 @@ private fun MasterBusStrip() {
         modifier = Modifier
             .width(56.dp)
             .fillMaxHeight()
-            .background(Surface0.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
-            .border(1.dp, Mauve.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            .background(Mocha.Surface0.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+            .border(1.dp, Mocha.Mauve.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("MST", color = Mauve, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text("MST", color = Mocha.Mauve, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
-        Icon(Icons.Default.GraphicEq, "Master", tint = Mauve, modifier = Modifier.size(24.dp))
+        Icon(Icons.Default.GraphicEq, "Master", tint = Mocha.Mauve, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -383,7 +372,7 @@ private fun AudioEffectChip(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) Mauve.copy(alpha = 0.2f) else Surface1)
+            .background(if (isSelected) Mocha.Mauve.copy(alpha = 0.2f) else Mocha.Surface1)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -392,11 +381,11 @@ private fun AudioEffectChip(
         Box(
             modifier = Modifier
                 .size(6.dp)
-                .background(if (effect.enabled) Green else Red, RoundedCornerShape(3.dp))
+                .background(if (effect.enabled) Mocha.Green else Mocha.Red, RoundedCornerShape(3.dp))
         )
         Text(
             effect.type.displayName,
-            color = if (isSelected) Mauve else TextColor,
+            color = if (isSelected) Mocha.Mauve else Mocha.Text,
             fontSize = 11.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -404,7 +393,7 @@ private fun AudioEffectChip(
         Icon(
             Icons.Default.Close,
             "Remove",
-            tint = Subtext,
+            tint = Mocha.Subtext0,
             modifier = Modifier
                 .size(14.dp)
                 .clickable(onClick = onRemove)
@@ -422,10 +411,10 @@ private fun AudioEffectParams(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Surface0, RoundedCornerShape(8.dp))
+            .background(Mocha.Surface0, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        Text(effect.type.displayName, color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(effect.type.displayName, color = Mocha.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
 
         effect.params.forEach { (param, value) ->
@@ -438,7 +427,7 @@ private fun AudioEffectParams(
             ) {
                 Text(
                     formatParamName(param),
-                    color = Subtext,
+                    color = Mocha.Subtext0,
                     fontSize = 10.sp,
                     modifier = Modifier.width(60.dp)
                 )
@@ -450,14 +439,14 @@ private fun AudioEffectParams(
                         .weight(1f)
                         .height(20.dp),
                     colors = SliderDefaults.colors(
-                        thumbColor = Mauve,
-                        activeTrackColor = Mauve.copy(alpha = 0.6f),
-                        inactiveTrackColor = Surface1
+                        thumbColor = Mocha.Mauve,
+                        activeTrackColor = Mocha.Mauve.copy(alpha = 0.6f),
+                        inactiveTrackColor = Mocha.Surface1
                     )
                 )
                 Text(
                     formatParamValue(param, value),
-                    color = Subtext,
+                    color = Mocha.Subtext0,
                     fontSize = 9.sp,
                     modifier = Modifier.width(40.dp)
                 )
