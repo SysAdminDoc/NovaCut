@@ -502,7 +502,7 @@ data class AutoSaveState(
                 fadeOutMs = json.optLong("fadeOutMs", 0L),
                 blendMode = safeValueOf(json.optString("blendMode", "NORMAL"), BlendMode.NORMAL),
                 isCompound = json.optBoolean("isCompound", false),
-                linkedClipId = json.optString("linkedClipId", null).takeIf { !it.isNullOrEmpty() },
+                linkedClipId = json.optString("linkedClipId", "").takeIf { it.isNotEmpty() },
                 effects = (0 until effectsArr.length()).mapNotNull { i ->
                     try { deserializeEffect(effectsArr.getJSONObject(i)) } catch (e: Exception) {
                         Log.w(TAG, "Failed to deserialize effect $i", e); null
@@ -581,7 +581,7 @@ data class AutoSaveState(
                 gammaR = json.optDouble("gammaR", 1.0).toFloat(), gammaG = json.optDouble("gammaG", 1.0).toFloat(), gammaB = json.optDouble("gammaB", 1.0).toFloat(),
                 gainR = json.optDouble("gainR", 1.0).toFloat(), gainG = json.optDouble("gainG", 1.0).toFloat(), gainB = json.optDouble("gainB", 1.0).toFloat(),
                 offsetR = json.optDouble("offsetR", 0.0).toFloat(), offsetG = json.optDouble("offsetG", 0.0).toFloat(), offsetB = json.optDouble("offsetB", 0.0).toFloat(),
-                lutPath = json.optString("lutPath", null).takeIf { !it.isNullOrEmpty() },
+                lutPath = json.optString("lutPath", "").takeIf { it.isNotEmpty() },
                 lutIntensity = json.optDouble("lutIntensity", 1.0).toFloat(),
                 hslQualifier = json.optJSONObject("hsl")?.let { hsl ->
                     HslQualifier(

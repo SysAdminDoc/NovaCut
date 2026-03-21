@@ -1863,8 +1863,11 @@ class EditorViewModel @Inject constructor(
             _state.update { it.copy(isSynthesizingTts = false) }
             if (file != null) {
                 val uri = android.net.Uri.fromFile(file)
-                val durationMs = 3000L // Approximate, will be corrected on load
+                // Query actual duration from the generated audio file
+                val durationMs = videoEngine.getVideoDuration(uri).takeIf { it > 0 } ?: 3000L
+                saveUndoState("Add TTS voice")
                 addClipToTrack(uri, durationMs, TrackType.AUDIO)
+                rebuildTimeline()
                 showToast("Voice added to audio track")
                 hideTts()
             } else {
@@ -3514,8 +3517,9 @@ class EditorViewModel @Inject constructor(
         autoSave.stop()
         voiceoverDurationJob?.cancel()
         voiceoverEngine.release()
+        ttsEngine.stopPreview()
         videoEngine.removePlayerListener()
         videoEngine.resetExportState()
-        // DON'T call videoEngine.release() — it's a @Singleton that outlives this ViewModel
+        // DON'T call videoEngine.release() or ttsEngine.release() — they're @Singletons
     }
 }

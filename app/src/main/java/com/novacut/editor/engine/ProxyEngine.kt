@@ -49,7 +49,7 @@ class ProxyEngine @Inject constructor(
         return file.exists().also { if (it) proxyMap[key] = Uri.fromFile(file) }
     }
 
-    @OptIn(UnstableApi::class)
+    @androidx.annotation.OptIn(UnstableApi::class)
     suspend fun generateProxy(
         sourceUri: Uri,
         resolution: ProxyResolution,

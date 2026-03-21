@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -190,7 +192,7 @@ fun TextEditorSheet(
             )
             FilterChip(
                 onClick = { alignment = TextAlignment.LEFT },
-                label = { Icon(Icons.Default.FormatAlignLeft, null, modifier = Modifier.size(16.dp)) },
+                label = { Icon(Icons.AutoMirrored.Filled.FormatAlignLeft, null, modifier = Modifier.size(16.dp)) },
                 selected = alignment == TextAlignment.LEFT,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Mocha.Mauve.copy(alpha = 0.3f)
@@ -206,7 +208,7 @@ fun TextEditorSheet(
             )
             FilterChip(
                 onClick = { alignment = TextAlignment.RIGHT },
-                label = { Icon(Icons.Default.FormatAlignRight, null, modifier = Modifier.size(16.dp)) },
+                label = { Icon(Icons.AutoMirrored.Filled.FormatAlignRight, null, modifier = Modifier.size(16.dp)) },
                 selected = alignment == TextAlignment.RIGHT,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Mocha.Mauve.copy(alpha = 0.3f)

@@ -107,7 +107,7 @@ fun AudioMixerPanel(
                         .fillMaxWidth()
                         .padding(top = 8.dp)
                 ) {
-                    Divider(color = Mocha.Surface1, thickness = 1.dp)
+                    HorizontalDivider(color = Mocha.Surface1, thickness = 1.dp)
                     Spacer(Modifier.height(8.dp))
 
                     // Effect chain

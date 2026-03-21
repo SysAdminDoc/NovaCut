@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,7 +69,7 @@ val aiTools = listOf(
     AiToolConfig(
         "denoise", "Denoise Audio",
         "Remove background noise",
-        Icons.Default.VolumeOff, Mocha.Flamingo
+        Icons.AutoMirrored.Filled.VolumeOff, Mocha.Flamingo
     )
 )
 

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -92,7 +93,7 @@ private val clipMotionSubMenu = listOf(
 private val clipColorSubMenu = listOf(
     SubMenuItem("color_grade", Icons.Default.Palette, "Color\nGrade"),
     SubMenuItem("effects", Icons.Default.AutoFixHigh, "Effects"),
-    SubMenuItem("audio_norm", Icons.Default.VolumeUp, "Normalize\nAudio")
+    SubMenuItem("audio_norm", Icons.AutoMirrored.Filled.VolumeUp, "Normalize\nAudio")
 )
 
 // Clip mode — AI Magic tab sub-menu (expanded)

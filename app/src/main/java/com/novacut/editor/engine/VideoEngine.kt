@@ -528,7 +528,7 @@ class VideoEngine @Inject constructor(
                 // Apply speed: variable speed curve via SpeedProvider, or constant speed
                 if (clip.speedCurve != null && clip.speedCurve.points.size >= 2) {
                     val curve = clip.speedCurve
-                    val clipDurMs = clip.durationMs
+                    val clipDurMs = clip.trimEndMs - clip.trimStartMs // Use source time range for curve normalization
                     itemBuilder.setSpeed(object : androidx.media3.common.audio.SpeedProvider {
                         override fun getSpeed(presentationTimeUs: Long): Float {
                             val timeMs = presentationTimeUs / 1000L
@@ -1283,11 +1283,6 @@ private class VolumeAudioProcessor(
         }
 
         outputBuffer.flip()
-    }
-
-    override fun onFlush() {
-        super.onFlush()
-        processedFrames = 0L
     }
 
     override fun onReset() {

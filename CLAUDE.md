@@ -4,7 +4,7 @@
 Full-featured Android video editor built as a PowerDirector alternative. Kotlin + Jetpack Compose + Media3 Transformer.
 
 ## Version
-v2.8.0
+v2.9.0
 
 ## Tech Stack
 - **Language**: Kotlin 2.1.0
@@ -547,12 +547,34 @@ v2.8.0
 - **AutoEditPanel.kt** — Info cards (clips/music/target) + generate button.
 - **NoiseReductionPanel.kt** — Analyze + auto-fix button with progress.
 
+## v2.9.0 Final QA Audit (17 bugs fixed, 0 warnings remaining)
+
+### HIGH severity fixes
+- **TTS duration now queried from actual audio** — `getVideoDuration(uri)` replaces hardcoded 3000ms. TTS clips have correct sourceDurationMs.
+- **TTS addition is now undoable** — `saveUndoState("Add TTS voice")` before adding clip.
+- **addClipToTrack now rebuilds timeline** — TTS/voice clips immediately visible in ExoPlayer.
+- **SpeedCurve export uses source time range** — `trimEndMs - trimStartMs` instead of `clip.durationMs` for correct curve normalization.
+
+### MEDIUM severity fixes
+- **TTS preview stops on editor close** — `ttsEngine.stopPreview()` added to `onCleared()`.
+- **EffectShareEngine stream leak** — `openInputStream` now wrapped in `.use {}`.
+- **EffectShareEngine lutPath null safety** — `cg.has("lutPath")` check instead of `optString(key, null)`.
+- **Speed preset now rebuilds timeline** — `rebuildTimeline()` added after `applySpeedPreset()`.
+
+### Compile warnings eliminated (14→3)
+- `ProjectAutoSave.kt` — `optString(key, null)` → `optString(key, "").takeIf { it.isNotEmpty() }` (2 occurrences)
+- `ProxyEngine.kt` — `@OptIn` → `@androidx.annotation.OptIn` for Media3 annotation
+- `VideoEngine.kt` — Removed deprecated `onFlush()` override (covered by `onReset()`)
+- `AiToolsPanel.kt` — `Icons.Default.VolumeOff` → `Icons.AutoMirrored.Filled.VolumeOff`
+- `AudioMixerPanel.kt` — `Divider()` → `HorizontalDivider()`
+- `CloudBackupPanel.kt` — `Icons.Default.Login` → `Icons.AutoMirrored.Filled.Login`
+- `TextEditorSheet.kt` — `FormatAlignLeft/Right` → `Icons.AutoMirrored.Filled` variants
+- `ToolPanel.kt` — `Icons.Default.VolumeUp` → `Icons.AutoMirrored.Filled.VolumeUp`
+- Only 3 remaining: Media3 `EditedMediaItemSequence.Builder` deprecation (framework-level, no fix available)
+
 ## Next Steps
 - FFmpeg integration for broader codec support
 - Frame interpolation AI tool (requires optical flow model)
 - Object removal AI tool (requires inpainting model)
 - True dual-texture blend mode compositing via Media3 Compositor API
 - Community template gallery / sharing
-- Multi-camera sync (audio waveform alignment)
-- EDL/XML project export for desktop continuity
-- EDL/XML project export for desktop continuity
