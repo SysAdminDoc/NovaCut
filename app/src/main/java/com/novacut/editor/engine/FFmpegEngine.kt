@@ -5,6 +5,8 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import io.github.nicholasryan.ffmpegx.FFmpegX
+import org.json.JSONObject
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -64,10 +66,7 @@ class FFmpegEngine @Inject constructor(
             return@withContext -1
         }
         try {
-            // Reflective call to avoid hard compile-time dependency
-            val ffmpegClass = Class.forName("io.github.nicholasryan.ffmpegx.FFmpegX")
-            val executeMethod = ffmpegClass.getMethod("execute", String::class.java)
-            val result = executeMethod.invoke(null, command) as Int
+            val result = FFmpegX.execute(command)
             onProgress(1f)
             result
         } catch (e: Exception) {
@@ -113,14 +112,36 @@ class FFmpegEngine @Inject constructor(
         truePeakDb: Float = -1f,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        // Pass 1: measure
+        // Pass 1: measure loudness
         val measureCmd = "-i \"${inputFile.absolutePath}\" " +
-            "-af loudnorm=I=$targetLufs:TP=$truePeakDb:LRA=11:print_format=json -f null -"
-        // TODO: Parse JSON output for measured values
-        // Pass 2: apply with measured values
-        // For now, single-pass (less accurate but functional):
+            "-af loudnorm=I=$targetLufs:TP=$truePeakDb:LRA=11:print_format=json -f null /dev/null"
+        val pass1Result = FFmpegX.execute(measureCmd)
+        if (pass1Result != 0) {
+            Log.e(TAG, "Loudness measurement (pass 1) failed with code $pass1Result")
+            return@withContext false
+        }
+
+        // Parse measured values from JSON output
+        val output = FFmpegX.getLastCommandOutput()
+        val jsonStart = output.lastIndexOf('{')
+        val jsonEnd = output.lastIndexOf('}')
+        if (jsonStart < 0 || jsonEnd < 0) {
+            Log.e(TAG, "Could not find loudnorm JSON in FFmpeg output")
+            return@withContext false
+        }
+        val json = JSONObject(output.substring(jsonStart, jsonEnd + 1))
+        val measuredI = json.getString("input_i")
+        val measuredLRA = json.getString("input_lra")
+        val measuredTP = json.getString("input_tp")
+        val measuredThresh = json.getString("input_thresh")
+
+        onProgress(0.5f)
+
+        // Pass 2: apply correction with measured values
         val cmd = "-i \"${inputFile.absolutePath}\" " +
-            "-af loudnorm=I=$targetLufs:TP=$truePeakDb:LRA=11 " +
+            "-af loudnorm=I=$targetLufs:TP=$truePeakDb:LRA=11" +
+            ":measured_I=$measuredI:measured_LRA=$measuredLRA" +
+            ":measured_TP=$measuredTP:measured_thresh=$measuredThresh " +
             "-c:v copy \"${outputFile.absolutePath}\""
         execute(cmd, onProgress) == 0
     }
@@ -130,9 +151,9 @@ class FFmpegEngine @Inject constructor(
      */
     fun isAvailable(): Boolean {
         return try {
-            Class.forName("io.github.nicholasryan.ffmpegx.FFmpegX")
+            FFmpegX::class.java
             true
-        } catch (_: ClassNotFoundException) {
+        } catch (_: NoClassDefFoundError) {
             false
         }
     }

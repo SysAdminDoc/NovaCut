@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 63
-        versionName = "3.0.0"
+        versionCode = 64
+        versionName = "3.4.0"
     }
 
     signingConfigs {
@@ -135,23 +135,24 @@ dependencies {
     // MediaPipe (selfie segmentation for BG removal)
     implementation(libs.mediapipe.tasks.vision)
 
-    // Tier 2 dependencies (uncomment when ready to integrate):
-    // implementation("com.k2fsa.sherpa:onnx-android:1.10.+")  // Sherpa-ONNX ASR (51x faster Whisper)
-    // implementation("io.github.kaleyravideo:android-deepfilternet:0.5.+")  // ML noise reduction
-    // implementation("com.github.nicholasryan:aubio-android:0.4.+")  // aubio beat detection (NDK)
-    implementation("com.airbnb.android:lottie-compose:6.+")  // Lottie animated titles
+    // Tier 2: Sherpa-ONNX (Piper TTS + faster Whisper)
+    implementation(libs.sherpa.onnx.android)
 
-    // Tier 3 dependencies (uncomment when ready to integrate):
-    // implementation("org.opencv:opencv-android:4.9.+")  // OpenCV for stabilization
-    // implementation("com.google.mediapipe:tasks-vision:0.10.+")  // Face/pose detection for smart reframe
-    // implementation("io.github.nicholasryan:ffmpegx-android:6.1.+")  // FFmpeg fallback encoder
+    // Tier 2: DeepFilterNet ML noise reduction
+    implementation(libs.deepfilternet.android)
 
-    // Tier 4 dependencies (uncomment when ready to integrate):
-    // implementation("com.github.nicholasryan:mobilesam-android:0.1.+")  // MobileSAM tap-to-segment
-    implementation("io.opentimelineio:opentimelineio-java:0.15.+")  // OTIO timeline exchange
-    // implementation("com.google.protobuf:protobuf-javalite:4.+")  // Protobuf project format
-    // implementation("androidx.work:work-runtime-ktx:2.9.+")  // WorkManager for proxy generation (active via libs catalog)
+    // Tier 2: Lottie animated titles
+    implementation(libs.lottie.compose)
 
-    // Tier 5 dependencies (uncomment when ready to integrate):
-    // implementation("app.rive:rive-android:9.+")  // Rive interactive templates
+    // Tier 3: NCNN + Vulkan (RIFE frame interpolation)
+    implementation(libs.ncnn.android.vulkan)
+
+    // Tier 3: FFmpegX fallback encoder
+    implementation(libs.ffmpegx.android)
+
+    // Tier 4: OTIO timeline exchange
+    implementation(libs.opentimelineio.java)
+
+    // Tier 4: OkHttp (cloud inpainting API)
+    implementation(libs.okhttp)
 }

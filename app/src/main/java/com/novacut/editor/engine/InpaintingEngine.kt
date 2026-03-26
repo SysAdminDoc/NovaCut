@@ -1,13 +1,21 @@
 package com.novacut.editor.engine
 
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
+import java.nio.FloatBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -107,16 +115,39 @@ class InpaintingEngine @Inject constructor(
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
         val modelDir = File(context.filesDir, "models/inpainting").also { it.mkdirs() }
+        val outputFile = File(modelDir, MODEL_FILENAME)
         try {
-            // TODO: Implement actual model download from MODEL_URL
-            // val response = httpClient.get(MODEL_URL)
-            // val outputFile = File(modelDir, MODEL_FILENAME)
-            // response.bodyAsChannel().copyToWithProgress(outputFile, MODEL_SIZE_BYTES, onProgress)
-            Log.d(TAG, "Model download stub — LaMa-Dilated model not yet bundled")
+            Log.d(TAG, "Downloading LaMa-Dilated model from $MODEL_URL")
+            val connection = URL(MODEL_URL).openConnection().apply {
+                connectTimeout = 30_000
+                readTimeout = 30_000
+            }
+            val contentLength = connection.contentLengthLong.let {
+                if (it > 0) it else MODEL_SIZE_BYTES
+            }
+
+            val tempFile = File(modelDir, "$MODEL_FILENAME.tmp")
+            BufferedInputStream(connection.getInputStream(), 8192).use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    val buffer = ByteArray(8192)
+                    var totalBytesRead = 0L
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        onProgress((totalBytesRead.toFloat() / contentLength).coerceIn(0f, 1f))
+                    }
+                }
+            }
+
+            tempFile.renameTo(outputFile)
+            Log.d(TAG, "LaMa model downloaded: ${outputFile.length()} bytes")
             onProgress(1f)
-            false
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to download LaMa model", e)
+            outputFile.delete()
+            File(modelDir, "$MODEL_FILENAME.tmp").delete()
             false
         }
     }
@@ -160,52 +191,68 @@ class InpaintingEngine @Inject constructor(
         }
 
         try {
-            // TODO: ONNX Runtime inference for LaMa-Dilated
-            //
-            // val env = OrtEnvironment.getEnvironment()
-            // val sessionOptions = OrtSession.SessionOptions().apply {
-            //     // Try NNAPI first (Qualcomm NPU), fall back to CPU
-            //     try { addNnapi() } catch (_: Exception) { }
-            // }
-            // val session = env.createSession(
-            //     File(context.filesDir, "models/inpainting/$MODEL_FILENAME").absolutePath,
-            //     sessionOptions
-            // )
-            //
-            // // Preprocess: resize to 512x512, normalize to [0,1]
-            // val inputBitmap = Bitmap.createScaledBitmap(bitmap, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true)
-            // val maskBitmap = Bitmap.createScaledBitmap(mask, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true)
-            //
-            // val inputTensor = bitmapToFloatTensor(inputBitmap, normalize = true)  // [1, 3, 512, 512]
-            // val maskTensor = bitmapToFloatTensor(maskBitmap, grayscale = true)     // [1, 1, 512, 512]
-            //
-            // onProgress(0.3f)
-            //
-            // val results = session.run(mapOf("image" to inputTensor, "mask" to maskTensor))
-            // val outputTensor = results[0].value as Array<Array<Array<FloatArray>>>
-            //
-            // onProgress(0.8f)
-            //
-            // // Postprocess: convert output tensor back to bitmap, resize to original dimensions
-            // val outputBitmap = floatTensorToBitmap(outputTensor, bitmap.width, bitmap.height)
-            //
-            // session.close()
-            // env.close()
-            //
-            // onProgress(1f)
-            // return@withContext InpaintingResult(
-            //     outputBitmap = outputBitmap,
-            //     processingTimeMs = System.currentTimeMillis() - startTime,
-            //     inputResolution = bitmap.width to bitmap.height,
-            //     processedResolution = MODEL_INPUT_SIZE to MODEL_INPUT_SIZE
-            // )
+            // ONNX Runtime inference for LaMa-Dilated
+            val env = OrtEnvironment.getEnvironment()
+            val sessionOptions = OrtSession.SessionOptions().apply {
+                // Try NNAPI first (Qualcomm NPU), fall back to CPU
+                try { addNnapi() } catch (_: Exception) { }
+            }
+            val modelPath = File(context.filesDir, "models/inpainting/$MODEL_FILENAME").absolutePath
+            val session = env.createSession(modelPath, sessionOptions)
 
-            Log.d(TAG, "inpaintFrame stub — LaMa inference not yet implemented")
+            // Preprocess: resize to 512x512, normalize to [0,1]
+            val inputBitmap = Bitmap.createScaledBitmap(bitmap, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true)
+            val maskBitmap = Bitmap.createScaledBitmap(mask, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, true)
+
+            val imageTensor = bitmapToFloatTensor(env, inputBitmap, channels = 3)  // [1, 3, 512, 512]
+            val maskTensor = bitmapToFloatTensor(env, maskBitmap, channels = 1)     // [1, 1, 512, 512]
+
+            onProgress(0.3f)
+
+            val results = session.run(mapOf("image" to imageTensor, "mask" to maskTensor))
+            val outputData = (results[0].value as Array<*>)
+
+            onProgress(0.8f)
+
+            // Postprocess: convert output tensor back to bitmap, resize to original dimensions
+            @Suppress("UNCHECKED_CAST")
+            val outputBitmap = floatTensorToBitmap(
+                outputData as Array<Array<Array<FloatArray>>>,
+                bitmap.width, bitmap.height
+            )
+
+            imageTensor.close()
+            maskTensor.close()
+            results.close()
+            session.close()
+
+            if (inputBitmap !== bitmap) inputBitmap.recycle()
+            if (maskBitmap !== mask) maskBitmap.recycle()
+
             onProgress(1f)
-            null
+            Log.d(TAG, "LaMa inference completed in ${System.currentTimeMillis() - startTime}ms")
+            return@withContext InpaintingResult(
+                outputBitmap = outputBitmap,
+                processingTimeMs = System.currentTimeMillis() - startTime,
+                inputResolution = bitmap.width to bitmap.height,
+                processedResolution = MODEL_INPUT_SIZE to MODEL_INPUT_SIZE
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Inpainting failed", e)
-            null
+            Log.e(TAG, "ONNX inference failed, falling back to pixel-averaging", e)
+            // Fallback: simple pixel-averaging inpainting
+            try {
+                val fallbackBitmap = fallbackInpaint(bitmap, mask)
+                onProgress(1f)
+                return@withContext InpaintingResult(
+                    outputBitmap = fallbackBitmap,
+                    processingTimeMs = System.currentTimeMillis() - startTime,
+                    inputResolution = bitmap.width to bitmap.height,
+                    processedResolution = bitmap.width to bitmap.height
+                )
+            } catch (fallbackError: Exception) {
+                Log.e(TAG, "Fallback inpainting also failed", fallbackError)
+                null
+            }
         }
     }
 
@@ -284,5 +331,160 @@ class InpaintingEngine @Inject constructor(
             Log.e(TAG, "Video inpainting failed", e)
             null
         }
+    }
+
+    /**
+     * Convert a Bitmap to an ONNX float tensor in NCHW layout, normalized to [0, 1].
+     *
+     * @param env OrtEnvironment for tensor creation
+     * @param bitmap Source bitmap (should already be resized to model input dimensions)
+     * @param channels 3 for RGB image, 1 for grayscale mask
+     * @return OnnxTensor shaped [1, channels, height, width]
+     */
+    private fun bitmapToFloatTensor(
+        env: OrtEnvironment,
+        bitmap: Bitmap,
+        channels: Int
+    ): OnnxTensor {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        val bufferSize = 1 * channels * height * width
+        val floatBuffer = FloatBuffer.allocate(bufferSize)
+
+        if (channels == 3) {
+            // NCHW layout: [1, 3, H, W] — R plane, then G plane, then B plane
+            for (c in 0 until 3) {
+                for (y in 0 until height) {
+                    for (x in 0 until width) {
+                        val pixel = pixels[y * width + x]
+                        val value = when (c) {
+                            0 -> Color.red(pixel) / 255f
+                            1 -> Color.green(pixel) / 255f
+                            2 -> Color.blue(pixel) / 255f
+                            else -> 0f
+                        }
+                        floatBuffer.put(value)
+                    }
+                }
+            }
+        } else {
+            // Single channel mask: [1, 1, H, W] — use red channel, threshold to 0 or 1
+            for (y in 0 until height) {
+                for (x in 0 until width) {
+                    val pixel = pixels[y * width + x]
+                    val value = if (Color.red(pixel) > 127) 1f else 0f
+                    floatBuffer.put(value)
+                }
+            }
+        }
+
+        floatBuffer.rewind()
+        val shape = longArrayOf(1L, channels.toLong(), height.toLong(), width.toLong())
+        return OnnxTensor.createTensor(env, floatBuffer, shape)
+    }
+
+    /**
+     * Convert an ONNX output tensor in NCHW layout back to a Bitmap.
+     *
+     * @param tensorData Output tensor data shaped [1, 3, H, W] with values in [0, 1]
+     * @param targetWidth Desired output width (will scale from model resolution)
+     * @param targetHeight Desired output height (will scale from model resolution)
+     * @return Bitmap at the target resolution
+     */
+    private fun floatTensorToBitmap(
+        tensorData: Array<Array<Array<FloatArray>>>,
+        targetWidth: Int,
+        targetHeight: Int
+    ): Bitmap {
+        // tensorData shape: [1][3][H][W]
+        val channelData = tensorData[0] // [3][H][W]
+        val modelHeight = channelData[0].size
+        val modelWidth = channelData[0][0].size
+
+        val pixels = IntArray(modelWidth * modelHeight)
+        for (y in 0 until modelHeight) {
+            for (x in 0 until modelWidth) {
+                val r = (channelData[0][y][x].coerceIn(0f, 1f) * 255f).toInt()
+                val g = (channelData[1][y][x].coerceIn(0f, 1f) * 255f).toInt()
+                val b = (channelData[2][y][x].coerceIn(0f, 1f) * 255f).toInt()
+                pixels[y * modelWidth + x] = Color.argb(255, r, g, b)
+            }
+        }
+
+        val modelBitmap = Bitmap.createBitmap(modelWidth, modelHeight, Bitmap.Config.ARGB_8888)
+        modelBitmap.setPixels(pixels, 0, modelWidth, 0, 0, modelWidth, modelHeight)
+
+        return if (targetWidth != modelWidth || targetHeight != modelHeight) {
+            val scaled = Bitmap.createScaledBitmap(modelBitmap, targetWidth, targetHeight, true)
+            modelBitmap.recycle()
+            scaled
+        } else {
+            modelBitmap
+        }
+    }
+
+    /**
+     * Fallback inpainting using simple pixel-averaging when ONNX inference is unavailable.
+     * For each masked pixel, averages the nearest unmasked neighbor pixels.
+     */
+    private fun fallbackInpaint(bitmap: Bitmap, mask: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val scaledMask = if (mask.width != width || mask.height != height) {
+            Bitmap.createScaledBitmap(mask, width, height, false)
+        } else {
+            mask
+        }
+
+        val srcPixels = IntArray(width * height)
+        val maskPixels = IntArray(width * height)
+        bitmap.getPixels(srcPixels, 0, width, 0, 0, width, height)
+        scaledMask.getPixels(maskPixels, 0, width, 0, 0, width, height)
+
+        val outPixels = srcPixels.copyOf()
+        val isMasked = BooleanArray(width * height) { Color.red(maskPixels[it]) > 127 }
+
+        // Simple iterative averaging: sweep multiple passes to propagate fill inward
+        val maxPasses = maxOf(width, height)
+        val tempPixels = outPixels.copyOf()
+        for (pass in 0 until minOf(maxPasses, 50)) {
+            var changed = false
+            for (y in 0 until height) {
+                for (x in 0 until width) {
+                    val idx = y * width + x
+                    if (!isMasked[idx]) continue
+
+                    var rSum = 0; var gSum = 0; var bSum = 0; var count = 0
+                    // Sample 4-connected neighbors
+                    for ((dx, dy) in arrayOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)) {
+                        val nx = x + dx; val ny = y + dy
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val nIdx = ny * width + nx
+                            if (!isMasked[nIdx] || pass > 0) {
+                                rSum += Color.red(outPixels[nIdx])
+                                gSum += Color.green(outPixels[nIdx])
+                                bSum += Color.blue(outPixels[nIdx])
+                                count++
+                            }
+                        }
+                    }
+                    if (count > 0) {
+                        tempPixels[idx] = Color.argb(255, rSum / count, gSum / count, bSum / count)
+                        changed = true
+                    }
+                }
+            }
+            System.arraycopy(tempPixels, 0, outPixels, 0, outPixels.size)
+            if (!changed) break
+        }
+
+        if (scaledMask !== mask) scaledMask.recycle()
+
+        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        result.setPixels(outPixels, 0, width, 0, 0, width, height)
+        return result
     }
 }
