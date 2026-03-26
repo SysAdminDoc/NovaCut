@@ -56,7 +56,7 @@ class NoiseReductionEngine @Inject constructor(
         // Analyze spectral characteristics of the audio
 
         // Fallback: basic spectral analysis
-        val audioEngine = AudioEffectsEngine()
+        val audioEngine = AudioEffectsEngine
         // Analyze first 2 seconds for noise floor estimation
         NoiseProfile(
             type = "broadband",

@@ -1851,7 +1851,7 @@ class EditorViewModel @Inject constructor(
                 val firstClip = _state.value.tracks.flatMap { it.clips }.firstOrNull()
                 if (firstClip != null) {
                     val config = SmartReframeEngine.ReframeConfig(
-                        targetAspectRatio = targetAspect.ratio
+                        targetAspectRatio = targetAspect.toFloat()
                     )
                     smartReframeEngine.analyzeForReframe(firstClip.sourceUri, config) { progress ->
                         // Progress tracked via isReframing state

@@ -83,7 +83,7 @@ class SettingsRepository @Inject constructor(
         return context.dataStore.data.map { it[Keys.TUTORIAL_SHOWN] ?: false }.first()
     }
 
-    suspend fun setTutorialShown() {
-        context.dataStore.edit { it[Keys.TUTORIAL_SHOWN] = true }
+    suspend fun setTutorialShown(shown: Boolean = true) {
+        context.dataStore.edit { it[Keys.TUTORIAL_SHOWN] = shown }
     }
 }

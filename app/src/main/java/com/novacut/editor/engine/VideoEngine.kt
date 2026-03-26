@@ -509,7 +509,8 @@ class VideoEngine @Inject constructor(
                             val relEnd = (overlay.endTimeMs - clipStart).coerceAtMost(clip.durationMs)
                             ExportTextOverlay(overlay, relStart, relEnd)
                         }
-                        add(OverlayEffect(com.google.common.collect.ImmutableList.copyOf(overlayList)))
+                        @Suppress("UNCHECKED_CAST")
+                        add(OverlayEffect(com.google.common.collect.ImmutableList.copyOf(overlayList) as List<TextureOverlay>))
                     }
                     // Frame rate control (drops frames to target fps)
                     add(FrameDropEffect.createDefaultFrameDropEffect(config.frameRate.toFloat()))
@@ -622,6 +623,7 @@ class VideoEngine @Inject constructor(
                 VideoCodec.HEVC -> MimeTypes.VIDEO_H265
                 VideoCodec.H264 -> MimeTypes.VIDEO_H264
                 VideoCodec.AV1 -> MimeTypes.VIDEO_AV1
+                VideoCodec.VP9 -> MimeTypes.VIDEO_VP9
             }
 
             // Transformer.start() requires a Looper — must run on Main thread

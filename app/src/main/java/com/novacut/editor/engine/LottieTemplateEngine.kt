@@ -103,7 +103,17 @@ class LottieTemplateEngine @Inject constructor(
     suspend fun loadTemplate(assetPath: String): LottieComposition? {
         return try {
             val result = LottieCompositionFactory.fromAsset(context, assetPath)
-            result.await()?.value
+            val task = result
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var composition: LottieComposition? = null
+            task.addListener { result ->
+                composition = result
+                latch.countDown()
+            }.addFailureListener {
+                latch.countDown()
+            }
+            latch.await(10, java.util.concurrent.TimeUnit.SECONDS)
+            composition
         } catch (e: Exception) {
             null
         }
