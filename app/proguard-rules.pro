@@ -87,6 +87,27 @@
 -keep class io.opentimelineio.** { *; }
 -dontwarn io.opentimelineio.**
 
+# Sherpa-ONNX (Piper TTS + ASR — JNI native bridge)
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-dontwarn com.k2fsa.sherpa.onnx.**
+
+# DeepFilterNet (ML noise reduction — JNI native bridge)
+-keep class io.github.nicholasryan.deepfilternet.** { *; }
+-dontwarn io.github.nicholasryan.deepfilternet.**
+
+# NCNN (RIFE frame interpolation — JNI + Vulkan compute)
+-keep class com.tencent.ncnn.** { *; }
+-dontwarn com.tencent.ncnn.**
+
+# FFmpegX (fallback encoder — JNI native bridge)
+-keep class io.github.nicholasryan.ffmpegx.** { *; }
+-dontwarn io.github.nicholasryan.ffmpegx.**
+
+# OkHttp (cloud inpainting API)
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
 # Suppress common warnings
 -dontwarn org.bouncycastle.**
 -dontwarn org.conscrypt.**

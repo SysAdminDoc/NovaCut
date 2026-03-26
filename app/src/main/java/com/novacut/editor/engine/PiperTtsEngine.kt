@@ -8,6 +8,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import com.k2fsa.sherpa.onnx.OfflineTts
+import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
 import java.util.Locale
 import javax.inject.Inject
@@ -98,15 +102,25 @@ class PiperTtsEngine @Inject constructor(
             if (isSherpaAvailable() && isVoiceReady(voiceId)) {
                 try {
                     val voiceDir = File(voicesDir, voiceId)
-                    val sherpaClass = Class.forName("com.k2fsa.sherpa.onnx.OfflineTts")
                     Log.i(TAG, "Synthesizing with Piper voice: $voiceId")
-                    // Sherpa-ONNX integration via reflection
-                    // val config = OfflineTtsConfig(model = ..., tokens = ...)
-                    // val tts = OfflineTts(config)
-                    // val audio = tts.generate(text, sid = 0, speed = speed)
-                    // writeWavFile(outputFile, audio.samples, audio.sampleRate)
-                    // onProgress(1f)
-                    // return@withContext outputFile
+                    val config = OfflineTtsConfig(
+                        model = OfflineTtsModelConfig(
+                            vits = OfflineTtsVitsModelConfig(
+                                model = File(voiceDir, "model.onnx").absolutePath,
+                                tokens = File(voiceDir, "tokens.txt").absolutePath,
+                                dataDir = File(voiceDir, "espeak-ng-data").absolutePath
+                            ),
+                            numThreads = 2
+                        )
+                    )
+                    val tts = OfflineTts(config)
+                    onProgress(0.3f)
+                    val audio = tts.generate(text, sid = 0, speed = speed)
+                    onProgress(0.8f)
+                    writeWavFile(outputFile, audio.samples, audio.sampleRate)
+                    onProgress(1f)
+                    tts.release()
+                    return@withContext outputFile
                 } catch (e: Exception) {
                     Log.w(TAG, "Piper TTS failed, falling back to system TTS: ${e.message}")
                 }
@@ -185,9 +199,9 @@ class PiperTtsEngine @Inject constructor(
      */
     fun isSherpaAvailable(): Boolean {
         return try {
-            Class.forName("com.k2fsa.sherpa.onnx.OfflineTts")
+            OfflineTts::class.java
             true
-        } catch (_: ClassNotFoundException) {
+        } catch (_: NoClassDefFoundError) {
             false
         }
     }
@@ -201,6 +215,41 @@ class PiperTtsEngine @Inject constructor(
             voiceDir.deleteRecursively()
         } else false
     }
+
+    private fun writeWavFile(file: File, samples: FloatArray, sampleRate: Int) {
+        val pcm = ShortArray(samples.size) { i ->
+            (samples[i].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
+        }
+        val dataSize = pcm.size * 2
+        val totalSize = 36 + dataSize
+        file.outputStream().buffered().use { out ->
+            // RIFF header
+            out.write("RIFF".toByteArray())
+            out.write(intToLittleEndian(totalSize))
+            out.write("WAVE".toByteArray())
+            // fmt chunk
+            out.write("fmt ".toByteArray())
+            out.write(intToLittleEndian(16)) // chunk size
+            out.write(shortToLittleEndian(1)) // PCM format
+            out.write(shortToLittleEndian(1)) // mono
+            out.write(intToLittleEndian(sampleRate))
+            out.write(intToLittleEndian(sampleRate * 2)) // byte rate
+            out.write(shortToLittleEndian(2)) // block align
+            out.write(shortToLittleEndian(16)) // bits per sample
+            // data chunk
+            out.write("data".toByteArray())
+            out.write(intToLittleEndian(dataSize))
+            val buffer = java.nio.ByteBuffer.allocate(dataSize).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            for (s in pcm) buffer.putShort(s)
+            out.write(buffer.array())
+        }
+    }
+
+    private fun intToLittleEndian(value: Int): ByteArray =
+        byteArrayOf(value.toByte(), (value shr 8).toByte(), (value shr 16).toByte(), (value shr 24).toByte())
+
+    private fun shortToLittleEndian(value: Int): ByteArray =
+        byteArrayOf(value.toByte(), (value shr 8).toByte())
 
     companion object {
         private const val TAG = "PiperTTS"
