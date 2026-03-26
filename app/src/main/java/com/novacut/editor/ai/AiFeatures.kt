@@ -128,6 +128,7 @@ class AiFeatures @Inject constructor(
                 var eos = false
 
                 while (!eos) {
+                    ensureActive()
                     val inIdx = decoder.dequeueInputBuffer(10000)
                     if (inIdx >= 0) {
                         val buf = decoder.getInputBuffer(inIdx) ?: continue
@@ -409,7 +410,9 @@ class AiFeatures @Inject constructor(
             val analysisWidth = 64
             val analysisHeight = 36
 
-            while (currentMs < durationMs && currentMs < 30000L) { // Cap at 30s analysis
+            val maxAnalysisMs = minOf(durationMs, 120_000L) // Analyze up to 2 minutes
+            while (currentMs < maxAnalysisMs) {
+                ensureActive()
                 val frame = retriever.getFrameAtTime(
                     currentMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 )
@@ -574,6 +577,7 @@ class AiFeatures @Inject constructor(
                 var eos = false
 
                 while (!eos) {
+                    ensureActive()
                     val inIdx = decoder.dequeueInputBuffer(10000)
                     if (inIdx >= 0) {
                         val buf = decoder.getInputBuffer(inIdx) ?: continue

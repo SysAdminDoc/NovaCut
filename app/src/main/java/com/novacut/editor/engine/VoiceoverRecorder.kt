@@ -77,6 +77,8 @@ class VoiceoverRecorderEngine @Inject constructor(
         } catch (e: Exception) {
             recorder?.release()
             recorder = null
+            // Clean up orphaned incomplete recording file
+            file?.let { if (it.exists()) it.delete() }
             outputFile = null
             _isRecording.value = false
             null

@@ -97,6 +97,16 @@ fun SettingsScreen(
             )
         }
 
+        // Tutorial
+        SettingsSection("Tutorial") {
+            OutlinedButton(
+                onClick = { viewModel.resetTutorial() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Reset First-Run Tutorial")
+            }
+        }
+
         // About
         SettingsSection("About") {
             SettingsInfo("Version", NovaCutApp.VERSION)

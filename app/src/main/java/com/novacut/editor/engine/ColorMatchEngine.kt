@@ -123,15 +123,15 @@ object ColorMatchEngine {
             offsetR = offsetR.coerceIn(-0.3f, 0.3f),
             offsetG = offsetG.coerceIn(-0.3f, 0.3f),
             offsetB = offsetB.coerceIn(-0.3f, 0.3f),
-            // Gamma adjustment based on luminance ratio
-            gammaR = if (target.avgLuma > 0.01f) {
-                (1f + (reference.avgLuma - target.avgLuma) * 0.5f).coerceIn(0.5f, 2f)
+            // Per-channel gamma adjustment
+            gammaR = if (target.avgR > 0.01f) {
+                (1f + (reference.avgR - target.avgR) * 0.5f).coerceIn(0.5f, 2f)
             } else 1f,
-            gammaG = if (target.avgLuma > 0.01f) {
-                (1f + (reference.avgLuma - target.avgLuma) * 0.5f).coerceIn(0.5f, 2f)
+            gammaG = if (target.avgG > 0.01f) {
+                (1f + (reference.avgG - target.avgG) * 0.5f).coerceIn(0.5f, 2f)
             } else 1f,
-            gammaB = if (target.avgLuma > 0.01f) {
-                (1f + (reference.avgLuma - target.avgLuma) * 0.5f).coerceIn(0.5f, 2f)
+            gammaB = if (target.avgB > 0.01f) {
+                (1f + (reference.avgB - target.avgB) * 0.5f).coerceIn(0.5f, 2f)
             } else 1f
         )
     }

@@ -59,7 +59,7 @@ fun AutoEditPanel(
         ) {
             InfoCard("Clips", "$clipCount", Icons.Default.Videocam, Mocha.Blue, Modifier.weight(1f))
             InfoCard("Music", if (hasAudio) "Yes" else "No", Icons.Default.MusicNote, if (hasAudio) Mocha.Green else Mocha.Surface1, Modifier.weight(1f))
-            InfoCard("Target", "60s", Icons.Default.Timer, Mocha.Peach, Modifier.weight(1f))
+            InfoCard("Target", "~60s", Icons.Default.Timer, Mocha.Peach, Modifier.weight(1f))
         }
 
         Spacer(modifier = Modifier.height(16.dp))

@@ -15,6 +15,9 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import com.novacut.editor.ui.editor.EditorScreen
 import com.novacut.editor.ui.projects.ProjectListScreen
 import com.novacut.editor.ui.settings.SettingsScreen
@@ -24,14 +27,37 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    private var pendingVideoUri: Uri? = null
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* Permissions handled, UI will adapt */ }
+    ) { results ->
+        val denied = results.filter { !it.value }.keys
+        if (denied.isNotEmpty()) {
+            val permanentlyDenied = denied.any { perm ->
+                !shouldShowRequestPermissionRationale(perm)
+            }
+            if (permanentlyDenied) {
+                android.widget.Toast.makeText(
+                    this,
+                    "Permissions required. Please enable in Settings > Apps > NovaCut > Permissions.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } else {
+                android.widget.Toast.makeText(
+                    this,
+                    "Some permissions were denied. Media access may be limited.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestPermissions()
+        handleIncomingIntent(intent)
 
         setContent {
             NovaCutTheme {
@@ -50,7 +76,8 @@ class MainActivity : ComponentActivity() {
                             onProjectSelected = { projectId ->
                                 navController.navigate("editor/$projectId")
                             },
-                            onSettings = { navController.navigate("settings") }
+                            onSettings = { navController.navigate("settings") },
+                            pendingImportUri = pendingVideoUri?.also { pendingVideoUri = null }
                         )
                     }
                     composable("settings") {
@@ -63,6 +90,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW && intent.data != null) {
+            pendingVideoUri = intent.data
         }
     }
 
@@ -79,6 +117,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (checkPerm(Manifest.permission.RECORD_AUDIO)) needed.add(Manifest.permission.RECORD_AUDIO)
+        if (checkPerm(Manifest.permission.CAMERA)) needed.add(Manifest.permission.CAMERA)
 
         if (needed.isNotEmpty()) {
             permissionLauncher.launch(needed.toTypedArray())

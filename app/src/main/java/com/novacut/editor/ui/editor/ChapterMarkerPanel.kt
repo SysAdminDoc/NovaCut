@@ -185,8 +185,9 @@ fun ChapterMarkerPanel(
                             }
                             IconButton(
                                 onClick = {
-                                    onDeleteChapter(index)
                                     if (editingIndex == index) editingIndex = -1
+                                    else if (editingIndex > index) editingIndex--
+                                    onDeleteChapter(index)
                                 },
                                 modifier = Modifier.size(24.dp)
                             ) {

@@ -34,9 +34,9 @@ class ProxyEngine @Inject constructor(
     private val proxyMap = ConcurrentHashMap<String, Uri>()
 
     private fun keyFor(sourceUri: Uri): String {
-        // Use both hashCode and string length to reduce collision risk
-        val str = sourceUri.toString()
-        return "${str.hashCode()}_${str.length}"
+        val bytes = sourceUri.toString().toByteArray()
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+        return digest.joinToString("") { "%02x".format(it) }.take(32)
     }
 
     fun getProxyUri(sourceUri: Uri): Uri? {

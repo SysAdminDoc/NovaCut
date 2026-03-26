@@ -24,7 +24,7 @@ object AppModule {
             "novacut.db"
         )
             .addMigrations(*ProjectDatabase.ALL_MIGRATIONS)
-            .fallbackToDestructiveMigration() // Safety net if migration chain fails
+            .fallbackToDestructiveMigrationOnDowngrade() // Only destroy DB on downgrade, not on missing migrations
             .build()
     }
 

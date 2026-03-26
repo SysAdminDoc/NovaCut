@@ -230,25 +230,29 @@ private fun ChannelStrip(
             fontSize = 9.sp
         )
 
-        // Pan knob indicator
-        Box(
+        // Pan control
+        Text(
+            when {
+                track.pan < -0.1f -> "L${(-track.pan * 100).toInt()}"
+                track.pan > 0.1f -> "R${(track.pan * 100).toInt()}"
+                else -> "C"
+            },
+            color = Mocha.Subtext0,
+            fontSize = 8.sp
+        )
+        Slider(
+            value = track.pan,
+            onValueChange = { onPanChanged(it) },
+            valueRange = -1f..1f,
             modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Mocha.Surface1)
-                .clickable { onPanChanged(0f) }, // double-click to reset
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                when {
-                    track.pan < -0.1f -> "L"
-                    track.pan > 0.1f -> "R"
-                    else -> "C"
-                },
-                color = Mocha.Subtext0,
-                fontSize = 9.sp
+                .width(48.dp)
+                .height(16.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = Mocha.Mauve,
+                activeTrackColor = Mocha.Mauve.copy(alpha = 0.5f),
+                inactiveTrackColor = Mocha.Surface1
             )
-        }
+        )
 
         Spacer(Modifier.height(2.dp))
 
@@ -301,6 +305,17 @@ private fun VUMeter(
     right: Float,
     modifier: Modifier = Modifier
 ) {
+    // Smooth VU meter with ballistic decay
+    val smoothedLeft by animateFloatAsState(
+        targetValue = left.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = if (left > 0f) 50 else 150),
+        label = "vuLeft"
+    )
+    val smoothedRight by animateFloatAsState(
+        targetValue = right.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = if (right > 0f) 50 else 150),
+        label = "vuRight"
+    )
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -311,10 +326,10 @@ private fun VUMeter(
         drawRoundRect(Mocha.Surface1, cornerRadius = CornerRadius(2f, 2f))
 
         // Left bar
-        val leftHeight = h * left.coerceIn(0f, 1f)
+        val leftHeight = h * smoothedLeft
         val leftColor = when {
-            left > 0.9f -> Mocha.Red
-            left > 0.7f -> Mocha.Yellow
+            smoothedLeft > 0.9f -> Mocha.Red
+            smoothedLeft > 0.7f -> Mocha.Yellow
             else -> Mocha.Green
         }
         drawRect(
@@ -324,10 +339,10 @@ private fun VUMeter(
         )
 
         // Right bar
-        val rightHeight = h * right.coerceIn(0f, 1f)
+        val rightHeight = h * smoothedRight
         val rightColor = when {
-            right > 0.9f -> Mocha.Red
-            right > 0.7f -> Mocha.Yellow
+            smoothedRight > 0.9f -> Mocha.Red
+            smoothedRight > 0.7f -> Mocha.Yellow
             else -> Mocha.Green
         }
         drawRect(

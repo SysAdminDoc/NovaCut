@@ -77,6 +77,10 @@ fun SpeedCurveEditor(
                             if (isCurve && speedCurve == null) {
                                 onSpeedCurveChanged(SpeedCurve.constant(constantSpeed))
                             } else if (!isCurve) {
+                                // Preserve the curve's average speed as the constant speed
+                                if (speedCurve != null) {
+                                    onConstantSpeedChanged(constantSpeed)
+                                }
                                 onSpeedCurveChanged(null)
                             }
                         }

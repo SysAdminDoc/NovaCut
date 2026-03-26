@@ -148,6 +148,7 @@ data class AutoSaveState(
 ) {
     fun serialize(): String {
         val json = JSONObject().apply {
+            put("version", FORMAT_VERSION)
             put("projectId", projectId)
             put("timestamp", timestamp)
             put("playheadMs", playheadMs)
@@ -158,6 +159,8 @@ data class AutoSaveState(
     }
 
     companion object {
+        const val FORMAT_VERSION = 1
+
         // Safe enum valueOf with fallback — prevents crashes from stale/unknown enum values
         private inline fun <reified T : Enum<T>> safeValueOf(name: String, default: T): T {
             return try { enumValueOf<T>(name) } catch (_: IllegalArgumentException) { default }
@@ -230,7 +233,13 @@ data class AutoSaveState(
                 put("fadeOutMs", clip.fadeOutMs)
                 put("blendMode", clip.blendMode.name)
                 put("isCompound", clip.isCompound)
+                if (clip.isCompound && clip.compoundClips.isNotEmpty()) {
+                    put("compoundClips", JSONArray().apply {
+                        clip.compoundClips.forEach { put(serializeClip(it)) }
+                    })
+                }
                 clip.linkedClipId?.let { put("linkedClipId", it) }
+                clip.groupId?.let { put("groupId", it) }
                 put("effects", JSONArray().apply {
                     clip.effects.forEach { put(serializeEffect(it)) }
                 })
@@ -376,6 +385,12 @@ data class AutoSaveState(
                 put("styleType", cap.style.type.name)
                 put("fontSize", cap.style.fontSize.toDouble())
                 put("positionY", cap.style.positionY.toDouble())
+                put("fontFamily", cap.style.fontFamily)
+                put("color", cap.style.color)
+                put("backgroundColor", cap.style.backgroundColor)
+                put("highlightColor", cap.style.highlightColor)
+                put("outline", cap.style.outline)
+                put("shadow", cap.style.shadow)
                 if (cap.words.isNotEmpty()) {
                     put("words", JSONArray().apply {
                         cap.words.forEach { w ->
@@ -502,7 +517,13 @@ data class AutoSaveState(
                 fadeOutMs = json.optLong("fadeOutMs", 0L),
                 blendMode = safeValueOf(json.optString("blendMode", "NORMAL"), BlendMode.NORMAL),
                 isCompound = json.optBoolean("isCompound", false),
+                compoundClips = json.optJSONArray("compoundClips")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i ->
+                        try { deserializeClip(arr.getJSONObject(i)) } catch (_: Exception) { null }
+                    }
+                } ?: emptyList(),
                 linkedClipId = json.optString("linkedClipId", "").takeIf { it.isNotEmpty() },
+                groupId = json.optString("groupId", "").takeIf { it.isNotEmpty() },
                 effects = (0 until effectsArr.length()).mapNotNull { i ->
                     try { deserializeEffect(effectsArr.getJSONObject(i)) } catch (e: Exception) {
                         Log.w(TAG, "Failed to deserialize effect $i", e); null
@@ -626,7 +647,14 @@ data class AutoSaveState(
                 trackToMotion = json.optBoolean("trackToMotion", false),
                 points = (0 until pointsArr.length()).map { i ->
                     val pt = pointsArr.getJSONObject(i)
-                    MaskPoint(x = pt.optDouble("x", 0.0).toFloat(), y = pt.optDouble("y", 0.0).toFloat())
+                    MaskPoint(
+                        x = pt.optDouble("x", 0.0).toFloat(),
+                        y = pt.optDouble("y", 0.0).toFloat(),
+                        handleInX = pt.optDouble("handleInX", 0.0).toFloat(),
+                        handleInY = pt.optDouble("handleInY", 0.0).toFloat(),
+                        handleOutX = pt.optDouble("handleOutX", 0.0).toFloat(),
+                        handleOutY = pt.optDouble("handleOutY", 0.0).toFloat()
+                    )
                 }
             )
         }
@@ -656,7 +684,13 @@ data class AutoSaveState(
                 style = CaptionStyle(
                     type = safeValueOf(json.optString("styleType", "SUBTITLE_BAR"), CaptionStyleType.SUBTITLE_BAR),
                     fontSize = json.optDouble("fontSize", 36.0).toFloat(),
-                    positionY = json.optDouble("positionY", 0.85).toFloat()
+                    positionY = json.optDouble("positionY", 0.85).toFloat(),
+                    fontFamily = json.optString("fontFamily", "sans-serif-medium"),
+                    color = json.optLong("color", 0xFFFFFFFFL),
+                    backgroundColor = json.optLong("backgroundColor", 0xCC000000L),
+                    highlightColor = json.optLong("highlightColor", 0xFFFFD700L),
+                    outline = json.optBoolean("outline", true),
+                    shadow = json.optBoolean("shadow", false)
                 ),
                 words = (0 until wordsArr.length()).map { i ->
                     val w = wordsArr.getJSONObject(i)

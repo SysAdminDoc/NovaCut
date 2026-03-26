@@ -51,7 +51,7 @@ object SubtitleExporter {
                 // Word-level cues if available
                 if (caption.words.isNotEmpty()) {
                     val wordText = caption.words.joinToString(" ") { word ->
-                        "<${formatVttTime(word.startTimeMs)}>${word.text}"
+                        "<${formatVttTime(word.startTimeMs)}><c>${word.text}</c>"
                     }
                     appendLine(wordText)
                 } else {

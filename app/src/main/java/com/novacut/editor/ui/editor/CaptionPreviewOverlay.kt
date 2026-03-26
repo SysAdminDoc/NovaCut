@@ -45,17 +45,7 @@ fun CaptionPreviewOverlay(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(
-                        when {
-                            style.positionY < 0.3f -> Alignment.TopCenter
-                            style.positionY > 0.7f -> Alignment.BottomCenter
-                            else -> Alignment.Center
-                        }
-                    )
-                    .padding(
-                        top = if (style.positionY < 0.3f) (style.positionY * 200).dp else 0.dp,
-                        bottom = if (style.positionY > 0.7f) ((1f - style.positionY) * 200).dp else 0.dp
-                    )
+                    .align(androidx.compose.ui.BiasAlignment(0f, style.positionY * 2f - 1f))
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center
             ) {

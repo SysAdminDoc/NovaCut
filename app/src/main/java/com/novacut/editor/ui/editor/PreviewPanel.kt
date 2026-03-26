@@ -60,11 +60,11 @@ fun PreviewPanel(
                     PlayerView(ctx).apply {
                         useController = false
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                        onPlayerViewReady(this)
                     }
                 },
                 update = { playerView ->
                     playerView.player = engine.getPlayer()
-                    onPlayerViewReady(playerView)
                 },
                 modifier = Modifier.fillMaxSize()
             )

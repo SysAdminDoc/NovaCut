@@ -75,7 +75,8 @@ fun ExportProgressOverlay(
                 Text("Exporting...", color = TextColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
 
                 // Estimated time remaining
-                val elapsed = System.currentTimeMillis() - exportStartTime
+                val currentTime by rememberUpdatedState(System.currentTimeMillis())
+                val elapsed = currentTime - exportStartTime
                 val estimatedTotal = if (exportProgress > 0.05f) {
                     (elapsed / exportProgress).toLong()
                 } else 0L

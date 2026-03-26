@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.novacut.editor.model.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +34,7 @@ class SettingsRepository @Inject constructor(
         val AUTO_SAVE = booleanPreferencesKey("auto_save_enabled")
         val AUTO_SAVE_INTERVAL = intPreferencesKey("auto_save_interval_sec")
         val PROXY_RES = stringPreferencesKey("proxy_resolution")
+        val TUTORIAL_SHOWN = booleanPreferencesKey("tutorial_shown")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -75,5 +77,13 @@ class SettingsRepository @Inject constructor(
 
     suspend fun updateProxyResolution(value: ProxyResolution) {
         context.dataStore.edit { it[Keys.PROXY_RES] = value.name }
+    }
+
+    suspend fun isTutorialShown(): Boolean {
+        return context.dataStore.data.map { it[Keys.TUTORIAL_SHOWN] ?: false }.first()
+    }
+
+    suspend fun setTutorialShown() {
+        context.dataStore.edit { it[Keys.TUTORIAL_SHOWN] = true }
     }
 }

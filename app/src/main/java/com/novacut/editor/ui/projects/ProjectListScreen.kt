@@ -35,12 +35,22 @@ import com.novacut.editor.ui.theme.Mocha
 fun ProjectListScreen(
     onProjectSelected: (String) -> Unit,
     onSettings: () -> Unit = {},
+    pendingImportUri: android.net.Uri? = null,
     viewModel: ProjectListViewModel = hiltViewModel()
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
     var showTemplateSheet by remember { mutableStateOf(false) }
+
+    // Handle incoming video from external intent (ACTION_VIEW)
+    LaunchedEffect(pendingImportUri) {
+        if (pendingImportUri != null) {
+            viewModel.createProjectFromImport(pendingImportUri) { projectId ->
+                onProjectSelected(projectId)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier

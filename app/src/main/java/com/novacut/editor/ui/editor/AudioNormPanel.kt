@@ -24,10 +24,11 @@ private val Yellow = Color(0xFFF9E2AF)
 private val Crust = Color(0xFF11111B)
 
 enum class NormalizationMode(val label: String, val targetLufs: Float) {
-    YOUTUBE("YouTube (-14 LUFS)", -14f),
-    PODCAST("Podcast (-16 LUFS)", -16f),
-    BROADCAST("Broadcast (-23 LUFS)", -23f),
-    STREAMING("Streaming (-14 LUFS)", -14f),
+    YOUTUBE("YouTube / Spotify (-14 LUFS)", -14f),
+    TIKTOK("TikTok (-14 LUFS)", -14f),
+    PODCAST("Podcast / Apple (-16 LUFS)", -16f),
+    BROADCAST("Broadcast EBU R128 (-23 LUFS)", -23f),
+    CINEMA("Cinema (-24 LUFS)", -24f),
     LOUD("Loud (-9 LUFS)", -9f),
     CUSTOM("Custom", -14f)
 }

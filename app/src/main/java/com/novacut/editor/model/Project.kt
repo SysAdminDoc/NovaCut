@@ -105,7 +105,8 @@ data class Clip(
     val audioEffects: List<AudioEffect> = emptyList(),
     val proxyUri: Uri? = null,
     val motionTrackingData: MotionTrackingData? = null,
-    val captions: List<Caption> = emptyList()
+    val captions: List<Caption> = emptyList(),
+    val groupId: String? = null
 ) {
     val durationMs: Long get() {
         val trimRange = trimEndMs - trimStartMs
@@ -174,7 +175,9 @@ data class SpeedCurve(
             if (t >= sorted[i].position && t <= sorted[i + 1].position) {
                 val p0 = sorted[i]
                 val p1 = sorted[i + 1]
-                val localT = (t - p0.position) / (p1.position - p0.position)
+                val denom = p1.position - p0.position
+                if (denom <= 0f) return p0.speed
+                val localT = (t - p0.position) / denom
                 return cubicBezierInterpolate(
                     p0.speed, p0.handleOutY, p1.handleInY, p1.speed, localT
                 )
@@ -496,6 +499,8 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
     WARM_TONE("Warm Tone", EffectCategory.FILTER),
     CYBERPUNK("Cyberpunk", EffectCategory.FILTER),
     NOIR("Noir", EffectCategory.FILTER),
+    VHS_RETRO("VHS/Retro", EffectCategory.FILTER),
+    LIGHT_LEAK("Light Leak", EffectCategory.FILTER),
 
     // Blur
     GAUSSIAN_BLUR("Gaussian Blur", EffectCategory.BLUR),
@@ -549,6 +554,8 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
             RADIAL_BLUR, MOTION_BLUR, FISHEYE -> mapOf("intensity" to 0.5f)
             WAVE -> mapOf("amplitude" to 0.02f, "frequency" to 10f)
             POSTERIZE -> mapOf("levels" to 6f)
+            VHS_RETRO -> mapOf("intensity" to 0.5f)
+            LIGHT_LEAK -> mapOf("intensity" to 0.5f)
             GRAYSCALE, SEPIA, INVERT, MIRROR, REVERSE -> emptyMap()
         }
     }
@@ -593,7 +600,19 @@ enum class TransitionType(val displayName: String) {
     CROSS_ZOOM("Cross Zoom"),
     DREAMY("Dreamy"),
     HEART("Heart"),
-    SWIRL("Swirl")
+    SWIRL("Swirl"),
+    DOOR_OPEN("Door Open"),
+    BURN("Burn"),
+    RADIAL_WIPE("Radial Wipe"),
+    MOSAIC_REVEAL("Mosaic Reveal"),
+    BOUNCE("Bounce"),
+    LENS_FLARE("Lens Flare"),
+    PAGE_CURL("Page Curl"),
+    CROSS_WARP("Cross Warp"),
+    ANGULAR("Angular"),
+    KALEIDOSCOPE("Kaleidoscope"),
+    SQUARES_WIRE("Squares Wire"),
+    COLOR_PHASE("Color Phase")
 }
 
 // --- Keyframes ---
@@ -721,6 +740,59 @@ data class ExportConfig(
     val chapters: List<ChapterMarker> = emptyList(),
     val subtitleFormat: SubtitleFormat? = null
 ) {
+    companion object {
+        fun youtube1080() = ExportConfig(
+            resolution = Resolution.FHD_1080P, frameRate = 30, quality = ExportQuality.HIGH,
+            aspectRatio = AspectRatio.RATIO_16_9, codec = VideoCodec.H264,
+            platformPreset = PlatformPreset.YOUTUBE_1080
+        )
+        fun youtube4k() = ExportConfig(
+            resolution = Resolution.UHD_4K, frameRate = 30, quality = ExportQuality.HIGH,
+            aspectRatio = AspectRatio.RATIO_16_9, codec = VideoCodec.HEVC,
+            platformPreset = PlatformPreset.YOUTUBE_4K
+        )
+        fun tiktok() = ExportConfig(
+            resolution = Resolution.FHD_1080P, frameRate = 30, quality = ExportQuality.HIGH,
+            aspectRatio = AspectRatio.RATIO_9_16, codec = VideoCodec.H264,
+            platformPreset = PlatformPreset.TIKTOK
+        )
+        fun instagram() = ExportConfig(
+            resolution = Resolution.FHD_1080P, frameRate = 30, quality = ExportQuality.MEDIUM,
+            aspectRatio = AspectRatio.RATIO_9_16, codec = VideoCodec.H264,
+            platformPreset = PlatformPreset.INSTAGRAM_REEL
+        )
+        fun instagramSquare() = ExportConfig(
+            resolution = Resolution.FHD_1080P, frameRate = 30, quality = ExportQuality.MEDIUM,
+            aspectRatio = AspectRatio.RATIO_1_1, codec = VideoCodec.H264,
+            platformPreset = PlatformPreset.INSTAGRAM_FEED
+        )
+        fun threads() = ExportConfig(
+            resolution = Resolution.FHD_1080P, frameRate = 30, quality = ExportQuality.HIGH,
+            aspectRatio = AspectRatio.RATIO_9_16, codec = VideoCodec.H264,
+            platformPreset = PlatformPreset.THREADS
+        )
+
+        /**
+         * Query the device's hardware encoder support and return available video codecs.
+         * H.264 is always included (guaranteed on all Android devices).
+         * HEVC, AV1, and VP9 are included only if a hardware encoder is present.
+         */
+        fun getAvailableCodecs(): List<VideoCodec> {
+            val list = mutableListOf(VideoCodec.H264) // Always available
+            val codecList = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
+            codecList.codecInfos.filter { it.isEncoder }.forEach { info ->
+                info.supportedTypes.forEach { type ->
+                    when (type.lowercase()) {
+                        "video/hevc" -> if (VideoCodec.HEVC !in list) list.add(VideoCodec.HEVC)
+                        "video/av01" -> if (VideoCodec.AV1 !in list) list.add(VideoCodec.AV1)
+                        "video/x-vnd.on2.vp9" -> if (VideoCodec.VP9 !in list) list.add(VideoCodec.VP9)
+                    }
+                }
+            }
+            return list
+        }
+    }
+
     val videoBitrate: Int get() = when (resolution) {
         Resolution.SD_480P -> when (quality) {
             ExportQuality.LOW -> 2_000_000
@@ -753,7 +825,8 @@ data class ExportConfig(
 enum class VideoCodec(val mimeType: String, val label: String) {
     H264("video/avc", "H.264"),
     HEVC("video/hevc", "H.265/HEVC"),
-    AV1("video/av01", "AV1")
+    AV1("video/av01", "AV1"),
+    VP9("video/x-vnd.on2.vp9", "VP9")
 }
 
 enum class AudioCodec(val mimeType: String, val label: String) {
@@ -804,6 +877,9 @@ enum class PlatformPreset(
     ),
     LINKEDIN(
         "LinkedIn", Resolution.FHD_1080P, AspectRatio.RATIO_16_9, 30, VideoCodec.H264
+    ),
+    THREADS(
+        "Threads", Resolution.FHD_1080P, AspectRatio.RATIO_9_16, 30, VideoCodec.H264
     )
 }
 

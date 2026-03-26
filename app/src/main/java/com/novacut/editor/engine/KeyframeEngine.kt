@@ -48,7 +48,7 @@ object KeyframeEngine {
 
         val t = (timeOffsetMs - prev.timeOffsetMs).toFloat() / duration
 
-        return when (next.interpolation) {
+        return when (prev.interpolation) {
             KeyframeInterpolation.HOLD -> prev.value
             KeyframeInterpolation.LINEAR -> lerp(prev.value, next.value, t)
             KeyframeInterpolation.BEZIER -> {

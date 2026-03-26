@@ -7,6 +7,8 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
@@ -26,6 +28,7 @@ class TtsEngine @Inject constructor(
     private var tts: TextToSpeech? = null
     @Volatile private var isReady = false
     private val outputDir = File(context.filesDir, "tts").also { it.mkdirs() }
+    private val mutex = Mutex()
 
     // Available voice styles mapped to TTS parameters
     enum class VoiceStyle(val displayName: String, val pitch: Float, val rate: Float) {
@@ -83,6 +86,7 @@ class TtsEngine @Inject constructor(
         val utteranceId = UUID.randomUUID().toString()
 
         try {
+            mutex.withLock {
             suspendCancellableCoroutine { cont ->
                 engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(id: String?) {
@@ -124,6 +128,7 @@ class TtsEngine @Inject constructor(
                     engine.stop()
                     outputFile.delete()
                 }
+            }
             }
         } catch (e: Exception) {
             Log.e("TtsEngine", "Synthesis failed", e)

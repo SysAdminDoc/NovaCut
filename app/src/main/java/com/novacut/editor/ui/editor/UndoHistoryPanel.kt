@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.model.UndoHistoryEntry
 import com.novacut.editor.ui.theme.Mocha
+import kotlinx.coroutines.delay
 
 @Composable
 fun UndoHistoryPanel(
@@ -30,7 +31,13 @@ fun UndoHistoryPanel(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-    val now = remember { System.currentTimeMillis() }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5000L)
+            now = System.currentTimeMillis()
+        }
+    }
 
     LaunchedEffect(currentIndex) {
         if (entries.isNotEmpty() && currentIndex in entries.indices) {

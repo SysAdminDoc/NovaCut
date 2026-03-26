@@ -290,13 +290,8 @@ private fun CurveCanvas(
                         if (nearest != null) {
                             onKeyframeSelected(nearest)
                         } else {
+                            // Single tap on empty space just deselects
                             onKeyframeSelected(null)
-                            // Double-tap to add keyframe at active property
-                            val firstActive = activeProperties.firstOrNull() ?: return@detectTapGestures
-                            val time = (offset.x / size.width * clipDurationMs).toLong()
-                            val range = getPropertyRange(firstActive)
-                            val value = range.first + (1f - offset.y / size.height) * (range.second - range.first)
-                            onAddKeyframe(firstActive, time, value)
                         }
                     },
                     onDoubleTap = { offset ->

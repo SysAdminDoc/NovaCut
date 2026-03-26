@@ -63,7 +63,8 @@ fun SnapshotHistoryPanel(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    onCreateSnapshot(snapshotName.ifBlank { "" })
+                    val defaultName = "Snapshot ${java.text.SimpleDateFormat("MMM d HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}"
+                    onCreateSnapshot(snapshotName.ifBlank { defaultName })
                     snapshotName = ""
                     showNameDialog = false
                 }) {

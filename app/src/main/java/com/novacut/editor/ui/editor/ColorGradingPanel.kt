@@ -205,10 +205,10 @@ private fun ColorWheel(
                     }
 
                     // Indicator dot
-                    val dotX = center.x + r * radius * 2f
-                    val dotY = center.y + g * radius * 2f
+                    val dotX = center.x + r * radius
+                    val dotY = center.y + g * radius
                     drawCircle(Color.White, 6f, Offset(dotX, dotY))
-                    drawCircle(Color.White, 6f, Offset(dotX, dotY), style = Stroke(2f))
+                    drawCircle(Color.Black, 6f, Offset(dotX, dotY), style = Stroke(2f))
                 }
                 .pointerInput(Unit) {
                     detectDragGestures(
@@ -218,7 +218,9 @@ private fun ColorWheel(
                         val cy = size.height / 2f
                         val dx = ((change.position.x - cx) / cx).coerceIn(-0.5f, 0.5f)
                         val dy = ((change.position.y - cy) / cy).coerceIn(-0.5f, 0.5f)
-                        onChanged(dx, dy, -(dx + dy) / 2f)
+                        // Map X to R offset, Y to G offset, diagonal to B offset
+                        val bOffset = (-dx - dy).coerceIn(-0.5f, 0.5f) / 2f
+                        onChanged(dx, dy, bOffset)
                     }
                 },
             contentAlignment = Alignment.Center

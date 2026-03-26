@@ -76,7 +76,9 @@ private val clipEditSubMenu = listOf(
     SubMenuItem("paste_fx", Icons.Default.ContentPaste, "Paste\nEffects"),
     SubMenuItem("unlink_av", Icons.Default.LinkOff, "Unlink\nA/V"),
     SubMenuItem("compound", Icons.Default.ViewModule, "Compound\nClip"),
-    SubMenuItem("speed_presets", Icons.Default.Speed, "Speed\nPresets")
+    SubMenuItem("speed_presets", Icons.Default.Speed, "Speed\nPresets"),
+    SubMenuItem("group", Icons.Default.GroupWork, "Group"),
+    SubMenuItem("ungroup", Icons.Default.Workspaces, "Ungroup")
 )
 
 // Clip mode — Motion tab sub-menu (replaces simple Transform panel)
@@ -113,6 +115,10 @@ private val clipAiSubMenu = listOf(
     SubMenuItem("object_remove", Icons.Default.HideImage, "Object\nRemove"),
     SubMenuItem("upscale", Icons.Default.ZoomIn, "Upscale\n4K"),
     SubMenuItem("frame_interp", Icons.Default.SlowMotionVideo, "Frame\nInterp"),
+    SubMenuItem("video_upscale", Icons.Default.ZoomIn, "AI\nUpscale"),
+    SubMenuItem("ai_background", Icons.Default.PhotoFilter, "AI\nBackground"),
+    SubMenuItem("ai_stabilize", Icons.Default.Straighten, "AI\nStabilize"),
+    SubMenuItem("ai_style_transfer", Icons.Default.Style, "AI\nStyle"),
     SubMenuItem("filler_removal", Icons.Default.ContentCut, "Remove\nFillers"),
     SubMenuItem("noise_reduction", Icons.Default.GraphicEq, "Reduce\nNoise")
 )

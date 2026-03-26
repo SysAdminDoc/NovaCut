@@ -26,4 +26,5 @@ class SettingsViewModel @Inject constructor(
     fun setAutoSave(v: Boolean) = viewModelScope.launch { repo.updateAutoSave(v) }
     fun setAutoSaveInterval(v: Int) = viewModelScope.launch { repo.updateAutoSaveInterval(v) }
     fun setProxyResolution(v: ProxyResolution) = viewModelScope.launch { repo.updateProxyResolution(v) }
+    fun resetTutorial() = viewModelScope.launch { repo.setTutorialShown(false) }
 }

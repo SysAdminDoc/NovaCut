@@ -17,6 +17,7 @@ import com.novacut.editor.ui.theme.Mocha
 @Composable
 fun NoiseReductionPanel(
     isAnalyzing: Boolean,
+    analysisResult: String? = null,
     onAnalyze: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
@@ -62,6 +63,22 @@ fun NoiseReductionPanel(
                 Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Analyze & Fix Noise")
+            }
+        }
+
+        // Show analysis result when available
+        if (analysisResult != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Mocha.Surface0, RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.CheckCircle, "Done", tint = Mocha.Green, modifier = Modifier.size(16.dp))
+                Text(analysisResult, color = Mocha.Text, fontSize = 12.sp)
             }
         }
     }

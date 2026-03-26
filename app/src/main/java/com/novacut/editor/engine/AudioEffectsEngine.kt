@@ -178,8 +178,8 @@ object AudioEffectsEngine {
                 peak = maxOf(peak, abs(buffer[i + ch]))
             }
 
-            // Attack = fast rise (low coeff), Release = slow decay (high coeff)
-            val coeff = if (peak > envelope) releaseCoeff else attackCoeff
+            // Attack = fast rise when signal exceeds envelope, Release = slow decay when signal drops
+            val coeff = if (peak > envelope) attackCoeff else releaseCoeff
             envelope = coeff * envelope + (1f - coeff) * peak
 
             val gain = if (envelope <= threshold) {

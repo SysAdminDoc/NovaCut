@@ -70,6 +70,26 @@ val aiTools = listOf(
         "denoise", "Denoise Audio",
         "Remove background noise",
         Icons.AutoMirrored.Filled.VolumeOff, Mocha.Flamingo
+    ),
+    AiToolConfig(
+        "video_upscale", "AI Upscale",
+        "Upscale video with Real-ESRGAN",
+        Icons.Default.ZoomIn, Mocha.Rosewater
+    ),
+    AiToolConfig(
+        "ai_background", "AI Background",
+        "AI green screen with RVM matting",
+        Icons.Default.PhotoFilter, Mocha.Lavender
+    ),
+    AiToolConfig(
+        "ai_stabilize", "AI Stabilize",
+        "OpenCV optical flow stabilization",
+        Icons.Default.Straighten, Mocha.Sky
+    ),
+    AiToolConfig(
+        "ai_style_transfer", "Style Transfer",
+        "AnimeGAN / Neural Style Transfer",
+        Icons.Default.Style, Mocha.Maroon
     )
 )
 

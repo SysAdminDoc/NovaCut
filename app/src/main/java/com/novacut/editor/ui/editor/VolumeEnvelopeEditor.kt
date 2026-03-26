@@ -56,7 +56,7 @@ fun VolumeEnvelopeEditor(
                             easing = Easing.LINEAR
                         )
                         val otherKfs = keyframes.filter { it.property != KeyframeProperty.VOLUME }
-                        onKeyframesChanged(otherKfs + volumeKeyframes + newKf)
+                        onKeyframesChanged(otherKfs + (volumeKeyframes + newKf).sortedBy { it.timeOffsetMs })
                     },
                     onTap = { offset ->
                         // Select nearest keyframe

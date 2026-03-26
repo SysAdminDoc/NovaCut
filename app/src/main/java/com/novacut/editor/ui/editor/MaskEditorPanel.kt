@@ -262,6 +262,7 @@ fun MaskPreviewOverlay(
     modifier: Modifier = Modifier
 ) {
     val drawingPoints = remember { mutableStateListOf<Offset>() }
+    var draggedPointIndex by remember { mutableIntStateOf(-1) }
 
     Canvas(
         modifier = modifier
@@ -285,20 +286,31 @@ fun MaskPreviewOverlay(
                         }
                     )
                 } else {
-                    detectDragGestures { change, _ ->
-                        val hitRadius = 30f
-                        mask.points.forEachIndexed { idx, point ->
-                            val px = point.x * size.width
-                            val py = point.y * size.height
-                            val dx = change.position.x - px
-                            val dy = change.position.y - py
-                            if (dx * dx + dy * dy < hitRadius * hitRadius) {
-                                onMaskPointMoved(
-                                    selectedMaskId, idx,
-                                    (change.position.x / size.width).coerceIn(0f, 1f),
-                                    (change.position.y / size.height).coerceIn(0f, 1f)
-                                )
+                    detectDragGestures(
+                        onDragStart = { startOffset ->
+                            // Find the closest point at drag start
+                            val hitRadius = 30f
+                            var bestIdx = -1
+                            var bestDist = Float.MAX_VALUE
+                            mask.points.forEachIndexed { idx, point ->
+                                val px = point.x * size.width
+                                val py = point.y * size.height
+                                val dist = (startOffset.x - px) * (startOffset.x - px) + (startOffset.y - py) * (startOffset.y - py)
+                                if (dist < hitRadius * hitRadius && dist < bestDist) {
+                                    bestDist = dist
+                                    bestIdx = idx
+                                }
                             }
+                            draggedPointIndex = bestIdx
+                        }
+                    ) { change, _ ->
+                        val idx = draggedPointIndex
+                        if (idx >= 0 && idx < mask.points.size) {
+                            onMaskPointMoved(
+                                selectedMaskId, idx,
+                                (change.position.x / size.width).coerceIn(0f, 1f),
+                                (change.position.y / size.height).coerceIn(0f, 1f)
+                            )
                         }
                     }
                 }

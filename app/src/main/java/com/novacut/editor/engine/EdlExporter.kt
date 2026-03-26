@@ -48,7 +48,9 @@ class EdlExporter @Inject constructor(
             for ((index, clip) in videoClips.withIndex()) {
                 val editNum = String.format("%03d", index + 1)
                 val reelName = clip.sourceUri.lastPathSegment
-                    ?.take(8)?.uppercase() ?: "AX"
+                    ?.replace(Regex("[^A-Za-z0-9]"), "")
+                    ?.take(8)?.uppercase()?.ifEmpty { "AX" }
+                    ?.padEnd(8) ?: "AX      "
 
                 val srcIn = msToTimecode(clip.trimStartMs, frameRate)
                 val srcOut = msToTimecode(clip.trimEndMs, frameRate)
@@ -149,9 +151,10 @@ class EdlExporter @Inject constructor(
 
             val totalDuration = tracks.flatMap { it.clips }
                 .maxOfOrNull { it.timelineEndMs } ?: 0
+            val totalFrames = totalDuration * frameRate / 1000
             sb.appendLine(
                 """        <sequence format="r1" """ +
-                    """duration="${totalDuration}/1000s">"""
+                    """duration="${totalFrames}/${frameRate}s">"""
             )
             sb.appendLine("""          <spine>""")
 
@@ -168,9 +171,12 @@ class EdlExporter @Inject constructor(
                     it.sourceUri == clip.sourceUri
                 }
                 val mediaId = "r${mediaIdx + 10}"
-                val start = "${clip.trimStartMs}/1000s"
-                val duration = "${clip.durationMs}/1000s"
-                val offset = "${clip.timelineStartMs}/1000s"
+                val startFrames = clip.trimStartMs * frameRate / 1000
+                val durationFrames = clip.durationMs * frameRate / 1000
+                val offsetFrames = clip.timelineStartMs * frameRate / 1000
+                val start = "${startFrames}/${frameRate}s"
+                val duration = "${durationFrames}/${frameRate}s"
+                val offset = "${offsetFrames}/${frameRate}s"
                 val clipName = clip.sourceUri.lastPathSegment ?: "clip"
 
                 sb.appendLine(

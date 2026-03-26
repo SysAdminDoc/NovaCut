@@ -54,7 +54,11 @@ fun MediaManagerPanel(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val assets = remember(tracks) { analyzeMediaAssets(context, tracks) }
+    val assets by produceState(initialValue = emptyList<MediaAsset>(), key1 = tracks) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            analyzeMediaAssets(context, tracks)
+        }
+    }
     val totalSize = assets.sumOf { it.fileSize }
     val missingCount = assets.count { !it.isAccessible }
 

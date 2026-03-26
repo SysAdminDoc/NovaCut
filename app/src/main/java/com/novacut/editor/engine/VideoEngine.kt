@@ -407,6 +407,30 @@ class VideoEngine @Inject constructor(
                                 EffectShaders.transitionHeart(durationUs)
                             TransitionType.SWIRL ->
                                 EffectShaders.transitionSwirl(durationUs)
+                            TransitionType.DOOR_OPEN ->
+                                EffectShaders.transitionDoorOpen(durationUs)
+                            TransitionType.BURN ->
+                                EffectShaders.transitionBurn(durationUs)
+                            TransitionType.RADIAL_WIPE ->
+                                EffectShaders.transitionRadialWipe(durationUs)
+                            TransitionType.MOSAIC_REVEAL ->
+                                EffectShaders.transitionMosaicReveal(durationUs)
+                            TransitionType.BOUNCE ->
+                                EffectShaders.transitionBounce(durationUs)
+                            TransitionType.LENS_FLARE ->
+                                EffectShaders.transitionLensFlare(durationUs)
+                            TransitionType.PAGE_CURL ->
+                                EffectShaders.transitionPageCurl(durationUs)
+                            TransitionType.CROSS_WARP ->
+                                EffectShaders.transitionCrossWarp(durationUs)
+                            TransitionType.ANGULAR ->
+                                EffectShaders.transitionAngular(durationUs)
+                            TransitionType.KALEIDOSCOPE ->
+                                EffectShaders.transitionKaleidoscope(durationUs)
+                            TransitionType.SQUARES_WIRE ->
+                                EffectShaders.transitionSquaresWire(durationUs)
+                            TransitionType.COLOR_PHASE ->
+                                EffectShaders.transitionColorPhase(durationUs)
                         })
                     }
                     // Apply static opacity (if no keyframe opacity overrides)
@@ -485,9 +509,7 @@ class VideoEngine @Inject constructor(
                             val relEnd = (overlay.endTimeMs - clipStart).coerceAtMost(clip.durationMs)
                             ExportTextOverlay(overlay, relStart, relEnd)
                         }
-                        @Suppress("UNCHECKED_CAST")
-                        val typed = overlayList as List<TextureOverlay>
-                        add(OverlayEffect(com.google.common.collect.ImmutableList.copyOf(typed)))
+                        add(OverlayEffect(com.google.common.collect.ImmutableList.copyOf(overlayList)))
                     }
                     // Frame rate control (drops frames to target fps)
                     add(FrameDropEffect.createDefaultFrameDropEffect(config.frameRate.toFloat()))
@@ -638,6 +660,7 @@ class VideoEngine @Inject constructor(
                         Log.e(TAG, "Export failed", exportException)
                         _exportState.value = ExportState.ERROR
                         _exportProgress.value = 0f
+                        outputFile.delete()
                         onError(exportException)
                     }
                 }
@@ -662,6 +685,7 @@ class VideoEngine @Inject constructor(
                     transformer.cancel()
                     _exportState.value = ExportState.ERROR
                     _exportProgress.value = 0f
+                    outputFile.delete()
                     onError(Exception("Export timed out"))
                 }
                 activeTransformer = null
@@ -671,6 +695,7 @@ class VideoEngine @Inject constructor(
             _exportState.value = ExportState.ERROR
             _exportProgress.value = 0f
             activeTransformer = null
+            outputFile.delete()
             onError(e)
         }
     }
@@ -773,6 +798,18 @@ class VideoEngine @Inject constructor(
                     TransitionType.DREAMY -> EffectShaders.transitionDreamy(durationUs)
                     TransitionType.HEART -> EffectShaders.transitionHeart(durationUs)
                     TransitionType.SWIRL -> EffectShaders.transitionSwirl(durationUs)
+                    TransitionType.DOOR_OPEN -> EffectShaders.transitionDoorOpen(durationUs)
+                    TransitionType.BURN -> EffectShaders.transitionBurn(durationUs)
+                    TransitionType.RADIAL_WIPE -> EffectShaders.transitionRadialWipe(durationUs)
+                    TransitionType.MOSAIC_REVEAL -> EffectShaders.transitionMosaicReveal(durationUs)
+                    TransitionType.BOUNCE -> EffectShaders.transitionBounce(durationUs)
+                    TransitionType.LENS_FLARE -> EffectShaders.transitionLensFlare(durationUs)
+                    TransitionType.PAGE_CURL -> EffectShaders.transitionPageCurl(durationUs)
+                    TransitionType.CROSS_WARP -> EffectShaders.transitionCrossWarp(durationUs)
+                    TransitionType.ANGULAR -> EffectShaders.transitionAngular(durationUs)
+                    TransitionType.KALEIDOSCOPE -> EffectShaders.transitionKaleidoscope(durationUs)
+                    TransitionType.SQUARES_WIRE -> EffectShaders.transitionSquaresWire(durationUs)
+                    TransitionType.COLOR_PHASE -> EffectShaders.transitionColorPhase(durationUs)
                 })
             }
             // Opacity
@@ -1172,6 +1209,14 @@ class VideoEngine @Inject constructor(
                 if (segmentationEngine.isReady()) {
                     segmentationEngine.createExportEffect(threshold)
                 } else null
+            }
+            EffectType.VHS_RETRO -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                EffectShaders.vhsRetro(intensity)
+            }
+            EffectType.LIGHT_LEAK -> {
+                val intensity = (effect.params["intensity"] ?: 0.5f).coerceIn(0f, 1f)
+                EffectShaders.lightLeak(intensity)
             }
             // Speed/Reverse handled separately in export pipeline, not as visual effects
             EffectType.SPEED, EffectType.REVERSE -> null

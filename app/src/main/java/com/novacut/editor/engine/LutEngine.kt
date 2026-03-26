@@ -71,17 +71,23 @@ object LutEngine {
             val firstParts = lines[0].trim().split("\\s+".toRegex())
             val startIdx = if (firstParts.size <= 3 && firstParts.all { it.toIntOrNull() != null }) 1 else 0
 
-            val data = mutableListOf<Float>()
+            // Determine scale from global max across all data lines
+            var globalMax = 0f
+            val rawLines = mutableListOf<List<Float>>()
             for (i in startIdx until lines.size) {
                 val parts = lines[i].trim().split("\\s+".toRegex())
                 if (parts.size >= 3) {
-                    // .3dl uses 0-1023 or 0-4095 range
-                    val maxVal = parts.maxOf { it.toFloat() }
-                    val scale = if (maxVal > 1f) (if (maxVal > 1023f) 4095f else 1023f) else 1f
-                    data.add(parts[0].toFloat() / scale)
-                    data.add(parts[1].toFloat() / scale)
-                    data.add(parts[2].toFloat() / scale)
+                    val vals = listOf(parts[0].toFloat(), parts[1].toFloat(), parts[2].toFloat())
+                    globalMax = maxOf(globalMax, vals.max())
+                    rawLines.add(vals)
                 }
+            }
+            val scale = if (globalMax > 1f) (if (globalMax > 1023f) 4095f else 1023f) else 1f
+            val data = mutableListOf<Float>()
+            for (vals in rawLines) {
+                data.add(vals[0] / scale)
+                data.add(vals[1] / scale)
+                data.add(vals[2] / scale)
             }
 
             val entryCount = data.size / 3

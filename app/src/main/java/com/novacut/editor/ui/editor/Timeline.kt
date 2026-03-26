@@ -30,7 +30,13 @@ import androidx.compose.ui.unit.sp
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
+import kotlin.math.abs
 import kotlinx.coroutines.launch
+
+private fun findSnapTarget(positionMs: Long, targets: List<Long>, thresholdMs: Long): Long? {
+    return targets.minByOrNull { abs(it - positionMs) }
+        ?.takeIf { abs(it - positionMs) <= thresholdMs }
+}
 
 @Composable
 fun Timeline(
@@ -54,7 +60,11 @@ fun Timeline(
     onToggleTrackLock: (String) -> Unit = {},
     beatMarkers: List<Long> = emptyList(),
     selectedClipIds: Set<String> = emptySet(),
+    onScrubStart: () -> Unit = {},
+    onScrubEnd: () -> Unit = {},
     onClipLongPress: (String) -> Unit = {},
+    onSlideClip: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
+    onSlipClip: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
     engine: VideoEngine,
     modifier: Modifier = Modifier
 ) {
@@ -247,15 +257,19 @@ fun Timeline(
                             .height(rulerHeight)
                             .background(Mocha.Crust)
                             .pointerInput(scrollOffsetMs, zoomLevel, totalDurationMs) {
-                                detectTapGestures { offset ->
-                                    val currentPixelsPerMs = zoomLevel * 0.15f
-                                    val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
-                                    onPlayheadMoved(tappedMs.coerceIn(0L, totalDurationMs))
-                                }
-                            }
-                            .pointerInput(scrollOffsetMs, zoomLevel, totalDurationMs) {
                                 detectDragGestures(
-                                    onDragStart = { offset -> rulerDragX = offset.x },
+                                    onDragStart = { offset ->
+                                        rulerDragX = offset.x
+                                        onScrubStart()
+                                        // Move playhead to tap position immediately
+                                        val currentPixelsPerMs = zoomLevel * 0.15f
+                                        if (currentPixelsPerMs > 0.001f) {
+                                            val tappedMs = scrollOffsetMs + (offset.x / currentPixelsPerMs).toLong()
+                                            onPlayheadMoved(tappedMs.coerceIn(0L, totalDurationMs))
+                                        }
+                                    },
+                                    onDragEnd = { onScrubEnd() },
+                                    onDragCancel = { onScrubEnd() },
                                     onDrag = { _, dragAmount ->
                                         rulerDragX += dragAmount.x
                                         val currentPixelsPerMs = zoomLevel * 0.15f
@@ -350,6 +364,38 @@ fun Timeline(
                                                     clipColor,
                                                     RoundedCornerShape(6.dp)
                                                 ) else Modifier
+                                            )
+                                            .then(
+                                                if (isSelected) Modifier.pointerInput(clip.id, isTrimMode, zoomLevel) {
+                                                    val currentPixelsPerMs = zoomLevel * 0.15f
+                                                    val trimHandleWidthPx = 12.dp.toPx()
+                                                    detectDragGestures(
+                                                        onDragStart = { offset ->
+                                                            // Only handle drags in the middle of the clip (not on trim handles)
+                                                        },
+                                                        onDragEnd = {},
+                                                        onDragCancel = {},
+                                                        onDrag = { change, dragAmount ->
+                                                            if (currentPixelsPerMs < 0.001f) return@detectDragGestures
+                                                            val clipWidthPxLocal = clip.durationMs * currentPixelsPerMs
+                                                            val dragStartX = change.position.x - dragAmount.x
+                                                            val isOnLeftHandle = dragStartX < trimHandleWidthPx
+                                                            val isOnRightHandle = dragStartX > (clipWidthPxLocal - trimHandleWidthPx)
+
+                                                            // Skip if dragging on trim handle edges (already handled)
+                                                            if (isOnLeftHandle || isOnRightHandle) return@detectDragGestures
+
+                                                            val deltaMs = (dragAmount.x / currentPixelsPerMs).toLong()
+                                                            if (isTrimMode) {
+                                                                // Slip edit: shift source window within clip (trim mode + body drag)
+                                                                onSlipClip(clip.id, deltaMs)
+                                                            } else {
+                                                                // Slide edit: move clip position on timeline
+                                                                onSlideClip(clip.id, deltaMs)
+                                                            }
+                                                        }
+                                                    )
+                                                } else Modifier
                                             )
                                     ) {
                                         // Thumbnail strip for video tracks
@@ -578,30 +624,53 @@ fun Timeline(
                             }
 
                             // Magnetic snap indicator (shows when clip edges align)
-                            // Snap lines are drawn at clip boundaries for visual feedback
-                            val allClipEdges = track.clips.flatMap { listOf(it.timelineStartMs, it.timelineEndMs) }.distinct()
+                            // Collect snap targets: all clip edges (except selected), playhead, and timeline origin
                             val selectedClipObj = track.clips.find { it.id == selectedClipId }
                             if (selectedClipObj != null) {
-                                allClipEdges.forEach { edgeMs ->
-                                    if (edgeMs != selectedClipObj.timelineStartMs && edgeMs != selectedClipObj.timelineEndMs) {
-                                        val selStart = selectedClipObj.timelineStartMs
-                                        val selEnd = selectedClipObj.timelineEndMs
-                                        val snapThreshold = (5 / pixelsPerMs).toLong() // 5px snap distance
-                                        if (kotlin.math.abs(selStart - edgeMs) < snapThreshold || kotlin.math.abs(selEnd - edgeMs) < snapThreshold) {
-                                            val snapPx = ((edgeMs - scrollOffsetMs) * pixelsPerMs)
-                                            if (snapPx in 0f..timelineWidthPx) {
-                                                Canvas(
-                                                    modifier = Modifier
-                                                        .offset(x = with(density) { snapPx.toDp() })
-                                                        .width(1.dp)
-                                                        .fillMaxHeight()
-                                                ) {
-                                                    drawRect(
-                                                        color = Color(0xFF89B4FA), // Blue snap line
-                                                        size = Size(1.5f * density.density, size.height)
-                                                    )
-                                                }
+                                val snapTargets = track.clips
+                                    .filter { it.id != selectedClipId }
+                                    .flatMap { listOf(it.timelineStartMs, it.timelineEndMs) }
+                                    .distinct()
+                                    .plus(playheadMs)
+                                    .plus(0L)
+                                val snapThresholdPx = with(density) { 8.dp.toPx() }
+                                val snapThresholdMs = (snapThresholdPx / pixelsPerMs).toLong()
+
+                                val startSnap = findSnapTarget(selectedClipObj.timelineStartMs, snapTargets, snapThresholdMs)
+                                val endSnap = findSnapTarget(selectedClipObj.timelineEndMs, snapTargets, snapThresholdMs)
+                                val snapPositions = listOfNotNull(startSnap, endSnap).distinct()
+
+                                snapPositions.forEach { snapMs ->
+                                    val snapPx = ((snapMs - scrollOffsetMs) * pixelsPerMs)
+                                    if (snapPx in 0f..timelineWidthPx) {
+                                        Canvas(
+                                            modifier = Modifier
+                                                .offset(x = with(density) { snapPx.toDp() })
+                                                .width(2.dp)
+                                                .fillMaxHeight()
+                                        ) {
+                                            drawRect(
+                                                color = Color(0xFF89B4FA), // Blue snap line
+                                                size = Size(2f * density.density, size.height)
+                                            )
+                                            // Draw small diamond indicators at top and bottom
+                                            val diamondSize = 4f * density.density
+                                            val topDiamond = Path().apply {
+                                                moveTo(size.width / 2, 0f)
+                                                lineTo(size.width / 2 + diamondSize, diamondSize)
+                                                lineTo(size.width / 2, diamondSize * 2)
+                                                lineTo(size.width / 2 - diamondSize, diamondSize)
+                                                close()
                                             }
+                                            drawPath(topDiamond, Color(0xFF89B4FA))
+                                            val bottomDiamond = Path().apply {
+                                                moveTo(size.width / 2, size.height)
+                                                lineTo(size.width / 2 + diamondSize, size.height - diamondSize)
+                                                lineTo(size.width / 2, size.height - diamondSize * 2)
+                                                lineTo(size.width / 2 - diamondSize, size.height - diamondSize)
+                                                close()
+                                            }
+                                            drawPath(bottomDiamond, Color(0xFF89B4FA))
                                         }
                                     }
                                 }

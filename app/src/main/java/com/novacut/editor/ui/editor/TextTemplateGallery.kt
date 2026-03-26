@@ -203,6 +203,7 @@ fun TextTemplateGallery(
     modifier: Modifier = Modifier
 ) {
     var selectedCategory by remember { mutableStateOf<TextTemplateCategory?>(null) }
+    var showAnimated by remember { mutableStateOf(false) }
     val filteredTemplates = if (selectedCategory != null) {
         builtInTextTemplates.filter { it.category == selectedCategory }
     } else builtInTextTemplates
@@ -225,6 +226,23 @@ fun TextTemplateGallery(
         }
 
         Spacer(Modifier.height(8.dp))
+
+        // Static / Animated tab selector
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = !showAnimated,
+                onClick = { showAnimated = false },
+                label = { Text("Static", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = showAnimated,
+                onClick = { showAnimated = true },
+                label = { Text("Animated", fontSize = 11.sp) }
+            )
+        }
 
         // Category filter
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -256,20 +274,78 @@ fun TextTemplateGallery(
 
         Spacer(Modifier.height(8.dp))
 
-        // Template grid
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 350.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(filteredTemplates, key = { it.id }) { template ->
-                TemplateCard(
-                    template = template,
-                    onClick = { onTemplateSelected(template) }
-                )
+        if (showAnimated) {
+            // Animated Lottie templates
+            val lottieTemplates = listOf(
+                "Slide In Lower Third" to "lower_third",
+                "Modern Lower Third" to "lower_third",
+                "Bounce Title" to "full_screen",
+                "Typewriter" to "full_screen",
+                "Glitch Reveal" to "full_screen",
+                "Neon Glow" to "full_screen",
+                "Fade Subtitle" to "subtitle",
+                "Circle Logo Reveal" to "logo_reveal",
+                "3-2-1 Countdown" to "full_screen",
+                "Subscribe Button" to "lower_third"
+            )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.heightIn(max = 300.dp)
+            ) {
+                items(lottieTemplates.size) { idx ->
+                    val (name, category) = lottieTemplates[idx]
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .clickable {
+                                onTemplateSelected(TextTemplate(
+                                    name = name,
+                                    category = TextTemplateCategory.TITLE_CARD,
+                                    layers = listOf(
+                                        TextOverlay(
+                                            text = "Your Text",
+                                            fontSize = 48f,
+                                            color = 0xFFFFFFFF,
+                                            backgroundColor = 0x00000000,
+                                            animationIn = TextAnimation.FADE,
+                                            animationOut = TextAnimation.FADE
+                                        )
+                                    ),
+                                    durationMs = 3000L
+                                ))
+                            },
+                        colors = CardDefaults.cardColors(containerColor = Surface0)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(name, color = TextColor, fontSize = 11.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                            Text(category, color = Subtext, fontSize = 9.sp)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Static template grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 350.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredTemplates, key = { it.id }) { template ->
+                    TemplateCard(
+                        template = template,
+                        onClick = { onTemplateSelected(template) }
+                    )
+                }
             }
         }
     }

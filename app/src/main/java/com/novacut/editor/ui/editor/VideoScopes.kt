@@ -46,8 +46,13 @@ fun VideoScopesOverlay(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scopeData = remember(frameBitmap, activeScope) {
-        frameBitmap?.let { analyzeBitmap(it, activeScope) }
+    val scopeData by produceState<ScopeData?>(initialValue = null, key1 = frameBitmap, key2 = activeScope) {
+        val bitmap = frameBitmap
+        value = if (bitmap != null && !bitmap.isRecycled) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                analyzeBitmap(bitmap, activeScope)
+            }
+        } else null
     }
 
     Column(
@@ -208,6 +213,33 @@ private fun analyzeVectorscope(pixels: IntArray): VectorscopeData {
     }
     return VectorscopeData(points)
 }
+
+/**
+ * GPU-accelerated scope analysis (future improvement for ES 3.1+ devices).
+ *
+ * Waveform compute shader approach:
+ *   layout(local_size_x = 16, local_size_y = 16) in;
+ *   layout(binding = 0) readonly buffer InputImage { vec4 pixels[]; };
+ *   layout(binding = 1) buffer WaveformBins { uint bins[]; };
+ *   void main() {
+ *     uvec2 pos = gl_GlobalInvocationID.xy;
+ *     vec4 pixel = pixels[pos.y * width + pos.x];
+ *     float luma = 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
+ *     uint bin = uint(luma * 255.0);
+ *     uint col = pos.x * scopeWidth / width;
+ *     atomicAdd(bins[col * 256 + bin], 1u);
+ *   }
+ *
+ * Vectorscope compute shader:
+ *   float Cb = -0.1687 * pixel.r - 0.3313 * pixel.g + 0.5 * pixel.b + 0.5;
+ *   float Cr = 0.5 * pixel.r - 0.4187 * pixel.g - 0.0813 * pixel.b + 0.5;
+ *   uint x = uint(Cb * scopeSize);
+ *   uint y = uint(Cr * scopeSize);
+ *   atomicAdd(bins[y * scopeSize + x], 1u);
+ *
+ * Benefits: Real-time scopes during playback (current CPU approach blocks composition).
+ * Requires: OpenGL ES 3.1+ (SSBO + compute shaders), available on most devices since 2015.
+ */
 
 // --- Drawing ---
 

@@ -279,7 +279,7 @@ private fun CaptionEditForm(
                 Text("Start (s)", color = Subtext, fontSize = 10.sp)
                 Slider(
                     value = startTime,
-                    onValueChange = { startTime = it },
+                    onValueChange = { startTime = it.coerceAtMost(endTime) },
                     valueRange = 0f..(clipDurationMs / 1000f),
                     modifier = Modifier.height(24.dp),
                     colors = SliderDefaults.colors(thumbColor = Mauve, activeTrackColor = Mauve.copy(alpha = 0.6f))
@@ -290,7 +290,7 @@ private fun CaptionEditForm(
                 Text("End (s)", color = Subtext, fontSize = 10.sp)
                 Slider(
                     value = endTime,
-                    onValueChange = { endTime = it },
+                    onValueChange = { endTime = it.coerceAtLeast(startTime) },
                     valueRange = 0f..(clipDurationMs / 1000f),
                     modifier = Modifier.height(24.dp),
                     colors = SliderDefaults.colors(thumbColor = Mauve, activeTrackColor = Mauve.copy(alpha = 0.6f))

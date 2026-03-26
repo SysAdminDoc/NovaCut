@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.*
+import androidx.compose.ui.text.font.FontWeight
 import com.novacut.editor.ui.theme.Mocha
 
 @Composable
@@ -27,6 +28,8 @@ fun ExportSheet(
     onShare: () -> Unit = {},
     onSaveToGallery: () -> Unit = {},
     onCancel: () -> Unit = {},
+    onExportOtio: () -> Unit = {},
+    onExportFcpxml: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -75,7 +78,7 @@ fun ExportSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "${(exportProgress * 100).toInt().coerceIn(0, 99)}%",
+                    "${(exportProgress * 100).toInt().coerceIn(0, 100)}%",
                     color = Mocha.Subtext0,
                     fontSize = 14.sp
                 )
@@ -369,6 +372,29 @@ fun ExportSheet(
             Icon(Icons.Default.FileUpload, contentDescription = "Export video", modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Export Video", fontSize = 15.sp)
+        }
+
+        // Timeline Exchange section
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Timeline Exchange", color = Mocha.Subtext0, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = onExportOtio,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Blue),
+                border = BorderStroke(1.dp, Mocha.Blue.copy(alpha = 0.4f))
+            ) {
+                Text("OTIO", fontSize = 11.sp)
+            }
+            OutlinedButton(
+                onClick = onExportFcpxml,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Blue),
+                border = BorderStroke(1.dp, Mocha.Blue.copy(alpha = 0.4f))
+            ) {
+                Text("FCPXML", fontSize = 11.sp)
+            }
         }
     }
 }

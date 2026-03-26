@@ -194,10 +194,11 @@ object EffectShaders {
         FRAG_CHROMATIC_ABERRATION, mapOf("uIntensity" to intensity)
     )
 
-    fun chromaKey(keyR: Float, keyG: Float, keyB: Float, threshold: Float, smoothing: Float) =
+    fun chromaKey(keyR: Float, keyG: Float, keyB: Float, threshold: Float, smoothing: Float, spill: Float = 0.5f) =
         ShaderEffect(FRAG_CHROMA_KEY, mapOf(
             "uKeyR" to keyR, "uKeyG" to keyG, "uKeyB" to keyB,
-            "uThreshold" to threshold, "uSmoothing" to smoothing
+            "uThreshold" to threshold, "uSmoothing" to smoothing,
+            "uSpill" to spill
         ))
 
     // ─── Transition shaders (applied to clip start/end) ─────────────────
@@ -279,6 +280,64 @@ object EffectShaders {
         FRAG_SWIRL, mapOf("uDurationUs" to durationUs)
     )
 
+    fun vhsRetro(intensity: Float) = ShaderEffect(
+        FRAG_VHS_RETRO, mapOf("uIntensity" to intensity)
+    )
+
+    fun lightLeak(intensity: Float) = ShaderEffect(
+        FRAG_LIGHT_LEAK, mapOf("uIntensity" to intensity)
+    )
+
+    // ─── New transition factory methods ─────────────────────────────────
+
+    fun transitionDoorOpen(durationUs: Float) = ShaderEffect(
+        FRAG_DOOR_OPEN, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionBurn(durationUs: Float) = ShaderEffect(
+        FRAG_BURN, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionRadialWipe(durationUs: Float) = ShaderEffect(
+        FRAG_RADIAL_WIPE, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionMosaicReveal(durationUs: Float) = ShaderEffect(
+        FRAG_MOSAIC_REVEAL, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionBounce(durationUs: Float) = ShaderEffect(
+        FRAG_BOUNCE, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionLensFlare(durationUs: Float) = ShaderEffect(
+        FRAG_LENS_FLARE, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionPageCurl(durationUs: Float) = ShaderEffect(
+        FRAG_PAGE_CURL, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionCrossWarp(durationUs: Float) = ShaderEffect(
+        FRAG_CROSS_WARP, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionAngular(durationUs: Float) = ShaderEffect(
+        FRAG_ANGULAR, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionKaleidoscope(durationUs: Float) = ShaderEffect(
+        FRAG_KALEIDOSCOPE, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionSquaresWire(durationUs: Float) = ShaderEffect(
+        FRAG_SQUARES_WIRE, mapOf("uDurationUs" to durationUs)
+    )
+
+    fun transitionColorPhase(durationUs: Float) = ShaderEffect(
+        FRAG_COLOR_PHASE, mapOf("uDurationUs" to durationUs)
+    )
+
     // ─── Fragment shader sources ────────────────────────────────────────
 
     private const val H = "#version 300 es\nprecision mediump float;\n" +
@@ -305,26 +364,53 @@ object EffectShaders {
 
     private const val FRAG_FILM_GRAIN = H +
         "uniform float uIntensity;\nuniform float uTime;\n" +
-        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n" +
+        "float hash(vec2 p) {\n" +
+        "  vec3 p3 = fract(vec3(p.xyx) * 0.1031);\n" +
+        "  p3 += dot(p3, p3.yzx + 33.33);\n" +
+        "  return fract((p3.x + p3.y) * p3.z);\n" +
+        "}\n" +
+        "float blueNoise(vec2 uv, float t) {\n" +
+        "  float n1 = hash(uv + t);\n" +
+        "  float n2 = hash(uv * 1.7 + t + 42.0);\n" +
+        "  return (n1 + n2) * 0.5 - 0.5;\n" +
+        "}\n" +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  float noise = rand(vTexCoord * 1000.0 + uTime) * 2.0 - 1.0;\n" +
-        "  fragColor = vec4(clamp(c.rgb + noise * uIntensity * 0.3, 0.0, 1.0), c.a);\n}"
+        "  float lum = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));\n" +
+        "  float shadowMask = 1.0 - smoothstep(0.0, 0.5, lum);\n" +
+        "  float grainStr = mix(0.3, 1.0, shadowMask);\n" +
+        "  float noise = blueNoise(vTexCoord * 800.0, fract(uTime * 7.0));\n" +
+        "  fragColor = vec4(clamp(c.rgb + noise * uIntensity * 0.3 * grainStr, 0.0, 1.0), c.a);\n}"
 
     private const val FRAG_GAUSSIAN_BLUR = H +
         "uniform vec2 uResolution;\nuniform float uRadius;\n" +
         "void main() {\n" +
         "  vec2 t = uRadius / uResolution;\n" +
-        "  vec4 s = texture(uTexSampler, vTexCoord) * 4.0;\n" +
-        "  s += texture(uTexSampler, vTexCoord + vec2(t.x, 0.0)) * 2.0;\n" +
-        "  s += texture(uTexSampler, vTexCoord - vec2(t.x, 0.0)) * 2.0;\n" +
-        "  s += texture(uTexSampler, vTexCoord + vec2(0.0, t.y)) * 2.0;\n" +
-        "  s += texture(uTexSampler, vTexCoord - vec2(0.0, t.y)) * 2.0;\n" +
-        "  s += texture(uTexSampler, vTexCoord + t);\n" +
-        "  s += texture(uTexSampler, vTexCoord - t);\n" +
-        "  s += texture(uTexSampler, vTexCoord + vec2(t.x, -t.y));\n" +
-        "  s += texture(uTexSampler, vTexCoord + vec2(-t.x, t.y));\n" +
-        "  fragColor = s / 16.0;\n}"
+        "  float w0 = 0.2270270270;\n" +
+        "  float w1 = 0.1945945946;\n" +
+        "  float w2 = 0.1216216216;\n" +
+        "  float w3 = 0.0540540541;\n" +
+        "  float w4 = 0.0162162162;\n" +
+        "  vec4 s = texture(uTexSampler, vTexCoord) * w0;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(t.x, 0.0)) * w1;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(t.x, 0.0)) * w1;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(t.x * 2.0, 0.0)) * w2;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(t.x * 2.0, 0.0)) * w2;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(t.x * 3.0, 0.0)) * w3;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(t.x * 3.0, 0.0)) * w3;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(t.x * 4.0, 0.0)) * w4;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(t.x * 4.0, 0.0)) * w4;\n" +
+        "  vec4 h = s;\n" +
+        "  s = h * w0;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(0.0, t.y)) * w1;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(0.0, t.y)) * w1;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(0.0, t.y * 2.0)) * w2;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(0.0, t.y * 2.0)) * w2;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(0.0, t.y * 3.0)) * w3;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(0.0, t.y * 3.0)) * w3;\n" +
+        "  s += texture(uTexSampler, vTexCoord + vec2(0.0, t.y * 4.0)) * w4;\n" +
+        "  s += texture(uTexSampler, vTexCoord - vec2(0.0, t.y * 4.0)) * w4;\n" +
+        "  fragColor = mix(h, s, 0.5);\n}"
 
     private const val FRAG_RADIAL_BLUR = H +
         "uniform float uIntensity;\n" +
@@ -390,13 +476,20 @@ object EffectShaders {
         "uniform vec2 uResolution;\nuniform float uIntensity;\nuniform float uTime;\n" +
         "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n" +
         "void main() {\n" +
-        "  float off = uIntensity * 0.02;\n" +
-        "  float shift = rand(vec2(floor(vTexCoord.y * 20.0), floor(uTime * 5.0))) * off;\n" +
-        "  float r = texture(uTexSampler, vec2(vTexCoord.x + shift, vTexCoord.y)).r;\n" +
-        "  float g = texture(uTexSampler, vTexCoord).g;\n" +
-        "  float b = texture(uTexSampler, vec2(vTexCoord.x - shift, vTexCoord.y)).b;\n" +
-        "  float scan = sin(vTexCoord.y * uResolution.y * 1.5) * 0.04 * uIntensity;\n" +
-        "  fragColor = vec4(r + scan, g + scan, b + scan, 1.0);\n}"
+        "  vec2 uv = vTexCoord;\n" +
+        "  float timeSlice = floor(uTime * 8.0);\n" +
+        "  float lineShift = rand(vec2(floor(uv.y * 30.0), timeSlice)) * step(0.8, rand(vec2(timeSlice, 3.0)));\n" +
+        "  uv.x += (lineShift - 0.5) * uIntensity * 0.08;\n" +
+        "  float blockY = floor(uv.y * 8.0) / 8.0;\n" +
+        "  float blockX = floor(uv.x * 8.0) / 8.0;\n" +
+        "  float blockRand = rand(vec2(blockX, blockY) + timeSlice);\n" +
+        "  float blockActive = step(0.92, blockRand) * uIntensity;\n" +
+        "  vec2 blockUv = uv + vec2(rand(vec2(blockY, timeSlice)) - 0.5, 0.0) * blockActive * 0.15;\n" +
+        "  float rgbOff = uIntensity * 0.015;\n" +
+        "  float r = texture(uTexSampler, clamp(vec2(blockUv.x + rgbOff, blockUv.y), 0.0, 1.0)).r;\n" +
+        "  float g = texture(uTexSampler, clamp(blockUv, 0.0, 1.0)).g;\n" +
+        "  float b = texture(uTexSampler, clamp(vec2(blockUv.x - rgbOff, blockUv.y + rgbOff * 0.5), 0.0, 1.0)).b;\n" +
+        "  fragColor = vec4(r, g, b, 1.0);\n}"
 
     private const val FRAG_PIXELATE = H +
         "uniform vec2 uResolution;\nuniform float uSize;\n" +
@@ -423,13 +516,36 @@ object EffectShaders {
         "  fragColor = vec4(r, g, b, 1.0);\n}"
 
     private const val FRAG_CHROMA_KEY = H +
-        "uniform float uKeyR;\nuniform float uKeyG;\nuniform float uKeyB;\n" +
-        "uniform float uThreshold;\nuniform float uSmoothing;\n" +
+        "uniform float uKeyR, uKeyG, uKeyB;\n" +
+        "uniform float uThreshold, uSmoothing;\n" +
+        "uniform float uSpill;\n" +
         "void main() {\n" +
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
-        "  float diff = distance(c.rgb, vec3(uKeyR, uKeyG, uKeyB));\n" +
-        "  float alpha = smoothstep(uThreshold, uThreshold + uSmoothing, diff);\n" +
-        "  fragColor = vec4(c.rgb, c.a * alpha);\n}"
+        "  // Convert key color to YCbCr (Cb, Cr)\n" +
+        "  float keyCb = -0.1687 * uKeyR - 0.3313 * uKeyG + 0.5 * uKeyB + 0.5;\n" +
+        "  float keyCr =  0.5 * uKeyR - 0.4187 * uKeyG - 0.0813 * uKeyB + 0.5;\n" +
+        "  // Convert pixel to YCbCr (Cb, Cr)\n" +
+        "  float pixCb = -0.1687 * c.r - 0.3313 * c.g + 0.5 * c.b + 0.5;\n" +
+        "  float pixCr =  0.5 * c.r - 0.4187 * c.g - 0.0813 * c.b + 0.5;\n" +
+        "  // CbCr distance for chroma keying\n" +
+        "  float dist = distance(vec2(pixCb, pixCr), vec2(keyCb, keyCr));\n" +
+        "  float alpha = smoothstep(uThreshold, uThreshold + uSmoothing, dist);\n" +
+        "  // Green spill suppression\n" +
+        "  vec3 color = c.rgb;\n" +
+        "  float gSpill = color.g - max(color.r, color.b) * (1.0 - uSpill * 0.5);\n" +
+        "  if (gSpill > 0.0 && uKeyG > uKeyR && uKeyG > uKeyB) {\n" +
+        "    color.g -= gSpill;\n" +
+        "    color.r += gSpill * 0.5;\n" +
+        "    color.b += gSpill * 0.5;\n" +
+        "  }\n" +
+        "  // Blue spill suppression\n" +
+        "  float bSpill = color.b - max(color.r, color.g) * (1.0 - uSpill * 0.5);\n" +
+        "  if (bSpill > 0.0 && uKeyB > uKeyR && uKeyB > uKeyG) {\n" +
+        "    color.b -= bSpill;\n" +
+        "    color.r += bSpill * 0.5;\n" +
+        "    color.g += bSpill * 0.5;\n" +
+        "  }\n" +
+        "  fragColor = vec4(color, alpha);\n}"
 
     // ─── Transition shaders ─────────────────────────────────────────────
 
@@ -900,6 +1016,196 @@ object EffectShaders {
         "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
         "  vec3 result = clamp(c.rgb - vec3(0.5), 0.0, 1.0);\n" +
         "  fragColor = vec4(mix(c.rgb, result, uOpacity), c.a);\n}"
+
+    // ─── New effect fragment shaders ────────────────────────────────
+
+    private const val FRAG_VHS_RETRO = H +
+        "uniform vec2 uResolution;\nuniform float uIntensity;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  vec2 uv = vTexCoord;\n" +
+        "  float trackOff = sin(uv.y * 40.0 + uTime * 3.0) * 0.002 * uIntensity;\n" +
+        "  uv.x += trackOff;\n" +
+        "  float chromaOff = uIntensity * 3.0 / uResolution.x;\n" +
+        "  float r = texture(uTexSampler, vec2(uv.x + chromaOff, uv.y)).r;\n" +
+        "  float g = texture(uTexSampler, uv).g;\n" +
+        "  float b = texture(uTexSampler, vec2(uv.x - chromaOff, uv.y)).b;\n" +
+        "  vec3 col = vec3(r, g, b);\n" +
+        "  float scanline = sin(uv.y * uResolution.y * 3.14159) * 0.5 + 0.5;\n" +
+        "  col *= mix(1.0, scanline, 0.15 * uIntensity);\n" +
+        "  col = floor(col * (4.0 + (1.0 - uIntensity) * 12.0) + 0.5) / (4.0 + (1.0 - uIntensity) * 12.0);\n" +
+        "  fragColor = vec4(col, 1.0);\n}"
+
+    private const val FRAG_LIGHT_LEAK = H +
+        "uniform float uIntensity;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float cx = 0.3 + 0.4 * sin(uTime * 0.5);\n" +
+        "  float cy = 0.3 + 0.4 * cos(uTime * 0.7);\n" +
+        "  float dist = length(vTexCoord - vec2(cx, cy));\n" +
+        "  float glow = exp(-dist * 2.5) * uIntensity;\n" +
+        "  vec3 leak = vec3(1.0, 0.6, 0.2) * glow;\n" +
+        "  vec3 result = 1.0 - (1.0 - c.rgb) * (1.0 - leak);\n" +
+        "  fragColor = vec4(result, c.a);\n}"
+
+    // ─── New transition fragment shaders ─────────────────────────────
+
+    private const val FRAG_DOOR_OPEN = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float half = progress * 0.5;\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float reveal = step(half, abs(vTexCoord.x - 0.5));\n" +
+        "  float edge = smoothstep(half - 0.01, half + 0.01, abs(vTexCoord.x - 0.5));\n" +
+        "  fragColor = vec4(c.rgb * (1.0 - edge), c.a);\n}"
+
+    private const val FRAG_BURN = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float noise = rand(floor(vTexCoord * 50.0));\n" +
+        "  float burn = smoothstep(progress - 0.1, progress + 0.1, noise);\n" +
+        "  vec3 fire = mix(vec3(1.0, 0.3, 0.0), vec3(1.0, 0.8, 0.0), smoothstep(progress - 0.05, progress, noise));\n" +
+        "  float edgeMask = smoothstep(progress - 0.12, progress - 0.02, noise) * (1.0 - smoothstep(progress - 0.02, progress + 0.02, noise));\n" +
+        "  vec3 result = mix(c.rgb, fire, edgeMask) * burn;\n" +
+        "  fragColor = vec4(result, c.a);\n}"
+
+    private const val FRAG_RADIAL_WIPE = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  vec2 uv = vTexCoord - 0.5;\n" +
+        "  float angle = atan(uv.y, uv.x) / 6.28318 + 0.5;\n" +
+        "  float reveal = smoothstep(progress - 0.02, progress + 0.02, angle);\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  fragColor = vec4(c.rgb * (1.0 - reveal), c.a);\n}"
+
+    private const val FRAG_MOSAIC_REVEAL = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float gridSize = 10.0;\n" +
+        "  vec2 cell = floor(vTexCoord * gridSize);\n" +
+        "  float r = rand(cell);\n" +
+        "  float reveal = smoothstep(r - 0.1, r + 0.1, progress);\n" +
+        "  float pixSize = mix(gridSize, 200.0, reveal);\n" +
+        "  vec2 uv = floor(vTexCoord * pixSize) / pixSize;\n" +
+        "  vec4 c = texture(uTexSampler, uv);\n" +
+        "  fragColor = vec4(c.rgb * reveal, c.a);\n}"
+
+    private const val FRAG_BOUNCE = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float t = progress;\n" +
+        "  float bounce = abs(sin(t * 3.14159 * 2.5)) * (1.0 - t);\n" +
+        "  float scale = mix(0.0, 1.0, t) + bounce * 0.3;\n" +
+        "  vec2 uv = (vTexCoord - 0.5) / max(scale, 0.01) + 0.5;\n" +
+        "  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)\n" +
+        "    fragColor = vec4(0.0, 0.0, 0.0, 1.0);\n" +
+        "  else fragColor = texture(uTexSampler, uv);\n}"
+
+    private const val FRAG_LENS_FLARE = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float flarePos = progress;\n" +
+        "  vec2 center = vec2(mix(-0.3, 1.3, flarePos), 0.5);\n" +
+        "  float dist = length(vTexCoord - center);\n" +
+        "  float flare = exp(-dist * 4.0) * (1.0 - abs(progress - 0.5) * 2.0) * 2.0;\n" +
+        "  vec3 flareCol = vec3(1.0, 0.9, 0.7) * flare;\n" +
+        "  vec3 result = c.rgb * progress + flareCol;\n" +
+        "  fragColor = vec4(clamp(result, 0.0, 1.0), c.a);\n}"
+
+    private const val FRAG_PAGE_CURL = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float curlPos = 1.0 - progress;\n" +
+        "  vec2 uv = vTexCoord;\n" +
+        "  float curl = curlPos * 1.2;\n" +
+        "  if (uv.x > curl) {\n" +
+        "    float d = uv.x - curl;\n" +
+        "    float r = 0.15;\n" +
+        "    float angle = d / r;\n" +
+        "    if (angle < 3.14159) {\n" +
+        "      vec2 curlUv = vec2(curl - sin(angle) * r, uv.y);\n" +
+        "      vec4 c = texture(uTexSampler, clamp(curlUv, 0.0, 1.0));\n" +
+        "      float shadow = 1.0 - d * 2.0;\n" +
+        "      fragColor = vec4(c.rgb * max(shadow, 0.3), c.a);\n" +
+        "    } else { fragColor = vec4(0.0, 0.0, 0.0, 1.0); }\n" +
+        "  } else {\n" +
+        "    vec4 c = texture(uTexSampler, uv);\n" +
+        "    float shadow = smoothstep(curl - 0.1, curl, uv.x);\n" +
+        "    fragColor = vec4(c.rgb * (0.7 + 0.3 * (1.0 - shadow * (1.0 - progress))), c.a);\n" +
+        "  }\n}"
+
+    private const val FRAG_CROSS_WARP = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float warp = (1.0 - progress) * 0.5;\n" +
+        "  vec2 uv = mix(vTexCoord, vec2(0.5), warp);\n" +
+        "  vec4 c = texture(uTexSampler, clamp(uv, 0.0, 1.0));\n" +
+        "  fragColor = vec4(c.rgb * progress, c.a);\n}"
+
+    private const val FRAG_ANGULAR = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  vec2 uv = vTexCoord - 0.5;\n" +
+        "  float angle = atan(uv.y, uv.x) / 3.14159;\n" +
+        "  float sweep = progress * 2.0 - 1.0;\n" +
+        "  float reveal = smoothstep(sweep - 0.05, sweep + 0.05, angle);\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  fragColor = vec4(c.rgb * reveal, c.a);\n}"
+
+    private const val FRAG_KALEIDOSCOPE = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  vec2 uv = vTexCoord - 0.5;\n" +
+        "  float angle = atan(uv.y, uv.x);\n" +
+        "  float dist = length(uv);\n" +
+        "  float segments = 6.0;\n" +
+        "  float kalAngle = (1.0 - progress) * 6.28318;\n" +
+        "  angle = mod(angle + kalAngle, 6.28318 / segments);\n" +
+        "  angle = abs(angle - 3.14159 / segments);\n" +
+        "  vec2 kalUv = vec2(cos(angle), sin(angle)) * dist + 0.5;\n" +
+        "  vec4 c = texture(uTexSampler, clamp(kalUv, 0.0, 1.0));\n" +
+        "  fragColor = vec4(c.rgb * progress, c.a);\n}"
+
+    private const val FRAG_SQUARES_WIRE = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float gridSize = 10.0;\n" +
+        "  vec2 cell = fract(vTexCoord * gridSize);\n" +
+        "  vec2 cellId = floor(vTexCoord * gridSize);\n" +
+        "  float dist = length(cellId / gridSize - 0.5) * 1.414;\n" +
+        "  float reveal = smoothstep(dist - 0.1, dist + 0.1, progress * 1.5);\n" +
+        "  float wireSize = max(0.0, (1.0 - reveal) * 0.5);\n" +
+        "  float wire = step(wireSize, cell.x) * step(wireSize, cell.y) *\n" +
+        "               step(wireSize, 1.0 - cell.x) * step(wireSize, 1.0 - cell.y);\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  fragColor = vec4(c.rgb * wire * reveal, c.a);\n}"
+
+    private const val FRAG_COLOR_PHASE = H +
+        "uniform float uDurationUs;\nuniform float uTime;\n" +
+        "void main() {\n" +
+        "  float progress = clamp(uTime * 1000000.0 / uDurationUs, 0.0, 1.0);\n" +
+        "  float p2 = progress * progress;\n" +
+        "  vec2 uvR = mix(vTexCoord + vec2(0.1, 0.0), vTexCoord, p2);\n" +
+        "  vec2 uvG = mix(vTexCoord + vec2(-0.05, 0.1), vTexCoord, p2);\n" +
+        "  vec2 uvB = mix(vTexCoord + vec2(0.0, -0.1), vTexCoord, p2);\n" +
+        "  float r = texture(uTexSampler, clamp(uvR, 0.0, 1.0)).r;\n" +
+        "  float g = texture(uTexSampler, clamp(uvG, 0.0, 1.0)).g;\n" +
+        "  float b = texture(uTexSampler, clamp(uvB, 0.0, 1.0)).b;\n" +
+        "  fragColor = vec4(vec3(r, g, b) * progress, 1.0);\n}"
 
     // ─── Mask fragment shaders ───────────────────────────────────────
 

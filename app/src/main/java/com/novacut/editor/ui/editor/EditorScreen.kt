@@ -31,6 +31,8 @@ import com.novacut.editor.ui.export.ExportSheet
 import com.novacut.editor.ui.mediapicker.MediaPickerSheet
 import com.novacut.editor.ui.theme.Mocha
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 
 @Composable
@@ -45,7 +47,24 @@ fun EditorScreen(
     val segmentationState by viewModel.segmentationModelState.collectAsStateWithLifecycle()
     val segmentationProgress by viewModel.segmentationDownloadProgress.collectAsStateWithLifecycle()
     val scopeFrame by viewModel.scopeFrame.collectAsStateWithLifecycle()
+    val showLutPicker by viewModel.showLutPicker.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // LUT file picker
+    val lutPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.onLutFileSelected(uri)
+        } else {
+            viewModel.onLutPickerDismissed()
+        }
+    }
+    LaunchedEffect(showLutPicker) {
+        if (showLutPicker) {
+            lutPickerLauncher.launch(arrayOf("*/*"))
+        }
+    }
 
     val hasOpenPanel = state.showMediaPicker || state.showExportSheet || state.showEffectsPanel ||
         state.showTextEditor || state.showTransitionPicker || state.showAudioPanel ||
@@ -217,6 +236,10 @@ fun EditorScreen(
                     beatMarkers = state.beatMarkers,
                     selectedClipIds = state.selectedClipIds,
                     onClipLongPress = viewModel::toggleClipMultiSelect,
+                    onSlideClip = viewModel::slideClip,
+                    onSlipClip = viewModel::slipClip,
+                    onScrubStart = viewModel::beginScrub,
+                    onScrubEnd = viewModel::endScrub,
                     engine = viewModel.engine,
                     modifier = Modifier.weight(0.55f)
                 )
@@ -285,6 +308,8 @@ fun EditorScreen(
                         "render_preview" -> viewModel.showRenderPreview()
                         "cloud_backup" -> viewModel.showCloudBackup()
                         "archive" -> viewModel.exportProjectArchive()
+                        "group" -> viewModel.groupSelectedClips()
+                        "ungroup" -> viewModel.ungroupSelectedClips()
                         "unlink_av" -> viewModel.unlinkAudioVideo()
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
                         "batch_export" -> viewModel.showBatchExport()
@@ -313,6 +338,10 @@ fun EditorScreen(
                         "upscale" -> viewModel.runAiTool("upscale")
                         "frame_interp" -> viewModel.runAiTool("frame_interp")
                         "object_remove" -> viewModel.runAiTool("object_remove")
+                        "video_upscale" -> viewModel.runAiTool("video_upscale")
+                        "ai_background" -> viewModel.runAiTool("ai_background")
+                        "ai_stabilize" -> viewModel.runAiTool("ai_stabilize")
+                        "ai_style_transfer" -> viewModel.runAiTool("ai_style_transfer")
                         "bg_replace" -> viewModel.runAiTool("bg_replace")
                         // smart_reframe handled above via showSmartReframe()
                         else -> Log.w("EditorScreen", "Unknown action: $actionId")
@@ -459,6 +488,8 @@ fun EditorScreen(
                 },
                 onSaveToGallery = viewModel::saveToGallery,
                 onCancel = { viewModel.engine.cancelExport() },
+                onExportOtio = viewModel::exportToOtio,
+                onExportFcpxml = viewModel::exportToFcpxml,
                 onClose = viewModel::hideExportSheet
             )
         }
@@ -727,8 +758,8 @@ fun EditorScreen(
                 MaskPreviewOverlay(
                     masks = clip.masks,
                     selectedMaskId = state.selectedMaskId,
-                    previewWidth = 1920f, // Will be overridden by actual preview size
-                    previewHeight = 1080f,
+                    previewWidth = 1f, // Normalized coordinates (0..1)
+                    previewHeight = 1f,
                     onMaskPointMoved = viewModel::updateMaskPoint,
                     onFreehandDraw = viewModel::setFreehandMaskPoints,
                     modifier = Modifier.align(Alignment.Center)
@@ -812,7 +843,7 @@ fun EditorScreen(
                     onScaleChanged = { sx, sy -> state.selectedClipId?.let { viewModel.setClipTransform(it, scaleX = sx, scaleY = sy) } },
                     onRotationChanged = { r -> state.selectedClipId?.let { viewModel.setClipTransform(it, rotation = r) } },
                     onAnchorChanged = viewModel::setClipAnchor,
-                    onTransformStarted = viewModel::beginEffectAdjust,
+                    onTransformStarted = viewModel::beginTransformChange,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
@@ -1091,8 +1122,27 @@ fun EditorScreen(
         ) {
             NoiseReductionPanel(
                 isAnalyzing = state.isAnalyzingNoise,
+                analysisResult = state.noiseAnalysisResult,
                 onAnalyze = viewModel::analyzeAndReduceNoise,
                 onClose = viewModel::hideNoiseReduction
+            )
+        }
+
+        // Effect Library
+        AnimatedVisibility(
+            visible = state.showEffectLibrary,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            EffectLibraryPanel(
+                hasClipSelected = state.selectedClipId != null,
+                hasCopiedEffects = state.copiedEffects.isNotEmpty(),
+                onExportEffects = { viewModel.exportClipEffects("exported_effects") },
+                onImportEffects = { viewModel.showToast("Use file picker to import .ncfx") },
+                onCopyEffects = viewModel::copyEffects,
+                onPasteEffects = viewModel::pasteEffects,
+                onClose = viewModel::hideEffectLibrary
             )
         }
 
@@ -1173,15 +1223,18 @@ fun EditorScreen(
         }
 
         // Video scopes overlay
-        if (state.showScopes) {
+        AnimatedVisibility(
+            visible = state.showScopes,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
             VideoScopesOverlay(
                 frameBitmap = scopeFrame,
                 activeScope = state.activeScopeType,
                 onScopeChanged = viewModel::setScopeType,
                 onClose = viewModel::toggleScopes,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
+                modifier = Modifier.padding(8.dp)
             )
         }
 

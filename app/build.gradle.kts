@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 62
-        versionName = "2.9.0"
+        versionCode = 63
+        versionName = "3.0.0"
     }
 
     signingConfigs {
@@ -32,11 +32,11 @@ android {
                 keyAlias = props["keyAlias"] as String
                 keyPassword = props["keyPassword"] as String
             } else if (bundledKs.exists()) {
-                // Fallback: use bundled keystore for local builds
+                // Fallback: use bundled keystore for local/debug builds
                 storeFile = bundledKs
-                storePassword = "novacut123"
-                keyAlias = "novacut"
-                keyPassword = "novacut123"
+                storePassword = System.getenv("NOVACUT_KS_PASS") ?: "debug"
+                keyAlias = System.getenv("NOVACUT_KEY_ALIAS") ?: "novacut"
+                keyPassword = System.getenv("NOVACUT_KEY_PASS") ?: "debug"
             }
         }
     }
@@ -132,4 +132,21 @@ dependencies {
 
     // MediaPipe (selfie segmentation for BG removal)
     implementation(libs.mediapipe.tasks.vision)
+
+    // Tier 2 dependencies (uncomment when ready to integrate):
+    // implementation("com.k2fsa.sherpa:onnx-android:1.10.+")  // Sherpa-ONNX ASR (51x faster Whisper)
+    // implementation("io.github.kaleyravideo:android-deepfilternet:0.5.+")  // ML noise reduction
+    // implementation("com.github.nicholasryan:aubio-android:0.4.+")  // aubio beat detection (NDK)
+    // implementation("com.airbnb.android:lottie-compose:6.+")  // Lottie animated titles
+
+    // Tier 3 dependencies (uncomment when ready to integrate):
+    // implementation("org.opencv:opencv-android:4.9.+")  // OpenCV for stabilization
+    // implementation("com.google.mediapipe:tasks-vision:0.10.+")  // Face/pose detection for smart reframe
+    // implementation("io.github.nicholasryan:ffmpegx-android:6.1.+")  // FFmpeg fallback encoder
+
+    // Tier 4 dependencies (uncomment when ready to integrate):
+    // implementation("com.github.nicholasryan:mobilesam-android:0.1.+")  // MobileSAM tap-to-segment
+    // implementation("io.opentimelineio:opentimelineio-java:0.15.+")  // OTIO timeline exchange
+    // implementation("com.google.protobuf:protobuf-javalite:4.+")  // Protobuf project format
+    // implementation("androidx.work:work-runtime-ktx:2.9.+")  // WorkManager for proxy generation
 }

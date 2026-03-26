@@ -66,7 +66,7 @@ class EffectShareEngine @Inject constructor(
                         put("offsetR", colorGrade.offsetR.toDouble())
                         put("offsetG", colorGrade.offsetG.toDouble())
                         put("offsetB", colorGrade.offsetB.toDouble())
-                        colorGrade.lutPath?.let { put("lutPath", it) }
+                        colorGrade.lutPath?.let { put("lutFileName", java.io.File(it).name) }
                         put("lutIntensity", colorGrade.lutIntensity.toDouble())
                     })
                 }
@@ -165,7 +165,7 @@ class EffectShareEngine @Inject constructor(
                     offsetR = cg.optDouble("offsetR", 0.0).toFloat(),
                     offsetG = cg.optDouble("offsetG", 0.0).toFloat(),
                     offsetB = cg.optDouble("offsetB", 0.0).toFloat(),
-                    lutPath = if (cg.has("lutPath")) cg.getString("lutPath") else null,
+                    lutPath = cg.optString("lutFileName", cg.optString("lutPath", null)),
                     lutIntensity = cg.optDouble("lutIntensity", 1.0).toFloat()
                 )
             }

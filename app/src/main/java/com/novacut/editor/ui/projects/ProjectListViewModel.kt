@@ -10,6 +10,7 @@ import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.SortMode
 import com.novacut.editor.model.Track
+import com.novacut.editor.model.TrackType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -97,8 +98,8 @@ class ProjectListViewModel @Inject constructor(
             val autoState = AutoSaveState(
                 projectId = project.id,
                 tracks = tracks.map { track ->
-                    // Clear clip source URIs (media files won't exist in new project)
-                    track.copy(clips = emptyList())
+                    // Clear clips from media tracks, keep structure from non-media tracks
+                    track.copy(clips = if (track.type == TrackType.VIDEO || track.type == TrackType.AUDIO) emptyList() else track.clips)
                 },
                 textOverlays = textOverlays
             )
@@ -126,6 +127,20 @@ class ProjectListViewModel @Inject constructor(
         viewModelScope.launch {
             projectDao.insertProject(newProject)
             autoSave.copyAutoSave(project.id, newId)
+        }
+    }
+
+    fun createProjectFromImport(videoUri: android.net.Uri, onCreated: (String) -> Unit) {
+        val fileName = videoUri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "Imported"
+        val project = Project(
+            name = fileName,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            projectDao.insertProject(project)
+            // The editor will handle adding the clip when it opens
+            onCreated(project.id)
         }
     }
 }
