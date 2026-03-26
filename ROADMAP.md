@@ -104,13 +104,27 @@
 - [x] **Clip reorder** — `reorderClip()` repositions clip within track with automatic timeline recalculation
 - [x] **Move clip to track** — `moveClipToTrack()` transfers clip between tracks, appending at end of target track
 
-### Remaining TODO Stubs (Dependency-Gated)
-- [ ] **Sherpa-ONNX Piper synthesis** — Full Piper TTS via Sherpa-ONNX (blocked on `com.k2fsa.sherpa:onnx-android` dependency)
-- [ ] **DeepFilterNet ML processing** — Full ML noise reduction (blocked on `android-deepfilternet` dependency)
-- [ ] **RIFE frame interpolation** — NCNN+Vulkan inference (blocked on NCNN Android dependency)
-- [ ] **LaMa inpainting** — ONNX Runtime inference (blocked on model hosting + ONNX dependency)
-- [ ] **Cloud inpainting API** — ProPainter cloud endpoint integration (blocked on server deployment)
-- [ ] **FFmpegX integration** — Full FFmpeg command execution (blocked on `ffmpegx-android` dependency)
+### Dependency-Gated Items (Completed in v3.4.0)
+- [x] **Sherpa-ONNX Piper synthesis** — Direct OfflineTts API with WAV file generation
+- [x] **DeepFilterNet ML processing** — Direct DeepFilterNet API with attenuation levels and spectral gate fallback
+- [x] **RIFE frame interpolation** — NCNN+Vulkan RIFE v4.6 inference with weighted bitmap blend fallback
+- [x] **LaMa inpainting** — ONNX Runtime with NNAPI acceleration, NCHW tensor conversion, neighbor-fill fallback
+- [x] **Cloud inpainting API** — OkHttp multipart upload with job submission/tracking/download
+- [x] **FFmpegX integration** — Direct FFmpegX.execute() with two-pass EBU R128 loudness normalization
+
+## v3.4.0 — Dependency Activation & Engine Wiring
+
+### Engine Implementations
+- [x] **PiperTtsEngine → Sherpa-ONNX** — Direct `OfflineTts` API replacing reflection stubs, WAV file generation with RIFF header
+- [x] **NoiseReductionEngine → DeepFilterNet** — Direct `DeepFilterNet(context, attenuationDb)` API, `processFile()` with spectral gate fallback
+- [x] **FFmpegEngine → FFmpegX** — Direct `FFmpegX.execute()`, two-pass EBU R128 loudness normalization with JSON parsing
+- [x] **FrameInterpolationEngine → NCNN RIFE** — HTTP model download with progress, RIFE v4.6 inference, weighted bitmap blend fallback
+- [x] **InpaintingEngine → ONNX Runtime** — LaMa model download, NNAPI acceleration, NCHW tensor conversion, neighbor-fill fallback
+- [x] **CloudInpaintingEngine → OkHttp** — Multipart upload with Bearer auth, job submission/tracking/download endpoints
+
+### Build Configuration
+- [x] **Dependencies activated** — All tier 2-4 dependencies moved from commented stubs to active implementation lines in version catalog
+- [x] **ProGuard rules** — Keep rules added for Sherpa-ONNX, DeepFilterNet, NCNN, FFmpegX, OkHttp JNI/native bridges
 
 ## v3.2.0 — Performance & UX Hardening
 

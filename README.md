@@ -1,6 +1,16 @@
-# NovaCut v3.3.0
+# NovaCut v3.4.0
 
 A professional Android video editor built with Kotlin and Jetpack Compose. Open alternative to CapCut, PowerDirector, and DaVinci Resolve — with on-device AI, GPU-accelerated effects, and desktop NLE interoperability.
+
+## What's New in v3.4.0
+- **Dependencies activated** — All tier 2-4 dependencies (Sherpa-ONNX, DeepFilterNet, NCNN, FFmpegX, OkHttp) moved from stubs to real implementations
+- **PiperTtsEngine** — Direct Sherpa-ONNX OfflineTts API with WAV file generation
+- **NoiseReductionEngine** — Direct DeepFilterNet API with attenuation levels and spectral gate fallback
+- **FFmpegEngine** — Direct FFmpegX.execute() with two-pass EBU R128 loudness normalization
+- **FrameInterpolationEngine** — NCNN RIFE v4.6 inference with model download and bitmap blend fallback
+- **InpaintingEngine** — ONNX Runtime LaMa with NNAPI acceleration and neighbor-fill fallback
+- **CloudInpaintingEngine** — OkHttp multipart upload with job submission/tracking/download
+- **ProGuard rules** — Keep rules for all new JNI/native dependencies
 
 ## What's New in v3.3.0
 - **Localization ready** — 90+ hardcoded UI strings extracted to strings.xml across 15+ panels

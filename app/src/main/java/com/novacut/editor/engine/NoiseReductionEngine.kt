@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import io.github.nicholasryan.deepfilternet.DeepFilterNet
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,9 +55,7 @@ class NoiseReductionEngine @Inject constructor(
     suspend fun analyzeNoise(uri: Uri): NoiseProfile = withContext(Dispatchers.IO) {
         if (isDeepFilterNetAvailable()) {
             try {
-                val dfnClass = Class.forName("io.github.nicholasryan.deepfilternet.DeepFilterNet")
-                val constructor = dfnClass.getConstructor(Context::class.java, Int::class.javaPrimitiveType)
-                val dfn = constructor.newInstance(context, 100)
+                val dfn = DeepFilterNet(context, 20) // 20dB attenuation for analysis
                 Log.d(TAG, "DeepFilterNet available — using ML noise analysis")
             } catch (e: Exception) {
                 Log.w(TAG, "DeepFilterNet init failed, using fallback: ${e.message}")
@@ -115,11 +114,16 @@ class NoiseReductionEngine @Inject constructor(
 
         if (isDeepFilterNetAvailable()) {
             try {
-                val dfnClass = Class.forName("io.github.nicholasryan.deepfilternet.DeepFilterNet")
-                val constructor = dfnClass.getConstructor(Context::class.java, Int::class.javaPrimitiveType)
-                val dfn = constructor.newInstance(context, attenuationDb.toInt())
-                val processMethod = dfnClass.getMethod("processFile", File::class.java, File::class.java)
-                processMethod.invoke(dfn, File(uri.path ?: ""), outputFile)
+                val attenuationInt = when (mode) {
+                    NoiseReductionMode.LIGHT -> 10
+                    NoiseReductionMode.MODERATE -> 20
+                    NoiseReductionMode.AGGRESSIVE -> 30
+                    else -> 20
+                }
+                val dfn = DeepFilterNet(context, attenuationInt)
+                val inputFile = File(uri.path ?: "")
+                dfn.processFile(inputFile, outputFile)
+                dfn.release()
                 onProgress(1f)
                 Log.i(TAG, "DeepFilterNet processing complete")
                 return@withContext NoiseReductionResult(
@@ -211,9 +215,9 @@ class NoiseReductionEngine @Inject constructor(
      */
     fun isDeepFilterNetAvailable(): Boolean {
         return try {
-            Class.forName("io.github.nicholasryan.deepfilternet.DeepFilterNet")
+            DeepFilterNet::class.java
             true
-        } catch (_: ClassNotFoundException) {
+        } catch (_: NoClassDefFoundError) {
             false
         }
     }

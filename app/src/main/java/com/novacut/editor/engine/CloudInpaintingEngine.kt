@@ -6,7 +6,14 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,6 +42,12 @@ import javax.inject.Singleton
 class CloudInpaintingEngine @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
+        .build()
+
     data class CloudConfig(
         val apiEndpoint: String = "",
         val apiKey: String = "",
@@ -85,12 +98,63 @@ class CloudInpaintingEngine @Inject constructor(
             return@withContext null
         }
 
-        // Cloud API integration pending — requires server deployment
-        // 1. Extract video segment (startMs to endMs) to temp file
-        // 2. Upload video + mask frames via multipart POST to ${config.apiEndpoint}/api/v1/inpaint
-        // 3. Return job ID from response
         Log.i(TAG, "Cloud inpainting: ${maskFrames.size} mask frames, ${durationSec}s segment")
-        null
+
+        try {
+            // Extract video segment to a temp file
+            val videoFile = File(context.cacheDir, "inpaint_segment_${System.currentTimeMillis()}.mp4")
+            context.contentResolver.openInputStream(videoUri)?.use { input ->
+                videoFile.outputStream().use { output -> input.copyTo(output) }
+            } ?: run {
+                Log.e(TAG, "Failed to open video URI: $videoUri")
+                return@withContext null
+            }
+
+            // Build multipart request body with video and mask frames
+            val multipartBuilder = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart(
+                    "video", videoFile.name,
+                    videoFile.asRequestBody("video/mp4".toMediaType())
+                )
+                .addFormDataPart("start_ms", startMs.toString())
+                .addFormDataPart("end_ms", endMs.toString())
+
+            maskFrames.forEach { (frameIndex, maskFile) ->
+                multipartBuilder.addFormDataPart(
+                    "mask_frames", "mask_$frameIndex.png",
+                    maskFile.asRequestBody("image/png".toMediaType())
+                )
+            }
+
+            val requestBody = multipartBuilder.build()
+
+            val request = Request.Builder()
+                .url("${config.apiEndpoint}/api/v1/inpaint")
+                .header("Authorization", "Bearer ${config.apiKey}")
+                .post(requestBody)
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Submit job failed: HTTP ${response.code} — ${response.message}")
+                return@withContext null
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody == null) {
+                Log.e(TAG, "Submit job returned empty response body")
+                return@withContext null
+            }
+
+            val json = JSONObject(responseBody)
+            val jobId = json.getString("job_id")
+            Log.i(TAG, "Job submitted successfully: $jobId")
+            jobId
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to submit inpainting job", e)
+            null
+        }
     }
 
     /**
@@ -103,9 +167,50 @@ class CloudInpaintingEngine @Inject constructor(
         if (config.apiEndpoint.isEmpty()) {
             return@withContext InpaintJob(jobId, JobStatus.FAILED, errorMessage = "API endpoint not configured")
         }
-        // GET ${config.apiEndpoint}/api/v1/inpaint/{jobId}/status
         Log.d(TAG, "Checking job status: $jobId")
-        InpaintJob(jobId, JobStatus.QUEUED)
+
+        try {
+            val request = Request.Builder()
+                .url("${config.apiEndpoint}/api/v1/inpaint/$jobId/status")
+                .header("Authorization", "Bearer ${config.apiKey}")
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Check status failed: HTTP ${response.code} — ${response.message}")
+                return@withContext InpaintJob(jobId, JobStatus.FAILED, errorMessage = "HTTP ${response.code}")
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody == null) {
+                Log.e(TAG, "Check status returned empty response body")
+                return@withContext InpaintJob(jobId, JobStatus.FAILED, errorMessage = "Empty response")
+            }
+
+            val json = JSONObject(responseBody)
+            val statusStr = json.getString("status")
+            val progress = json.optDouble("progress", 0.0).toFloat()
+            val errorMsg = json.optString("error", null)
+
+            val status = when (statusStr.uppercase()) {
+                "UPLOADING" -> JobStatus.UPLOADING
+                "QUEUED" -> JobStatus.QUEUED
+                "PROCESSING" -> JobStatus.PROCESSING
+                "COMPLETE" -> JobStatus.COMPLETE
+                "FAILED" -> JobStatus.FAILED
+                else -> {
+                    Log.w(TAG, "Unknown job status: $statusStr")
+                    JobStatus.QUEUED
+                }
+            }
+
+            Log.d(TAG, "Job $jobId status: $status, progress: $progress")
+            InpaintJob(jobId, status, progress, errorMessage = errorMsg)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check job status", e)
+            InpaintJob(jobId, JobStatus.FAILED, errorMessage = e.message)
+        }
     }
 
     /**
@@ -119,9 +224,38 @@ class CloudInpaintingEngine @Inject constructor(
             Log.w(TAG, "Cannot download result — API endpoint not configured")
             return@withContext null
         }
-        // GET ${config.apiEndpoint}/api/v1/inpaint/{jobId}/result
         Log.d(TAG, "Downloading result for job: $jobId")
-        null
+
+        try {
+            val request = Request.Builder()
+                .url("${config.apiEndpoint}/api/v1/inpaint/$jobId/result")
+                .header("Authorization", "Bearer ${config.apiKey}")
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Download result failed: HTTP ${response.code} — ${response.message}")
+                return@withContext null
+            }
+
+            val body = response.body
+            if (body == null) {
+                Log.e(TAG, "Download result returned empty body")
+                return@withContext null
+            }
+
+            val outputFile = File(context.cacheDir, "inpaint_result_${jobId}.mp4")
+            body.byteStream().use { input ->
+                outputFile.outputStream().use { output -> input.copyTo(output) }
+            }
+
+            Log.i(TAG, "Result downloaded: ${outputFile.absolutePath} (${outputFile.length()} bytes)")
+            outputFile
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to download inpainting result", e)
+            null
+        }
     }
 
     /**
