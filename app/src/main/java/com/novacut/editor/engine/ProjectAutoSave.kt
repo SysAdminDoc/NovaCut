@@ -601,13 +601,18 @@ data class AutoSaveState(
             val captionsArr = json.optJSONArray("captions") ?: JSONArray()
             val sourceUri = json.optString("sourceUri", "")
             if (sourceUri.isEmpty()) return null
+            val sourceDurationMs = json.optLong("sourceDurationMs", 0L)
+            val rawTrimEnd = json.optLong("trimEndMs", sourceDurationMs)
+            // Coerce trim values to satisfy model invariants (trimEndMs <= sourceDurationMs)
+            val trimStartMs = json.optLong("trimStartMs", 0L).coerceIn(0L, sourceDurationMs)
+            val trimEndMs = rawTrimEnd.coerceIn(trimStartMs, sourceDurationMs.coerceAtLeast(trimStartMs))
             return Clip(
                 id = json.optString("id", java.util.UUID.randomUUID().toString()),
                 sourceUri = Uri.parse(sourceUri),
-                sourceDurationMs = json.optLong("sourceDurationMs", 0L),
+                sourceDurationMs = sourceDurationMs.coerceAtLeast(trimEndMs),
                 timelineStartMs = json.optLong("timelineStartMs", 0L),
-                trimStartMs = json.optLong("trimStartMs", 0L),
-                trimEndMs = json.optLong("trimEndMs", 0L),
+                trimStartMs = trimStartMs,
+                trimEndMs = trimEndMs,
                 volume = json.optDouble("volume", 1.0).toFloat(),
                 speed = json.optDouble("speed", 1.0).toFloat(),
                 isReversed = json.optBoolean("isReversed", false),
@@ -825,10 +830,12 @@ data class AutoSaveState(
             }
         }
 
-        private fun deserializeTextOverlay(json: JSONObject): TextOverlay {
+        private fun deserializeTextOverlay(json: JSONObject): TextOverlay? {
+            val text = json.optString("text", "")
+            if (text.isEmpty()) return null // TextOverlay requires non-empty text
             return TextOverlay(
                 id = json.optString("id", java.util.UUID.randomUUID().toString()),
-                text = json.optString("text", ""),
+                text = text,
                 fontFamily = json.optString("fontFamily", "sans-serif"),
                 fontSize = json.optDouble("fontSize", 48.0).toFloat(),
                 color = json.optLong("color", 0xFFFFFFFF),

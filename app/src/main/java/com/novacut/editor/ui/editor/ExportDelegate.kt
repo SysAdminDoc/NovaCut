@@ -210,6 +210,7 @@ class ExportDelegate(
                     })
                 }
                 showToast("Exporting ${index + 1}/${queue.size}: ${item.outputName}")
+                videoEngine.resetExportState()
                 stateFlow.update { it.copy(exportConfig = item.config) }
                 startExport(outputDir)
                 val progressJob = scope.launch {
