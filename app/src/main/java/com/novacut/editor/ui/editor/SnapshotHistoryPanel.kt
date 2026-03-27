@@ -48,8 +48,8 @@ fun SnapshotHistoryPanel(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Mocha.Mauve,
                         unfocusedBorderColor = Mocha.Subtext0.copy(alpha = 0.3f),
-                        focusedMocha.Text = Mocha.Text,
-                        unfocusedMocha.Text = Mocha.Text,
+                        focusedTextColor = Mocha.Text,
+                        unfocusedTextColor = Mocha.Text,
                         cursorColor = Mocha.Mauve
                     )
                 )

@@ -237,10 +237,11 @@ fun ProjectListScreen(
         // Template picker
         if (showTemplateSheet) {
             val userTemplates = remember { viewModel.getUserTemplates() }
+            val ctx = LocalContext.current
             ProjectTemplateSheet(
                 onTemplateSelected = { template ->
                     showTemplateSheet = false
-                    val templateName = stringResource(template.nameResId)
+                    val templateName = ctx.getString(template.nameResId)
                     viewModel.createProject(
                         name = if (template.id == "blank") "Untitled" else templateName
                     ) { id -> onProjectSelected(id) }

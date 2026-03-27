@@ -16,8 +16,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 64
-        versionName = "3.4.0"
+        versionCode = 65
+        versionName = "3.5.0"
     }
 
     signingConfigs {
@@ -34,9 +34,9 @@ android {
             } else if (bundledKs.exists()) {
                 // Fallback: use bundled keystore for local/debug builds
                 storeFile = bundledKs
-                storePassword = System.getenv("NOVACUT_KS_PASS") ?: "debug"
+                storePassword = System.getenv("NOVACUT_KS_PASS") ?: "debug123"
                 keyAlias = System.getenv("NOVACUT_KEY_ALIAS") ?: "novacut"
-                keyPassword = System.getenv("NOVACUT_KEY_PASS") ?: "debug"
+                keyPassword = System.getenv("NOVACUT_KEY_PASS") ?: "debug123"
             }
         }
     }
@@ -135,23 +135,8 @@ dependencies {
     // MediaPipe (selfie segmentation for BG removal)
     implementation(libs.mediapipe.tasks.vision)
 
-    // Tier 2: Sherpa-ONNX (Piper TTS + faster Whisper)
-    implementation(libs.sherpa.onnx.android)
-
-    // Tier 2: DeepFilterNet ML noise reduction
-    implementation(libs.deepfilternet.android)
-
     // Tier 2: Lottie animated titles
     implementation(libs.lottie.compose)
-
-    // Tier 3: NCNN + Vulkan (RIFE frame interpolation)
-    implementation(libs.ncnn.android.vulkan)
-
-    // Tier 3: FFmpegX fallback encoder
-    implementation(libs.ffmpegx.android)
-
-    // Tier 4: OTIO timeline exchange
-    implementation(libs.opentimelineio.java)
 
     // Tier 4: OkHttp (cloud inpainting API)
     implementation(libs.okhttp)

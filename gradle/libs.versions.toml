@@ -17,13 +17,8 @@ datastore = "1.1.1"
 work = "2.10.0"
 onnxruntime = "1.17.0"
 mediapipe = "0.10.14"
-sherpaOnnx = "1.10.30"
-deepfilternet = "0.5.6"
-ncnn = "1.0.20240410"
-ffmpegx = "6.1.2"
 okhttp = "4.12.0"
 lottieCompose = "6.6.2"
-opentimelineio = "0.15.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -58,13 +53,8 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 coil-video = { group = "io.coil-kt", name = "coil-video", version.ref = "coil" }
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "mediapipe" }
-sherpa-onnx-android = { group = "com.k2fsa.sherpa", name = "onnx-android", version.ref = "sherpaOnnx" }
-deepfilternet-android = { group = "io.github.nicholasryan", name = "android-deepfilternet", version.ref = "deepfilternet" }
-ncnn-android-vulkan = { group = "com.tencent.ncnn", name = "ncnn-android-vulkan", version.ref = "ncnn" }
-ffmpegx-android = { group = "io.github.nicholasryan", name = "ffmpegx-android", version.ref = "ffmpegx" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottieCompose" }
-opentimelineio-java = { group = "io.opentimelineio", name = "opentimelineio-java", version.ref = "opentimelineio" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -37,7 +37,7 @@ fun ChapterMarkerPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Mocha.Crust, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(12.dp)
     ) {
         Row(
@@ -45,7 +45,7 @@ fun ChapterMarkerPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(stringResource(R.string.chapter_title), color = TextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.chapter_title), color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Row {
                 // Add chapter at playhead
                 IconButton(
@@ -55,10 +55,10 @@ fun ChapterMarkerPanel(
                     },
                     modifier = Modifier.size(32.dp)
                 ) {
-                    Icon(Icons.Default.Add, stringResource(R.string.chapter_add_cd), tint = Green, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Add, stringResource(R.string.chapter_add_cd), tint = Mocha.Green, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, stringResource(R.string.chapter_close_cd), tint = Subtext, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.chapter_close_cd), tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -66,7 +66,7 @@ fun ChapterMarkerPanel(
         Spacer(Modifier.height(4.dp))
         Text(
             "Chapters are embedded in MP4 exports for YouTube navigation",
-            color = Subtext,
+            color = Mocha.Subtext0,
             fontSize = 10.sp
         )
 
@@ -80,9 +80,9 @@ fun ChapterMarkerPanel(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Bookmarks, null, tint = Subtext.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.Bookmarks, null, tint = Mocha.Subtext0.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
                     Spacer(Modifier.height(4.dp))
-                    Text(stringResource(R.string.chapter_empty), color = Subtext, fontSize = 12.sp)
+                    Text(stringResource(R.string.chapter_empty), color = Mocha.Subtext0, fontSize = 12.sp)
                 }
             }
         } else {
@@ -100,7 +100,7 @@ fun ChapterMarkerPanel(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isEditing) Mauve.copy(alpha = 0.15f) else Surface0)
+                            .background(if (isEditing) Mocha.Mauve.copy(alpha = 0.15f) else Mocha.Surface0)
                             .clickable { onJumpTo(chapter.timeMs) }
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -115,16 +115,16 @@ fun ChapterMarkerPanel(
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
-                                    .background(Yellow.copy(alpha = 0.2f), RoundedCornerShape(4.dp)),
+                                    .background(Mocha.Yellow.copy(alpha = 0.2f), RoundedCornerShape(4.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("${index + 1}", color = Yellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("${index + 1}", color = Mocha.Yellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
 
                             // Time
                             Text(
                                 formatTimestamp(chapter.timeMs),
-                                color = Subtext,
+                                color = Mocha.Subtext0,
                                 fontSize = 11.sp
                             )
 
@@ -137,17 +137,17 @@ fun ChapterMarkerPanel(
                                         .weight(1f)
                                         .height(40.dp),
                                     singleLine = true,
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextColor),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Mocha.Text),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Mauve,
-                                        unfocusedBorderColor = Subtext.copy(alpha = 0.3f),
-                                        cursorColor = Mauve
+                                        focusedBorderColor = Mocha.Mauve,
+                                        unfocusedBorderColor = Mocha.Subtext0.copy(alpha = 0.3f),
+                                        cursorColor = Mocha.Mauve
                                     )
                                 )
                             } else {
                                 Text(
                                     chapter.title,
-                                    color = TextColor,
+                                    color = Mocha.Text,
                                     fontSize = 13.sp,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -163,7 +163,7 @@ fun ChapterMarkerPanel(
                                     },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Default.Check, "Save", tint = Green, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Default.Check, "Save", tint = Mocha.Green, modifier = Modifier.size(14.dp))
                                 }
                             } else {
                                 IconButton(
@@ -173,7 +173,7 @@ fun ChapterMarkerPanel(
                                     },
                                     modifier = Modifier.size(24.dp)
                                 ) {
-                                    Icon(Icons.Default.Edit, "Edit", tint = Subtext, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Default.Edit, "Edit", tint = Mocha.Subtext0, modifier = Modifier.size(14.dp))
                                 }
                             }
                             IconButton(
@@ -184,7 +184,7 @@ fun ChapterMarkerPanel(
                                 },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(Icons.Default.Delete, "Delete", tint = Red.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Delete, "Delete", tint = Mocha.Red.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                             }
                         }
                     }
