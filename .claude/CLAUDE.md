@@ -582,6 +582,11 @@ All roadmap + performance + accessibility + final features complete.
 ### Performance Fix
 - **autoDuck() boxing** — replaced `waveform.map { }.toShortArray()` (boxes millions of Shorts) with `ShortArray(size) { }` constructor
 
+### Deep Audit Fixes
+- **Clip deserialization hardened** — `trimEndMs`/`trimStartMs`/`sourceDurationMs` coerced before Clip construction to satisfy `require(trimEndMs <= sourceDurationMs)`. Prevents silent clip loss from legacy auto-save data.
+- **TextOverlay deserialization null-safe** — `deserializeTextOverlay` returns null for empty text instead of crashing on `require(text.isNotEmpty())`.
+- **Batch export state reset** — `videoEngine.resetExportState()` called before each batch item to prevent race condition where previous COMPLETE state causes `first { it == EXPORTING }` to never resolve.
+
 ### Known Remaining Issues
 - Export only uses first visible video track (overlay tracks with clips dropped). Multi-track compositing requires Media3 Compositor API.
 - `splitClipAt()` helper ignores speed curves when computing source position
