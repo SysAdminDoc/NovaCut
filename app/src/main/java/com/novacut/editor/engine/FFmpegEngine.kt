@@ -5,7 +5,7 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import io.github.nicholasryan.ffmpegx.FFmpegX
+// FFmpegX loaded via reflection when available (optional dependency)
 import org.json.JSONObject
 import java.io.File
 import javax.inject.Inject
@@ -66,7 +66,8 @@ class FFmpegEngine @Inject constructor(
             return@withContext -1
         }
         try {
-            val result = FFmpegX.execute(command)
+            val ffmpegCls = Class.forName("io.github.nicholasryan.ffmpegx.FFmpegX")
+            val result = ffmpegCls.getMethod("execute", String::class.java).invoke(null, command) as Int
             onProgress(1f)
             result
         } catch (e: Exception) {
@@ -115,14 +116,15 @@ class FFmpegEngine @Inject constructor(
         // Pass 1: measure loudness
         val measureCmd = "-i \"${inputFile.absolutePath}\" " +
             "-af loudnorm=I=$targetLufs:TP=$truePeakDb:LRA=11:print_format=json -f null /dev/null"
-        val pass1Result = FFmpegX.execute(measureCmd)
+        val ffmpegCls = Class.forName("io.github.nicholasryan.ffmpegx.FFmpegX")
+        val pass1Result = ffmpegCls.getMethod("execute", String::class.java).invoke(null, measureCmd) as Int
         if (pass1Result != 0) {
             Log.e(TAG, "Loudness measurement (pass 1) failed with code $pass1Result")
             return@withContext false
         }
 
         // Parse measured values from JSON output
-        val output = FFmpegX.getLastCommandOutput()
+        val output = ffmpegCls.getMethod("getLastCommandOutput").invoke(null) as String
         val jsonStart = output.lastIndexOf('{')
         val jsonEnd = output.lastIndexOf('}')
         if (jsonStart < 0 || jsonEnd < 0) {
@@ -151,9 +153,9 @@ class FFmpegEngine @Inject constructor(
      */
     fun isAvailable(): Boolean {
         return try {
-            FFmpegX::class.java
+            Class.forName("io.github.nicholasryan.ffmpegx.FFmpegX")
             true
-        } catch (_: NoClassDefFoundError) {
+        } catch (_: ClassNotFoundException) {
             false
         }
     }
