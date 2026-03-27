@@ -102,10 +102,44 @@ proxyWorkflowEngine, sherpaAsrEngine
 - ProGuard rules verified comprehensive (Hilt, Room, Media3, ONNX, MediaPipe, Coil)
 
 ## Build Info
-- `versionCode = 67`, `versionName = "3.7.0"`
+- `versionCode = 68`, `versionName = "3.8.0"`
 - `compileSdk = 35`, `targetSdk = 35`, `minSdk = 26`
 - R8 minify + shrink enabled for release
 - Signing via `keystore.properties` or env vars (`NOVACUT_KS_PASS`, `NOVACUT_KEY_ALIAS`, `NOVACUT_KEY_PASS`)
+
+## v3.8.0 — Competitor-Inspired Features (14 new)
+Research across CapCut, VN, KineMaster, PowerDirector, DaVinci Resolve iPad, and FOSS landscape.
+
+### New UI Components
+- `ui/editor/AiSuggestionBanner.kt` — Contextual AI suggestion banner above timeline (auto-detects: no effects → "Auto Color", low audio energy → "Denoise", no transitions → "Add Transitions")
+- `ui/editor/DrawingOverlayPanel.kt` — Drawing/annotation overlay with 6 Catppuccin colors, brush size slider, eraser, undo per path (from KineMaster)
+- `ui/editor/MultiCamPanel.kt` — 2x2 grid multi-cam angle switching with thumbnail previews, sync button (from PowerDirector)
+- `ui/editor/RadialActionMenu.kt` — Long-press radial quick-action menu on preview with spring animation, context-sensitive items (from KineMaster Media Wheel)
+
+### Features Added
+- Speed range extended from 16x to 100x everywhere (matching CapCut): ClipEditingDelegate, VideoEngine SpeedProvider, SpeedCurveEditor presets/slider
+- Transparent video export via WebM VP9 alpha channel toggle in ExportSheet (from KineMaster)
+- Filler word auto-strip from caption text via `cleanCaptionText()` in AiFeatures (from CapCut)
+- Manual beat tap mode in BeatSyncPanel — tap button during playback to place markers (from VN)
+- Pinch-to-transform gestures on PreviewPanel — pinch=scale, rotate=rotation, drag=position (from CapCut)
+- Script-to-video input in AutoEditPanel — text field for smarter clip selection via `parseScriptToSegments()` (from CapCut)
+- Auto-generated effect parameter UI — `ParamRange` metadata + `paramRangesForType()` replaced 170-line hand-coded when block in ToolPanel (from Pitivi pattern)
+- Community template export/import — `.novacut-template` files via TemplateManager + share intent in ProjectTemplateSheet
+- Project backup panel — CloudBackupPanel rewritten from stub to functional export/import archive panel
+- F-Droid fastlane metadata structure created
+
+### New EditorState Fields
+- `aiSuggestion: AiSuggestion?` — contextual AI suggestion data
+- `drawingPaths: List<DrawingPath>`, `isDrawingMode`, `drawingColor`, `drawingStrokeWidth` — drawing overlay state
+- `backupEstimatedSize`, `lastBackupTime`, `isExportingBackup` — backup panel state
+
+### New PanelIds
+- `DRAWING`, `MULTI_CAM`
+
+### Model Changes
+- `ExportConfig.transparentBackground: Boolean` — VP9 alpha export toggle
+- `Effect.kt` — `ParamRange` data class, `parameterRanges` map, `paramRangesForType()` for auto-generated UI
+- `EditorModels.kt` — `DrawingPath` data class, `AiSuggestion` data class, `ScriptSegment` data class
 
 ## v3.0.0 Final Engines
 - `engine/SoundpipeDspEngine.kt` — Reverb (Schroeder), Moog filter, distortion
