@@ -87,23 +87,25 @@ fun BatchExportPanel(
 
             // Custom options
             Spacer(Modifier.height(4.dp))
+            val audioOnlyLabel = stringResource(R.string.batch_export_audio_only)
+            val stemsLabel = stringResource(R.string.batch_export_audio_stems)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(
                     selected = false,
                     onClick = {
-                        onAddItem(ExportConfig(exportAudioOnly = true), stringResource(R.string.batch_export_audio_only))
+                        onAddItem(ExportConfig(exportAudioOnly = true), audioOnlyLabel)
                         showPresetPicker = false
                     },
-                    label = { Text(stringResource(R.string.batch_export_audio_only), fontSize = 10.sp) },
+                    label = { Text(audioOnlyLabel, fontSize = 10.sp) },
                     modifier = Modifier.height(28.dp)
                 )
                 FilterChip(
                     selected = false,
                     onClick = {
-                        onAddItem(ExportConfig(exportStemsOnly = true), stringResource(R.string.batch_export_audio_stems))
+                        onAddItem(ExportConfig(exportStemsOnly = true), stemsLabel)
                         showPresetPicker = false
                     },
-                    label = { Text(stringResource(R.string.batch_export_audio_stems), fontSize = 10.sp) },
+                    label = { Text(stemsLabel, fontSize = 10.sp) },
                     modifier = Modifier.height(28.dp)
                 )
             }

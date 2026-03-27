@@ -8,10 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import com.k2fsa.sherpa.onnx.OfflineTts
-import com.k2fsa.sherpa.onnx.OfflineTtsConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
+// Sherpa-ONNX loaded via reflection when available (optional dependency)
 import java.io.File
 import java.util.Locale
 import javax.inject.Inject
@@ -103,23 +100,32 @@ class PiperTtsEngine @Inject constructor(
                 try {
                     val voiceDir = File(voicesDir, voiceId)
                     Log.i(TAG, "Synthesizing with Piper voice: $voiceId")
-                    val config = OfflineTtsConfig(
-                        model = OfflineTtsModelConfig(
-                            vits = OfflineTtsVitsModelConfig(
-                                model = File(voiceDir, "model.onnx").absolutePath,
-                                tokens = File(voiceDir, "tokens.txt").absolutePath,
-                                dataDir = File(voiceDir, "espeak-ng-data").absolutePath
-                            ),
-                            numThreads = 2
-                        )
+                    // Sherpa-ONNX loaded via reflection (optional dependency)
+                    val vitsConfigCls = Class.forName("com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig")
+                    val vitsConfig = vitsConfigCls.getDeclaredConstructor(
+                        String::class.java, String::class.java, String::class.java
+                    ).newInstance(
+                        File(voiceDir, "model.onnx").absolutePath,
+                        File(voiceDir, "tokens.txt").absolutePath,
+                        File(voiceDir, "espeak-ng-data").absolutePath
                     )
-                    val tts = OfflineTts(config)
+                    val modelConfigCls = Class.forName("com.k2fsa.sherpa.onnx.OfflineTtsModelConfig")
+                    val modelConfig = modelConfigCls.getDeclaredConstructor(
+                        vitsConfigCls, Int::class.java
+                    ).newInstance(vitsConfig, 2)
+                    val configCls = Class.forName("com.k2fsa.sherpa.onnx.OfflineTtsConfig")
+                    val config = configCls.getDeclaredConstructor(modelConfigCls).newInstance(modelConfig)
+                    val ttsCls = Class.forName("com.k2fsa.sherpa.onnx.OfflineTts")
+                    val tts = ttsCls.getDeclaredConstructor(configCls).newInstance(config)
                     onProgress(0.3f)
-                    val audio = tts.generate(text, sid = 0, speed = speed)
+                    val audio = ttsCls.getMethod("generate", String::class.java, Int::class.java, Float::class.java)
+                        .invoke(tts, text, 0, speed)!!
                     onProgress(0.8f)
-                    writeWavFile(outputFile, audio.samples, audio.sampleRate)
+                    val samples = audio.javaClass.getField("samples").get(audio) as FloatArray
+                    val sampleRate = audio.javaClass.getField("sampleRate").get(audio) as Int
+                    writeWavFile(outputFile, samples, sampleRate)
                     onProgress(1f)
-                    tts.release()
+                    ttsCls.getMethod("release").invoke(tts)
                     return@withContext outputFile
                 } catch (e: Exception) {
                     Log.w(TAG, "Piper TTS failed, falling back to system TTS: ${e.message}")
@@ -199,9 +205,9 @@ class PiperTtsEngine @Inject constructor(
      */
     fun isSherpaAvailable(): Boolean {
         return try {
-            OfflineTts::class.java
+            Class.forName("com.k2fsa.sherpa.onnx.OfflineTts")
             true
-        } catch (_: NoClassDefFoundError) {
+        } catch (_: ClassNotFoundException) {
             false
         }
     }

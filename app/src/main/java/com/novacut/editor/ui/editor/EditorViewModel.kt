@@ -792,7 +792,7 @@ class EditorViewModel @Inject constructor(
     fun hideColorGrading() = colorGradingDelegate.hideColorGrading()
     fun beginColorGradeAdjust() = colorGradingDelegate.beginColorGradeAdjust()
     fun updateClipColorGrade(colorGrade: ColorGrade) = colorGradingDelegate.updateClipColorGrade(colorGrade)
-    val showLutPicker: StateFlow<Boolean> = colorGradingDelegate.showLutPicker
+    // showLutPicker exposed via getter above (line 333)
     fun importLut() = colorGradingDelegate.importLut()
     fun onLutPickerDismissed() = colorGradingDelegate.onLutPickerDismissed()
     fun onLutFileSelected(uri: Uri) = colorGradingDelegate.onLutFileSelected(uri)

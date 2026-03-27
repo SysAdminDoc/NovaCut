@@ -289,8 +289,9 @@ class FrameInterpolationEngine @Inject constructor(
 
         // Try NCNN RIFE inference
         try {
-            val net = com.tencent.ncnn.Net()
-            net.loadModel(File(modelDir, "rife-v4.6.bin").absolutePath)
+            val netCls = Class.forName("com.tencent.ncnn.Net")
+            val net = netCls.getDeclaredConstructor().newInstance()
+            netCls.getMethod("loadModel", String::class.java).invoke(net, File(modelDir, "rife-v4.6.bin").absolutePath)
             // NCNN Mat conversion and inference would happen here
             // val mat1 = ncnn::Mat.fromBitmap(frame1)
             // val mat2 = ncnn::Mat.fromBitmap(frame2)

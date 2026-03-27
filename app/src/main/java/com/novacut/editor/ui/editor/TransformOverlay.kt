@@ -176,10 +176,10 @@ fun TransformOverlay(
 
         // Center guides (crosshair when near center)
         if (abs(positionX) < 0.02f) {
-            drawLine(GuideColor.copy(alpha = 0.4f), Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1f)
+            drawLine(Mocha.Green.copy(alpha = 0.4f), Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1f)
         }
         if (abs(positionY) < 0.02f) {
-            drawLine(GuideColor.copy(alpha = 0.4f), Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1f)
+            drawLine(Mocha.Green.copy(alpha = 0.4f), Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1f)
         }
 
         // Draw within rotation context
@@ -235,25 +235,25 @@ fun TransformOverlay(
             // Rotation handle (line + circle above top center)
             val rotateStart = Offset(centerX, centerY - hh)
             val rotateEnd = Offset(centerX, centerY - hh - ROTATE_HANDLE_DISTANCE)
-            drawLine(RotateMocha.Mauve.copy(alpha = 0.6f), rotateStart, rotateEnd, 1.5f)
+            drawLine(Mocha.Mauve.copy(alpha = 0.6f), rotateStart, rotateEnd, 1.5f)
             drawCircle(Color.White, HANDLE_RADIUS + 1f, rotateEnd)
-            drawCircle(RotateMocha.Mauve, HANDLE_RADIUS, rotateEnd)
+            drawCircle(Mocha.Mauve, HANDLE_RADIUS, rotateEnd)
             // Rotation arrow icon
             val arrowPath = Path().apply {
                 moveTo(rotateEnd.x - 5f, rotateEnd.y - 2f)
                 lineTo(rotateEnd.x, rotateEnd.y - 6f)
                 lineTo(rotateEnd.x + 5f, rotateEnd.y - 2f)
             }
-            drawPath(arrowPath, RotateMocha.Mauve, style = Stroke(1.5f))
+            drawPath(arrowPath, Mocha.Mauve, style = Stroke(1.5f))
 
             // Anchor point (center crosshair)
             val anchorPos = Offset(
                 centerX - hw + anchorX * baseWidth,
                 centerY - hh + anchorY * baseHeight
             )
-            drawCircle(AnchorColor.copy(alpha = 0.5f), 4f, anchorPos)
-            drawLine(AnchorColor.copy(alpha = 0.5f), Offset(anchorPos.x - 8f, anchorPos.y), Offset(anchorPos.x + 8f, anchorPos.y), 1f)
-            drawLine(AnchorColor.copy(alpha = 0.5f), Offset(anchorPos.x, anchorPos.y - 8f), Offset(anchorPos.x, anchorPos.y + 8f), 1f)
+            drawCircle(Mocha.Peach.copy(alpha = 0.5f), 4f, anchorPos)
+            drawLine(Mocha.Peach.copy(alpha = 0.5f), Offset(anchorPos.x - 8f, anchorPos.y), Offset(anchorPos.x + 8f, anchorPos.y), 1f)
+            drawLine(Mocha.Peach.copy(alpha = 0.5f), Offset(anchorPos.x, anchorPos.y - 8f), Offset(anchorPos.x, anchorPos.y + 8f), 1f)
         }
 
         // Info label
