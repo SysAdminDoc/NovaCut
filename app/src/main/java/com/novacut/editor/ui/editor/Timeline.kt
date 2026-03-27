@@ -58,6 +58,7 @@ fun Timeline(
     onScrollChanged: (Long) -> Unit,
     onTrimChanged: (clipId: String, newTrimStartMs: Long?, newTrimEndMs: Long?) -> Unit = { _, _, _ -> },
     onTrimDragStarted: () -> Unit = {},
+    onTrimDragEnded: () -> Unit = {},
     onTimelineWidthChanged: (Float) -> Unit = {},
     onToggleTrackMute: (String) -> Unit = {},
     onToggleTrackVisible: (String) -> Unit = {},
@@ -591,8 +592,8 @@ fun Timeline(
                                                                 onTrimDragStarted()
                                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                             },
-                                                            onDragEnd = {},
-                                                            onDragCancel = {},
+                                                            onDragEnd = { onTrimDragEnded() },
+                                                            onDragCancel = { onTrimDragEnded() },
                                                             onHorizontalDrag = { _, dragAmount ->
                                                                 val ppm = currentZoomLevel * BASE_SCALE
                                                                 if (ppm < 0.001f) return@detectHorizontalDragGestures
@@ -625,8 +626,8 @@ fun Timeline(
                                                                 onTrimDragStarted()
                                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                             },
-                                                            onDragEnd = {},
-                                                            onDragCancel = {},
+                                                            onDragEnd = { onTrimDragEnded() },
+                                                            onDragCancel = { onTrimDragEnded() },
                                                             onHorizontalDrag = { _, dragAmount ->
                                                                 val ppm = currentZoomLevel * BASE_SCALE
                                                                 if (ppm < 0.001f) return@detectHorizontalDragGestures

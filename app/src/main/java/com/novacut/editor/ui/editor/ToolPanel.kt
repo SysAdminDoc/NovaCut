@@ -749,6 +749,7 @@ fun EffectSlider(
     min: Float,
     max: Float,
     onDragStarted: () -> Unit = {},
+    onDragEnded: () -> Unit = {},
     onValueChange: (Float) -> Unit
 ) {
     var isDragging by remember { mutableStateOf(false) }
@@ -769,7 +770,7 @@ fun EffectSlider(
                 }
                 onValueChange(it)
             },
-            onValueChangeFinished = { isDragging = false },
+            onValueChangeFinished = { isDragging = false; onDragEnded() },
             valueRange = min..max,
             colors = SliderDefaults.colors(
                 thumbColor = Mocha.Mauve,
@@ -785,6 +786,7 @@ fun SpeedPanel(
     currentSpeed: Float,
     isReversed: Boolean,
     onSpeedDragStarted: () -> Unit = {},
+    onSpeedDragEnded: () -> Unit = {},
     onSpeedChanged: (Float) -> Unit,
     onReversedChanged: (Boolean) -> Unit,
     onClose: () -> Unit,
@@ -834,7 +836,7 @@ fun SpeedPanel(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Custom speed slider with drag start for undo debounce
-        EffectSlider(stringResource(R.string.tool_custom_speed), currentSpeed, 0.1f, 16f, onSpeedDragStarted) { onSpeedChanged(it) }
+        EffectSlider(stringResource(R.string.tool_custom_speed), currentSpeed, 0.1f, 16f, onSpeedDragStarted, onSpeedDragEnded) { onSpeedChanged(it) }
 
         // Reverse toggle
         Row(

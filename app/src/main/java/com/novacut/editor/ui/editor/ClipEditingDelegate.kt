@@ -338,6 +338,12 @@ class ClipEditingDelegate(
         rebuildPlayerTimeline()
     }
 
+    fun endTrim() {
+        videoEngine.setScrubbingMode(false)
+        rebuildPlayerTimeline()
+        saveProject()
+    }
+
     // --- Speed ---
     fun beginSpeedChange() {
         saveUndoState("Change speed")
@@ -355,6 +361,11 @@ class ClipEditingDelegate(
         }
         // Apply speed to preview immediately (don't rebuild full timeline for smooth slider)
         videoEngine.setPreviewSpeed(speed.coerceIn(0.1f, 16f))
+    }
+
+    fun endSpeedChange() {
+        rebuildPlayerTimeline()
+        saveProject()
     }
 
     // --- Reorder ---
@@ -380,6 +391,7 @@ class ClipEditingDelegate(
             recalculateDuration(state.copy(tracks = tracks))
         }
         rebuildPlayerTimeline()
+        saveProject()
     }
 
     // --- Move Clip to Track ---
@@ -404,6 +416,7 @@ class ClipEditingDelegate(
             recalculateDuration(state.copy(tracks = tracks))
         }
         rebuildPlayerTimeline()
+        saveProject()
         showToast("Clip moved to track")
     }
 
@@ -417,9 +430,10 @@ class ClipEditingDelegate(
                     else clip
                 })
             }
-            state.copy(tracks = tracks)
+            recalculateDuration(state.copy(tracks = tracks))
         }
         rebuildPlayerTimeline()
+        saveProject()
     }
 
 }
