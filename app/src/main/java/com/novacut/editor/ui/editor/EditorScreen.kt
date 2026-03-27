@@ -232,6 +232,7 @@ fun EditorScreen(
                     onScrollChanged = viewModel::setScrollOffset,
                     onTrimChanged = viewModel::trimClip,
                     onTrimDragStarted = viewModel::beginTrim,
+                    onTrimDragEnded = viewModel::endTrim,
                     onTimelineWidthChanged = viewModel::setTimelineWidth,
                     onToggleTrackMute = viewModel::toggleTrackMute,
                     onToggleTrackVisible = viewModel::toggleTrackVisibility,
@@ -402,6 +403,7 @@ fun EditorScreen(
                     currentSpeed = clip.speed,
                     isReversed = clip.isReversed,
                     onSpeedDragStarted = viewModel::beginSpeedChange,
+                    onSpeedDragEnded = viewModel::endSpeedChange,
                     onSpeedChanged = { viewModel.setClipSpeed(clip.id, it) },
                     onReversedChanged = { viewModel.setClipReversed(clip.id, it) },
                     onClose = { viewModel.setTool(EditorTool.NONE) }
