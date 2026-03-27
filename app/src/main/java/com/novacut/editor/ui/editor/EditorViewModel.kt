@@ -1453,11 +1453,13 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    // Helper: add clip to a track by type
+    // Helper: add clip to a track by type (used by TTS)
     private fun addClipToTrack(uri: android.net.Uri, durationMs: Long, trackType: TrackType) {
         val track = _state.value.tracks.firstOrNull { it.type == trackType } ?: return
         val timelineStart = track.clips.maxOfOrNull { it.timelineEndMs } ?: 0L
+        val clipId = UUID.randomUUID().toString()
         val clip = Clip(
+            id = clipId,
             sourceUri = uri,
             sourceDurationMs = durationMs,
             timelineStartMs = timelineStart,
@@ -1467,6 +1469,15 @@ class EditorViewModel @Inject constructor(
             s.copy(tracks = s.tracks.map { t ->
                 if (t.id == track.id) t.copy(clips = t.clips + clip) else t
             })
+        }
+        // Extract waveform for timeline visualization
+        viewModelScope.launch {
+            try {
+                val waveform = audioEngine.extractWaveform(uri).toList()
+                _state.update { it.copy(waveforms = it.waveforms + (clipId to waveform)) }
+            } catch (e: Exception) {
+                android.util.Log.w("EditorViewModel", "Waveform extraction failed for TTS clip", e)
+            }
         }
     }
 
@@ -2097,6 +2108,7 @@ class EditorViewModel @Inject constructor(
 
     fun setClipVolume(clipId: String, volume: Float) {
         updateClipById(clipId) { it.copy(volume = volume.coerceIn(0f, 2f)) }
+        saveProject()
     }
 
     fun beginVolumeChange() {
@@ -2119,6 +2131,7 @@ class EditorViewModel @Inject constructor(
             )
         }
         updatePreview()
+        saveProject()
     }
 
     fun resetClipTransform(clipId: String) {
@@ -2142,6 +2155,7 @@ class EditorViewModel @Inject constructor(
             val maxFade = (clip.durationMs - clip.fadeOutMs).coerceAtLeast(0L)
             clip.copy(fadeInMs = fadeInMs.coerceIn(0L, maxFade))
         }
+        saveProject()
     }
 
     fun setClipFadeOut(clipId: String, fadeOutMs: Long) {
@@ -2149,6 +2163,7 @@ class EditorViewModel @Inject constructor(
             val maxFade = (clip.durationMs - clip.fadeInMs).coerceAtLeast(0L)
             clip.copy(fadeOutMs = fadeOutMs.coerceIn(0L, maxFade))
         }
+        saveProject()
     }
 
     // Export

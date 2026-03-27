@@ -587,6 +587,12 @@ All roadmap + performance + accessibility + final features complete.
 - **TextOverlay deserialization null-safe** — `deserializeTextOverlay` returns null for empty text instead of crashing on `require(text.isNotEmpty())`.
 - **Batch export state reset** — `videoEngine.resetExportState()` called before each batch item to prevent race condition where previous COMPLETE state causes `first { it == EXPORTING }` to never resolve.
 
+### Continued Debugging Fixes
+- **TTS clips missing waveform** — Private `addClipToTrack` helper (used by TTS) now extracts waveform after adding clip, matching the delegate's behavior.
+- **setClipVolume persistence** — Now calls `saveProject()` (was only saving on auto-save timer)
+- **setClipFadeIn/FadeOut persistence** — Both now call `saveProject()`
+- **setClipTransform persistence** — Now calls `saveProject()` (transform changes were lost on restart)
+
 ### Known Remaining Issues
 - Export only uses first visible video track (overlay tracks with clips dropped). Multi-track compositing requires Media3 Compositor API.
 - `splitClipAt()` helper ignores speed curves when computing source position
