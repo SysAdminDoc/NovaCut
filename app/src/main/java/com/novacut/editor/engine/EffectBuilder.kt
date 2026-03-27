@@ -453,13 +453,15 @@ internal object EffectBuilder {
         val hasKfPosition = clip.keyframes.any {
             it.property == KeyframeProperty.POSITION_X || it.property == KeyframeProperty.POSITION_Y
         }
+        val hasAnchor = clip.anchorX != 0f || clip.anchorY != 0f
         val needsStaticTransform = clip.rotation != 0f || clip.scaleX != 1f || clip.scaleY != 1f ||
-            clip.positionX != 0f || clip.positionY != 0f
+            clip.positionX != 0f || clip.positionY != 0f || hasAnchor
         if (hasKfScale || hasKfRotation || hasKfPosition) {
             val kfs = clip.keyframes
             val staticSx = clip.scaleX; val staticSy = clip.scaleY
             val staticRot = clip.rotation
             val staticPx = clip.positionX; val staticPy = clip.positionY
+            val ax = clip.anchorX; val ay = clip.anchorY
             add(MatrixTransformation { presentationTimeUs ->
                 val timeMs = presentationTimeUs / 1000L
                 val sx = KeyframeEngine.getValueAt(kfs, KeyframeProperty.SCALE_X, timeMs) ?: staticSx
@@ -468,15 +470,19 @@ internal object EffectBuilder {
                 val px = KeyframeEngine.getValueAt(kfs, KeyframeProperty.POSITION_X, timeMs) ?: staticPx
                 val py = KeyframeEngine.getValueAt(kfs, KeyframeProperty.POSITION_Y, timeMs) ?: staticPy
                 android.graphics.Matrix().apply {
+                    if (ax != 0f || ay != 0f) postTranslate(-ax, ay)
                     postScale(sx, sy)
                     postRotate(rot)
+                    if (ax != 0f || ay != 0f) postTranslate(ax, -ay)
                     postTranslate(px, -py)
                 }
             })
         } else if (needsStaticTransform) {
             val m = android.graphics.Matrix().apply {
+                if (hasAnchor) postTranslate(-clip.anchorX, clip.anchorY)
                 postScale(clip.scaleX, clip.scaleY)
                 postRotate(clip.rotation)
+                if (hasAnchor) postTranslate(clip.anchorX, -clip.anchorY)
                 postTranslate(clip.positionX, -clip.positionY)
             }
             add(MatrixTransformation { m })

@@ -293,7 +293,8 @@ class EditorViewModel @Inject constructor(
     )
 
     val overlayDelegate = OverlayDelegate(
-        stateFlow = _state, saveUndoState = ::saveUndoState, showToast = ::showToast
+        stateFlow = _state, saveUndoState = ::saveUndoState, showToast = ::showToast,
+        saveProject = ::saveProject
     )
 
     // Whisper model state (exposed via delegate for UI binding)
