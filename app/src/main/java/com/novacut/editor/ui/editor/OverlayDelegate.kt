@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class OverlayDelegate(
     private val stateFlow: MutableStateFlow<EditorState>,
     private val saveUndoState: (String) -> Unit,
-    private val showToast: (String) -> Unit
+    private val showToast: (String) -> Unit,
+    private val saveProject: () -> Unit
 ) {
     // --- Text Overlays ---
 
@@ -23,6 +24,7 @@ class OverlayDelegate(
         if (text.startTimeMs >= text.endTimeMs) { showToast("Invalid text overlay duration"); return }
         saveUndoState("Add text")
         stateFlow.update { it.copy(textOverlays = it.textOverlays + text) }
+        saveProject()
     }
 
     fun updateTextOverlay(textOverlay: TextOverlay) {
@@ -35,6 +37,7 @@ class OverlayDelegate(
                 }
             )
         }
+        saveProject()
     }
 
     fun removeTextOverlay(id: String) {
@@ -42,6 +45,7 @@ class OverlayDelegate(
         stateFlow.update { state ->
             state.copy(textOverlays = state.textOverlays.filterNot { it.id == id })
         }
+        saveProject()
     }
 
     // --- Image/Sticker Overlays ---
@@ -55,6 +59,7 @@ class OverlayDelegate(
             type = type
         )
         stateFlow.update { it.copy(imageOverlays = it.imageOverlays + overlay) }
+        saveProject()
         showToast("Sticker added")
     }
 
@@ -75,18 +80,23 @@ class OverlayDelegate(
     fun removeImageOverlay(id: String) {
         saveUndoState("Remove sticker")
         stateFlow.update { it.copy(imageOverlays = it.imageOverlays.filter { o -> o.id != id }) }
+        saveProject()
     }
 
     // --- Timeline Markers ---
 
     fun addTimelineMarker(label: String = "", color: MarkerColor = MarkerColor.BLUE) {
+        saveUndoState("Add marker")
         val marker = TimelineMarker(timeMs = stateFlow.value.playheadMs, label = label, color = color)
         stateFlow.update { it.copy(timelineMarkers = (it.timelineMarkers + marker).sortedBy { m -> m.timeMs }) }
+        saveProject()
         showToast("Marker added")
     }
 
     fun deleteTimelineMarker(id: String) {
+        saveUndoState("Delete marker")
         stateFlow.update { state -> state.copy(timelineMarkers = state.timelineMarkers.filter { it.id != id }) }
+        saveProject()
     }
 
 }
