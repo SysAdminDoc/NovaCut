@@ -26,6 +26,10 @@ import android.util.Log
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.export.BatchExportPanel
@@ -75,6 +79,8 @@ fun EditorScreen(
     var showRadialMenu by remember { mutableStateOf(false) }
     var radialMenuPosition by remember { mutableStateOf(Offset.Zero) }
 
+    val focusRequester = remember { FocusRequester() }
+
     val hasOpenPanel = state.panels.hasOpenPanel || state.selectedEffectId != null || state.editingTextOverlayId != null
     val isClipMode = state.selectedClipId != null
 
@@ -99,7 +105,87 @@ fun EditorScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Mocha.Base)) {
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Mocha.Base)
+        .focusRequester(focusRequester)
+        .focusable()
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown) {
+                when {
+                    // Space = play/pause
+                    event.key == Key.Spacebar -> { viewModel.togglePlayPause(); true }
+                    // Delete/Backspace = delete clip
+                    event.key == Key.Delete || event.key == Key.Backspace -> {
+                        if (state.selectedClipId != null) viewModel.deleteSelectedClip()
+                        true
+                    }
+                    // M = add marker
+                    event.key == Key.M && !event.isCtrlPressed -> { viewModel.addTimelineMarker(); true }
+                    // Z = undo (Ctrl+Z)
+                    event.key == Key.Z && event.isCtrlPressed && !event.isShiftPressed -> { viewModel.undo(); true }
+                    // Shift+Z or Ctrl+Y = redo
+                    (event.key == Key.Z && event.isCtrlPressed && event.isShiftPressed) ||
+                    (event.key == Key.Y && event.isCtrlPressed) -> { viewModel.redo(); true }
+                    // Left arrow = seek back 1s
+                    event.key == Key.DirectionLeft && !event.isCtrlPressed -> {
+                        viewModel.seekTo((playheadMs - 1000).coerceAtLeast(0))
+                        true
+                    }
+                    // Right arrow = seek forward 1s
+                    event.key == Key.DirectionRight && !event.isCtrlPressed -> {
+                        viewModel.seekTo(playheadMs + 1000)
+                        true
+                    }
+                    // Ctrl+Left = seek back 5s
+                    event.key == Key.DirectionLeft && event.isCtrlPressed -> {
+                        viewModel.seekTo((playheadMs - 5000).coerceAtLeast(0))
+                        true
+                    }
+                    // Ctrl+Right = seek forward 5s
+                    event.key == Key.DirectionRight && event.isCtrlPressed -> {
+                        viewModel.seekTo(playheadMs + 5000)
+                        true
+                    }
+                    // + or = key = zoom in
+                    event.key == Key.Equals || event.key == Key.NumPadAdd -> {
+                        viewModel.setZoomLevel((state.zoomLevel * 1.33f).coerceAtMost(10f))
+                        true
+                    }
+                    // - key = zoom out
+                    event.key == Key.Minus || event.key == Key.NumPadSubtract -> {
+                        viewModel.setZoomLevel((state.zoomLevel * 0.75f).coerceAtLeast(0.1f))
+                        true
+                    }
+                    // S = split at playhead
+                    event.key == Key.S && !event.isCtrlPressed -> {
+                        viewModel.splitAtPlayhead()
+                        true
+                    }
+                    // Ctrl+S = save project
+                    event.key == Key.S && event.isCtrlPressed -> {
+                        viewModel.saveProject()
+                        true
+                    }
+                    // C = copy effects
+                    event.key == Key.C && event.isCtrlPressed -> {
+                        viewModel.copyClipEffects()
+                        true
+                    }
+                    // V = paste effects
+                    event.key == Key.V && event.isCtrlPressed -> {
+                        viewModel.pasteClipEffects()
+                        true
+                    }
+                    else -> false
+                }
+            } else false
+        }
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top bar (Home / Undo / Redo / Delete / More / Export)
             EditorTopBar(
@@ -112,6 +198,7 @@ fun EditorScreen(
                 canRedo = state.redoStack.isNotEmpty(),
                 selectedClipId = state.selectedClipId,
                 onDelete = viewModel::deleteSelectedClip,
+                confirmBeforeDelete = viewModel.confirmBeforeDelete,
                 onAddMedia = viewModel::showMediaPicker,
                 onAddTrack = viewModel::addTrack,
                 onExport = viewModel::showExportSheet,
@@ -297,7 +384,7 @@ fun EditorScreen(
                     scrollOffsetMs = state.scrollOffsetMs,
                     selectedClipId = state.selectedClipId,
                     isTrimMode = state.currentTool == EditorTool.TRIM,
-                    waveforms = state.waveforms,
+                    waveforms = if (viewModel.showWaveforms) state.waveforms else emptyMap(),
                     onClipSelected = viewModel::selectClip,
                     onPlayheadMoved = viewModel::seekTo,
                     onZoomChanged = viewModel::setZoomLevel,
@@ -319,6 +406,8 @@ fun EditorScreen(
                     onClipLongPress = viewModel::toggleClipMultiSelect,
                     onSlideClip = viewModel::slideClip,
                     onSlipClip = viewModel::slipClip,
+                    onToggleTrackCollapsed = viewModel::toggleTrackCollapsed,
+                    onToggleTrackWaveform = viewModel::toggleTrackWaveform,
                     onScrubStart = viewModel::beginScrub,
                     onScrubEnd = viewModel::endScrub,
                     engine = viewModel.engine,
@@ -1357,6 +1446,7 @@ private fun EditorTopBar(
     canRedo: Boolean,
     selectedClipId: String?,
     onDelete: () -> Unit,
+    confirmBeforeDelete: Boolean = true,
     onAddMedia: () -> Unit,
     onAddTrack: (TrackType) -> Unit,
     onExport: () -> Unit,
@@ -1537,7 +1627,10 @@ private fun EditorTopBar(
 
             if (selectedClipId != null) {
                 IconButton(
-                    onClick = { showDeleteConfirmation = true },
+                    onClick = {
+                        if (confirmBeforeDelete) showDeleteConfirmation = true
+                        else onDelete()
+                    },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(

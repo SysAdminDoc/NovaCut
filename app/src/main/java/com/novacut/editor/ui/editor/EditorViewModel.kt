@@ -328,6 +328,12 @@ class EditorViewModel @Inject constructor(
     val snapToBeat: Boolean get() = _snapToBeat.value
     val snapToMarker: Boolean get() = _snapToMarker.value
 
+    // Confirm-before-delete / show-waveforms (driven by user settings)
+    private val _confirmBeforeDelete = MutableStateFlow(true)
+    private val _showWaveforms = MutableStateFlow(true)
+    val confirmBeforeDelete: Boolean get() = _confirmBeforeDelete.value
+    val showWaveforms: Boolean get() = _showWaveforms.value
+
     // Stored outside EditorState to avoid recomposition on every resize
     @Volatile
     private var timelineWidthPx: Float = 0f
@@ -481,10 +487,16 @@ class EditorViewModel @Inject constructor(
                 // Apply default export config from settings once on first load
                 if (!appliedDefaults) {
                     appliedDefaults = true
+                    val quality = when (settings.defaultExportQuality) {
+                        "LOW" -> ExportQuality.LOW
+                        "MEDIUM" -> ExportQuality.MEDIUM
+                        else -> ExportQuality.HIGH
+                    }
                     _state.update { s ->
                         s.copy(exportConfig = s.exportConfig.copy(
                             resolution = settings.defaultResolution,
-                            frameRate = settings.defaultFrameRate
+                            frameRate = settings.defaultFrameRate,
+                            quality = quality
                         ))
                     }
                 }
@@ -526,6 +538,10 @@ class EditorViewModel @Inject constructor(
                 // Sync snap settings
                 _snapToBeat.value = settings.snapToBeat
                 _snapToMarker.value = settings.snapToMarker
+
+                // Sync confirm-before-delete and waveform settings
+                _confirmBeforeDelete.value = settings.confirmBeforeDelete
+                _showWaveforms.value = settings.showWaveforms
             }
         }
     }
@@ -580,6 +596,19 @@ class EditorViewModel @Inject constructor(
     fun setClipReversed(clipId: String, reversed: Boolean) = clipEditingDelegate.setClipReversed(clipId, reversed)
     fun reorderClip(clipId: String, targetIndex: Int) = clipEditingDelegate.reorderClip(clipId, targetIndex)
     fun moveClipToTrack(clipId: String, targetTrackId: String) = clipEditingDelegate.moveClipToTrack(clipId, targetTrackId)
+
+    fun setClipLabel(clipId: String, label: ClipLabel) {
+        saveUndoState("Change clip label")
+        _state.update { state ->
+            state.copy(tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id == clipId) clip.copy(clipLabel = label) else clip
+                })
+            })
+        }
+        rebuildTimeline()
+        saveProject()
+    }
 
     // --- Effects & Transitions (delegated) ---
     fun addEffect(clipId: String, effect: Effect) = effectsDelegate.addEffect(clipId, effect)

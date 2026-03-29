@@ -375,6 +375,7 @@
     <string name="track_collapse">Collapse track</string>
     <string name="track_expand">Expand track</string>
     <string name="track_waveform_toggle">Toggle waveform</string>
+    <string name="track_height_adjust">Adjust track height</string>
 
     <!-- EditorScreen (delete confirmation) -->
     <string name="editor_delete_clip_message">Delete this clip? This action can be undone.</string>
@@ -504,4 +505,11 @@
     <string name="autosave_saving">Saving\u2026</string>
     <string name="autosave_saved">Saved</string>
     <string name="autosave_failed">Save failed</string>
+
+    <!-- Clip Labels -->
+    <string name="clip_label">Label</string>
+    <string name="clip_label_none">No Label</string>
+
+    <!-- Keyboard shortcuts -->
+    <string name="keyboard_shortcuts">Keyboard Shortcuts</string>
 </resources>

@@ -102,7 +102,7 @@ proxyWorkflowEngine, sherpaAsrEngine
 - ProGuard rules verified comprehensive (Hilt, Room, Media3, ONNX, MediaPipe, Coil)
 
 ## Build Info
-- `versionCode = 69`, `versionName = "3.9.0"`
+- `versionCode = 70`, `versionName = "3.10.0"`
 - `compileSdk = 35`, `targetSdk = 35`, `minSdk = 26`
 - R8 minify + shrink enabled for release
 - Signing via `keystore.properties` or env vars (`NOVACUT_KS_PASS`, `NOVACUT_KEY_ALIAS`, `NOVACUT_KEY_PASS`)
@@ -164,6 +164,35 @@ Research across CapCut, VN, KineMaster, PowerDirector, DaVinci Resolve iPad, and
 ### Snap-to-Beat/Marker Scrubbing
 - Timeline snap targets extended with beat markers (when snapToBeat enabled) and timeline markers (when snapToMarker enabled)
 - Settings-driven via SettingsRepository → EditorViewModel StateFlow sync
+
+## v3.10.0 — Track Headers, Keyboard Shortcuts & Editor Polish
+
+### Track Header Enhancements (UI Wiring)
+- Collapse/expand chevron per track (ChevronRight/ExpandMore) — collapsed tracks show thin colored bars
+- Per-track height from `Track.trackHeight` (replaces hardcoded 60dp)
+- Waveform toggle icon (GraphicEq) in track header for VIDEO/AUDIO tracks
+- Waveform rendering gated by `track.showWaveform`
+
+### Settings Wired into Editor
+- `confirmBeforeDelete` — gates delete confirmation dialog (skip when false)
+- `defaultExportQuality` — applied to initial ExportConfig on load (LOW/MEDIUM/HIGH)
+- `showWaveforms` — global waveform visibility toggle (empty map when false)
+
+### Chapter Markers on Export
+- `ExportDelegate.startExport()` populates `ExportConfig.chapters` from `timelineMarkers` when `includeChapterMarkers` is true
+
+### Clip Color Labels
+- `ClipLabel` enum (NONE, RED, PEACH, GREEN, BLUE, MAUVE, YELLOW) with Catppuccin ARGB values
+- `Clip.clipLabel` field with colored 3dp top border in Timeline
+- `setClipLabel()` ViewModel method with undo support
+- Serialized/deserialized in ProjectAutoSave
+
+### Keyboard Shortcuts (External Keyboard)
+- Space=play/pause, Delete=delete clip, M=add marker, S=split
+- Ctrl+Z=undo, Ctrl+Shift+Z/Ctrl+Y=redo, Ctrl+S=save
+- Arrow keys=seek ±1s, Ctrl+arrows=seek ±5s
+- +/-=zoom in/out, Ctrl+C/V=copy/paste effects
+- FocusRequester + focusable() for key event capture
 
 ### Model Changes
 - `ExportConfig.transparentBackground: Boolean` — VP9 alpha export toggle

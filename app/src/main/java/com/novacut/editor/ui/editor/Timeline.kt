@@ -70,6 +70,8 @@ fun Timeline(
     onClipLongPress: (String) -> Unit = {},
     onSlideClip: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
     onSlipClip: (clipId: String, deltaMs: Long) -> Unit = { _, _ -> },
+    onToggleTrackCollapsed: (String) -> Unit = {},
+    onToggleTrackWaveform: (String) -> Unit = {},
     snapToBeat: Boolean = false,
     snapToMarker: Boolean = true,
     markers: List<TimelineMarker> = emptyList(),
@@ -80,7 +82,6 @@ fun Timeline(
 ) {
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
-    val trackHeight = 60.dp
     val rulerHeight = 28.dp
     val pixelsPerMs = zoomLevel * BASE_SCALE
     val coroutineScope = rememberCoroutineScope()
@@ -202,6 +203,7 @@ fun Timeline(
 
                 for (track in tracks) {
                     key(track.id) {
+                        val currentTrackHeight = if (track.isCollapsed) 24.dp else track.trackHeight.dp
                         val trackColor = when (track.type) {
                             TrackType.VIDEO -> Mocha.Blue
                             TrackType.AUDIO -> Mocha.Green
@@ -211,13 +213,19 @@ fun Timeline(
                         }
                         Column(
                             modifier = Modifier
-                                .height(trackHeight)
+                                .height(currentTrackHeight)
                                 .fillMaxWidth()
                                 .background(Mocha.Crust)
                                 .border(0.5.dp, Mocha.Surface0),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
+                            Icon(
+                                if (track.isCollapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore,
+                                contentDescription = if (track.isCollapsed) "Expand" else "Collapse",
+                                tint = Mocha.Subtext0,
+                                modifier = Modifier.size(11.dp).clickable { onToggleTrackCollapsed(track.id) }
+                            )
                             Icon(
                                 imageVector = when (track.type) {
                                     TrackType.VIDEO -> Icons.Default.Videocam
@@ -252,6 +260,14 @@ fun Timeline(
                                     tint = if (track.isLocked) Mocha.Peach.copy(alpha = 0.7f) else Mocha.Surface2,
                                     modifier = Modifier.size(11.dp).clickable { onToggleTrackLock(track.id) }
                                 )
+                                if (track.type == TrackType.AUDIO || track.type == TrackType.VIDEO) {
+                                    Icon(
+                                        Icons.Default.GraphicEq,
+                                        contentDescription = "Toggle waveform",
+                                        tint = if (track.showWaveform) Mocha.Teal else Mocha.Surface2,
+                                        modifier = Modifier.size(11.dp).clickable { onToggleTrackWaveform(track.id) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -402,11 +418,12 @@ fun Timeline(
 
                     // Tracks
                     for (track in tracks) {
+                    val currentTrackHeight = if (track.isCollapsed) 24.dp else track.trackHeight.dp
                     key(track.id) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(trackHeight)
+                                .height(currentTrackHeight)
                                 .background(Mocha.Base)
                                 .border(
                                     width = 0.5.dp,
@@ -441,6 +458,30 @@ fun Timeline(
                                     )
                                 }
                         ) {
+                            if (track.isCollapsed) {
+                                // Show minimal collapsed indicator
+                                val trackColor = when (track.type) {
+                                    TrackType.VIDEO -> Mocha.Blue
+                                    TrackType.AUDIO -> Mocha.Green
+                                    TrackType.OVERLAY -> Mocha.Peach
+                                    TrackType.TEXT -> Mocha.Mauve
+                                    TrackType.ADJUSTMENT -> Mocha.Yellow
+                                }
+                                for (clip in track.clips) {
+                                    val clipStartPx = (clip.timelineStartMs - scrollOffsetMs) * pixelsPerMs
+                                    val clipWidthPx = clip.durationMs * pixelsPerMs
+                                    if (clipStartPx + clipWidthPx > 0 && clipStartPx < timelineWidthPx) {
+                                        Box(
+                                            modifier = Modifier
+                                                .offset(x = with(density) { clipStartPx.toDp() })
+                                                .size(width = with(density) { clipWidthPx.toDp() }, height = 16.dp)
+                                                .padding(vertical = 3.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(trackColor.copy(alpha = 0.6f))
+                                        )
+                                    }
+                                }
+                            } else {
                             // Draw clips
                             track.clips.forEach { clip ->
                                 val clipStartPx = ((clip.timelineStartMs - scrollOffsetMs) * pixelsPerMs)
@@ -515,6 +556,14 @@ fun Timeline(
                                                 } else Modifier
                                             )
                                     ) {
+                                        if (clip.clipLabel != ClipLabel.NONE) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(3.dp)
+                                                    .background(Color(clip.clipLabel.argb))
+                                            )
+                                        }
                                         // Thumbnail strip for video tracks
                                         if (track.type == TrackType.VIDEO) {
                                             val key = "${clip.id}_${quantizedZoom}"
@@ -541,10 +590,12 @@ fun Timeline(
                                         if (track.type == TrackType.AUDIO) {
                                             val waveform = waveforms[clip.id]
                                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                                if (waveform != null && waveform.isNotEmpty()) {
-                                                    drawWaveform(waveform, clipColor)
-                                                } else {
-                                                    drawWaveformPlaceholder(clipColor)
+                                                if (track.showWaveform) {
+                                                    if (waveform != null && waveform.isNotEmpty()) {
+                                                        drawWaveform(waveform, clipColor)
+                                                    } else {
+                                                        drawWaveformPlaceholder(clipColor)
+                                                    }
                                                 }
 
                                                 // Volume envelope (keyframe-based volume line)
@@ -729,6 +780,7 @@ fun Timeline(
                                     }
                                 }
                             }
+                            } // end else (not collapsed)
 
                             // Beat markers
                             beatMarkers.forEach { beatMs ->

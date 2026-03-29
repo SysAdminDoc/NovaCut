@@ -13,6 +13,7 @@ import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.model.BatchExportItem
 import com.novacut.editor.model.BatchExportStatus
+import com.novacut.editor.model.ChapterMarker
 import com.novacut.editor.model.ExportConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +50,12 @@ class ExportDelegate(
         }
 
         val config = currentState.exportConfig.copy(aspectRatio = currentState.project.aspectRatio)
+        val configWithChapters = if (config.includeChapterMarkers && config.chapters.isEmpty()) {
+            config.copy(chapters = currentState.timelineMarkers
+                .sortedBy { it.timeMs }
+                .map { ChapterMarker(timeMs = it.timeMs, title = it.label.ifBlank { "Chapter" }) }
+            )
+        } else config
         val tracks = currentState.tracks
         val textOverlays = currentState.textOverlays
 
@@ -74,7 +81,7 @@ class ExportDelegate(
             try {
                 videoEngine.export(
                     tracks = tracks,
-                    config = config,
+                    config = configWithChapters,
                     outputFile = outputFile,
                     textOverlays = textOverlays,
                     onProgress = { progress ->
