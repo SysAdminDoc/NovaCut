@@ -381,6 +381,7 @@ data class AutoSaveState(
                 }
                 clip.linkedClipId?.let { put("linkedClipId", it) }
                 clip.groupId?.let { put("groupId", it) }
+                put("clipLabel", clip.clipLabel.name)
                 put("effects", JSONArray().apply {
                     clip.effects.forEach { put(serializeEffect(it)) }
                 })
@@ -677,6 +678,7 @@ data class AutoSaveState(
                 } ?: emptyList(),
                 linkedClipId = json.optString("linkedClipId", "").takeIf { it.isNotEmpty() },
                 groupId = json.optString("groupId", "").takeIf { it.isNotEmpty() },
+                clipLabel = safeValueOf(json.optString("clipLabel", "NONE"), ClipLabel.NONE),
                 effects = (0 until effectsArr.length()).mapNotNull { i ->
                     try { deserializeEffect(effectsArr.getJSONObject(i)) } catch (e: Exception) {
                         Log.w(TAG, "Failed to deserialize effect $i", e); null

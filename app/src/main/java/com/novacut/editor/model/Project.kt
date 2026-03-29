@@ -83,6 +83,16 @@ data class Track(
     }
 }
 
+enum class ClipLabel(val argb: Long, val displayName: String) {
+    NONE(0x00000000, "None"),
+    RED(0xFFF38BA8, "Red"),
+    PEACH(0xFFFAB387, "Peach"),
+    GREEN(0xFFA6E3A1, "Green"),
+    BLUE(0xFF89B4FA, "Blue"),
+    MAUVE(0xFFCBA6F7, "Mauve"),
+    YELLOW(0xFFF9E2AF, "Yellow")
+}
+
 @Immutable
 data class Clip(
     val id: String = UUID.randomUUID().toString(),
@@ -118,7 +128,8 @@ data class Clip(
     val proxyUri: Uri? = null,
     val motionTrackingData: MotionTrackingData? = null,
     val captions: List<Caption> = emptyList(),
-    val groupId: String? = null
+    val groupId: String? = null,
+    val clipLabel: ClipLabel = ClipLabel.NONE
 ) {
     init {
         require(speed > 0f) { "Clip speed must be positive" }
