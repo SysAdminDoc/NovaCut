@@ -196,3 +196,34 @@
 ### Snap-to-Beat/Marker Scrubbing
 - [x] **Timeline snap extension** — Beat markers and timeline marker positions added as snap targets (settings-driven)
 - [x] **Settings sync** — `snapToBeat`/`snapToMarker` flow from SettingsRepository → EditorViewModel → Timeline params
+
+## v3.10.0 — Track Headers, Keyboard Shortcuts & Editor Polish
+
+### Track Header UI Wiring
+- [x] **Collapse/expand chevron** — Per-track ChevronRight/ExpandMore icon; collapsed tracks render as thin colored bars (24dp)
+- [x] **Per-track height** — Timeline uses `Track.trackHeight` instead of hardcoded 60dp
+- [x] **Waveform toggle icon** — GraphicEq icon in track header for VIDEO/AUDIO tracks, gated by `Track.showWaveform`
+- [x] **EditorScreen wiring** — `onToggleTrackCollapsed` and `onToggleTrackWaveform` passed to Timeline
+
+### Settings Wired into Editor
+- [x] **confirmBeforeDelete** — Delete confirmation dialog skipped when setting is false
+- [x] **defaultExportQuality** — Applied to initial ExportConfig on first load (LOW/MEDIUM/HIGH mapping)
+- [x] **showWaveforms** — Global waveform visibility: empty waveform map passed to Timeline when disabled
+
+### Chapter Markers on Export
+- [x] **Auto-populate chapters** — `ExportDelegate.startExport()` maps `timelineMarkers` → `ChapterMarker` list when `includeChapterMarkers` is true and chapters list is empty
+
+### Clip Color Labels
+- [x] **ClipLabel enum** — NONE, RED, PEACH, GREEN, BLUE, MAUVE, YELLOW with Catppuccin ARGB values
+- [x] **Clip.clipLabel field** — Added to Clip data class with `ClipLabel.NONE` default
+- [x] **Timeline rendering** — 3dp colored top border on clips with non-NONE label
+- [x] **ViewModel method** — `setClipLabel()` with undo support, timeline rebuild, and auto-save
+- [x] **ProjectAutoSave** — `clipLabel` serialized/deserialized with safe default
+
+### Keyboard Shortcuts (External Keyboard)
+- [x] **Play/pause** — Space bar toggles playback
+- [x] **Undo/redo** — Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y
+- [x] **Seek** — Arrow keys ±1s, Ctrl+arrows ±5s
+- [x] **Timeline** — M=add marker, S=split, +/-=zoom, Delete=delete clip
+- [x] **Project** — Ctrl+S=save, Ctrl+C/V=copy/paste effects
+- [x] **Focus system** — FocusRequester + focusable() on root Box for key event capture
