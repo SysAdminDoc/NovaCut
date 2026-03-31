@@ -922,4 +922,43 @@
 
     <!-- StickerPickerPanel -->
     <string name="cd_select_sticker">Select sticker %1$s</string>
+
+    <!-- CaptionStyleGallery -->
+    <string name="caption_styles_title">Caption Styles</string>
+    <string name="caption_karaoke_title">Karaoke &amp; Word Highlight</string>
+
+    <!-- AudioPanel -->
+    <string name="cd_close_audio_panel">Close audio panel</string>
+
+    <!-- ColorGradingPanel -->
+    <string name="cd_reset">Reset</string>
+    <string name="cd_close_color_grading">Close</string>
+    <string name="cd_remove_lut">Remove LUT</string>
+    <string name="cd_import_lut">Import</string>
+
+    <!-- MaskEditorPanel -->
+    <string name="cd_add_mask">Add Mask</string>
+    <string name="cd_close_mask_editor">Close</string>
+
+    <!-- SpeedCurveEditor -->
+    <string name="cd_close_speed_curve">Close</string>
+    <string name="cd_reverse_speed">Reverse</string>
+
+    <!-- SpeedPresets -->
+    <string name="cd_close_speed_presets">Close</string>
+
+    <!-- Timeline controls -->
+    <string name="cd_add_marker">Add Marker</string>
+    <string name="cd_zoom_out">Zoom Out</string>
+    <string name="cd_fit_timeline">Fit</string>
+    <string name="cd_zoom_in">Zoom In</string>
+
+    <!-- MarkerListPanel -->
+    <string name="cd_close_markers">Close</string>
+
+    <!-- MediaPicker -->
+    <string name="cd_close_media_picker">Close</string>
+
+    <!-- AiToolsPanel -->
+    <string name="cd_download_model">Download model</string>
 </resources>
