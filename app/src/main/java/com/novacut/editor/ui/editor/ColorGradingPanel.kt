@@ -62,10 +62,10 @@ fun ColorGradingPanel(
                 IconButton(onClick = {
                     onColorGradeChanged(ColorGrade())
                 }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Refresh, "Reset", tint = Mocha.Peach, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Refresh, stringResource(R.string.cd_reset), tint = Mocha.Peach, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.cd_close_color_grading), tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -549,7 +549,7 @@ private fun LutContent(
                 IconButton(onClick = {
                     onChange(grade.copy(lutPath = null, lutIntensity = 1f))
                 }) {
-                    Icon(Icons.Default.Delete, "Remove LUT", tint = Mocha.Red)
+                    Icon(Icons.Default.Delete, stringResource(R.string.cd_remove_lut), tint = Mocha.Red)
                 }
             }
 
@@ -569,7 +569,7 @@ private fun LutContent(
             colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve.copy(alpha = 0.2f)),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Icon(Icons.Default.FileOpen, "Import", tint = Mocha.Mauve, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.FileOpen, stringResource(R.string.cd_import_lut), tint = Mocha.Mauve, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.color_grading_import_lut), color = Mocha.Mauve)
         }

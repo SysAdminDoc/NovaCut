@@ -56,13 +56,13 @@ fun CaptionStyleGallery(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Caption Styles",
+                stringResource(R.string.caption_styles_title),
                 color = Mocha.Text,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, stringResource(R.string.caption_styles_title), tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -90,7 +90,7 @@ fun CaptionStyleGallery(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        "Karaoke & Word Highlight",
+                        stringResource(R.string.caption_karaoke_title),
                         color = Mocha.Mauve,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
@@ -119,7 +119,7 @@ fun CaptionStyleGallery(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        "Caption Styles",
+                        stringResource(R.string.caption_styles_title),
                         color = Mocha.Subtext0,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold

@@ -118,6 +118,7 @@ class AiFeatures @Inject constructor(
             extractor.selectTrack(audioIndex)
             val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            if (channels <= 0) return@withContext emptyList()
             val mime = format.getString(MediaFormat.KEY_MIME) ?: return@withContext emptyList()
 
             // Decode audio to PCM amplitudes
@@ -339,7 +340,7 @@ class AiFeatures @Inject constructor(
             for (i in 0 until sampleCount) {
                 val timeMs = durationMs * (i * 2 + 1) / (sampleCount * 2)
                 val frame = retriever.getFrameAtTime(
-                    timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 ) ?: continue
 
                 val scaled = Bitmap.createScaledBitmap(frame, 128, 72, true)
@@ -448,7 +449,7 @@ class AiFeatures @Inject constructor(
             while (currentMs < maxAnalysisMs) {
                 ensureActive()
                 val frame = retriever.getFrameAtTime(
-                    currentMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    currentMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 )
                 if (frame != null) {
                     val scaled = Bitmap.createScaledBitmap(frame, analysisWidth, analysisHeight, true)
@@ -598,6 +599,7 @@ class AiFeatures @Inject constructor(
             extractor.selectTrack(audioIndex)
             val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            if (channels <= 0) return@withContext NoiseProfile()
             val mime = format.getString(MediaFormat.KEY_MIME) ?: return@withContext NoiseProfile()
 
             // Decode full audio
@@ -744,7 +746,7 @@ class AiFeatures @Inject constructor(
 
             // Sample frame from middle of clip
             val frame = retriever.getFrameAtTime(
-                (durationMs / 2) * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                (durationMs / 2) * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
             ) ?: return@withContext BackgroundAnalysis()
 
             val scaled = Bitmap.createScaledBitmap(frame, 128, 72, true)
@@ -833,7 +835,7 @@ class AiFeatures @Inject constructor(
 
             while (currentMs < durationMs) {
                 val frame = retriever.getFrameAtTime(
-                    currentMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    currentMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 )
                 if (frame != null && previousFrame != null) {
                     val difference = calculateFrameDifference(previousFrame, frame)
@@ -887,7 +889,7 @@ class AiFeatures @Inject constructor(
 
             while (currentMs <= endMs) {
                 val frame = retriever.getFrameAtTime(
-                    currentMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    currentMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 )
                 if (frame != null) {
                     val scaled = Bitmap.createScaledBitmap(frame, analysisW, analysisH, true)
@@ -1003,7 +1005,7 @@ class AiFeatures @Inject constructor(
             for (i in 0 until 3) {
                 val timeMs = durationMs * (i * 2 + 1) / 6
                 val frame = retriever.getFrameAtTime(
-                    timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 ) ?: continue
 
                 val scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
@@ -1108,7 +1110,7 @@ class AiFeatures @Inject constructor(
 
             for (ms in frames) {
                 val frame = retriever.getFrameAtTime(
-                    ms * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    ms * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 ) ?: continue
                 val scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
                 if (scaled !== frame) frame.recycle()
@@ -1395,6 +1397,10 @@ class AiFeatures @Inject constructor(
                 extractor.selectTrack(audioIndex)
                 val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
                 val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                if (channels <= 0) {
+                    onProgress(1f)
+                    return@withContext regions
+                }
                 val mime = format.getString(MediaFormat.KEY_MIME) ?: run {
                     onProgress(1f)
                     return@withContext regions
@@ -1728,7 +1734,7 @@ class AiFeatures @Inject constructor(
             while (currentMs <= durationMs) {
                 ensureActive()
                 val frame = retriever.getFrameAtTime(
-                    currentMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    currentMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 )
                 if (frame != null) {
                     val scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
@@ -1909,7 +1915,7 @@ class AiFeatures @Inject constructor(
                     val midTime = clip.durationMs / 2
 
                     val frame = retriever.getFrameAtTime(
-                        midTime * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                        midTime * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                     )
                     if (frame != null) {
                         val scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
@@ -1923,7 +1929,7 @@ class AiFeatures @Inject constructor(
 
                         // Motion: compare two frames
                         val frame2 = retriever.getFrameAtTime(
-                            (midTime + 500) * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                            (midTime + 500) * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                         )
                         if (frame2 != null) {
                             val scaled2 = Bitmap.createScaledBitmap(frame2, 64, 36, true)
@@ -2234,6 +2240,7 @@ class AiFeatures @Inject constructor(
             extractor.selectTrack(audioIndex)
             val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            if (channels <= 0) return@withContext SpectralNoiseProfile()
             val mime = format.getString(MediaFormat.KEY_MIME) ?: return@withContext SpectralNoiseProfile()
 
             onProgress(0.1f)
