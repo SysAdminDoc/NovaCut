@@ -57,7 +57,7 @@ fun MaskEditorPanel(
                 var showAddMenu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Add, "Add Mask", tint = Mocha.Green, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Add, stringResource(R.string.cd_add_mask), tint = Mocha.Green, modifier = Modifier.size(18.dp))
                     }
                     DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                         MaskType.entries.forEach { type ->
@@ -72,7 +72,7 @@ fun MaskEditorPanel(
                     }
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.cd_close_mask_editor), tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
                 }
             }
         }

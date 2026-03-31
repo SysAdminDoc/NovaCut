@@ -49,7 +49,7 @@ fun AudioPanel(
         ) {
             Text(stringResource(R.string.audio_title), color = Mocha.Text, fontSize = 16.sp)
             IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Close, "Close audio panel", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, stringResource(R.string.cd_close_audio_panel), tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
             }
         }
 

@@ -55,7 +55,7 @@ fun SpeedCurveEditor(
         ) {
             Text(stringResource(R.string.speed_title), color = Mocha.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, stringResource(R.string.cd_close_speed_curve), tint = Mocha.Subtext0, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -207,7 +207,7 @@ fun SpeedCurveEditor(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.SwapHoriz, "Reverse", tint = if (isReversed) Mocha.Peach else Mocha.Subtext0, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.SwapHoriz, stringResource(R.string.cd_reverse_speed), tint = if (isReversed) Mocha.Peach else Mocha.Subtext0, modifier = Modifier.size(20.dp))
                 Text(stringResource(R.string.speed_reverse_playback), color = Mocha.Text, fontSize = 13.sp)
             }
             Switch(

@@ -65,7 +65,7 @@ fun MarkerListPanel(
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, "Close", tint = Mocha.Subtext0, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, stringResource(R.string.cd_close_markers), tint = Mocha.Subtext0, modifier = Modifier.size(16.dp))
             }
         }
 
