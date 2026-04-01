@@ -433,9 +433,10 @@ fun Timeline(
                                 }
                             } else {
                             // Draw clips
-                            track.clips.forEach { clip ->
+                            track.clips.forEachIndexed { clipIdx, clip ->
                                 val clipStartPx = ((clip.timelineStartMs - scrollOffsetMs) * pixelsPerMs)
                                 val clipWidthPx = (clip.durationMs * pixelsPerMs)
+                                val nextClipTransition = track.clips.getOrNull(clipIdx + 1)?.transition
 
                                 if (clipStartPx + clipWidthPx > 0 && clipStartPx < timelineWidthPx) {
                                     val isSelected = clip.id == selectedClipId
@@ -649,16 +650,51 @@ fun Timeline(
                                                 }
                                         )
 
-                                        // Transition indicator
+                                        // Transition-in zone overlay
                                         if (clip.transition != null) {
+                                            val transWidthPx = clip.transition.durationMs * pixelsPerMs
                                             Box(
                                                 modifier = Modifier
-                                                    .align(Alignment.TopStart)
-                                                    .padding(2.dp)
-                                                    .size(12.dp)
+                                                    .align(Alignment.CenterStart)
+                                                    .width(with(density) { transWidthPx.coerceAtLeast(8f).toDp() })
+                                                    .fillMaxHeight()
                                                     .background(
-                                                        Mocha.Yellow,
-                                                        RoundedCornerShape(2.dp)
+                                                        Brush.horizontalGradient(
+                                                            colors = listOf(
+                                                                Mocha.Yellow.copy(alpha = 0.5f),
+                                                                Mocha.Yellow.copy(alpha = 0f)
+                                                            )
+                                                        )
+                                                    )
+                                            ) {
+                                                // Transition type icon
+                                                Icon(
+                                                    imageVector = Icons.Filled.SwapHoriz,
+                                                    contentDescription = null,
+                                                    tint = Mocha.Yellow,
+                                                    modifier = Modifier
+                                                        .align(Alignment.CenterStart)
+                                                        .padding(start = 1.dp)
+                                                        .size(10.dp)
+                                                )
+                                            }
+                                        }
+
+                                        // Transition-out zone overlay (next clip has a transition)
+                                        if (nextClipTransition != null) {
+                                            val transOutWidthPx = nextClipTransition.durationMs * pixelsPerMs
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.CenterEnd)
+                                                    .width(with(density) { transOutWidthPx.coerceAtLeast(8f).toDp() })
+                                                    .fillMaxHeight()
+                                                    .background(
+                                                        Brush.horizontalGradient(
+                                                            colors = listOf(
+                                                                Mocha.Yellow.copy(alpha = 0f),
+                                                                Mocha.Yellow.copy(alpha = 0.5f)
+                                                            )
+                                                        )
                                                     )
                                             )
                                         }

@@ -418,6 +418,36 @@ internal object EffectBuilder {
     }
 
     /**
+     * Build transition-out effect for the outgoing clip.
+     * Activates near the end of the clip to create a matching exit animation
+     * for the next clip's incoming transition.
+     */
+    fun buildTransitionOutEffect(transition: Transition, clipDurationMs: Long): androidx.media3.common.Effect {
+        val durationUs = transition.durationMs * 1000f
+        val clipDurationUs = clipDurationMs * 1000f
+        return when (transition.type) {
+            TransitionType.DISSOLVE, TransitionType.FADE_BLACK ->
+                EffectShaders.transitionFadeOut(durationUs, clipDurationUs)
+            TransitionType.FADE_WHITE ->
+                EffectShaders.transitionFadeOut(durationUs, clipDurationUs, fadeToWhite = true)
+            TransitionType.WIPE_LEFT -> EffectShaders.transitionWipeOut(durationUs, clipDurationUs, -1f, 0f)
+            TransitionType.WIPE_RIGHT -> EffectShaders.transitionWipeOut(durationUs, clipDurationUs, 1f, 0f)
+            TransitionType.WIPE_UP -> EffectShaders.transitionWipeOut(durationUs, clipDurationUs, 0f, 1f)
+            TransitionType.WIPE_DOWN -> EffectShaders.transitionWipeOut(durationUs, clipDurationUs, 0f, -1f)
+            TransitionType.SLIDE_LEFT -> EffectShaders.transitionSlideOut(durationUs, clipDurationUs, -1f, 0f)
+            TransitionType.SLIDE_RIGHT -> EffectShaders.transitionSlideOut(durationUs, clipDurationUs, 1f, 0f)
+            TransitionType.ZOOM_IN, TransitionType.ZOOM_OUT, TransitionType.CROSS_ZOOM ->
+                EffectShaders.transitionZoomOutExit(durationUs, clipDurationUs)
+            TransitionType.SPIN, TransitionType.FLIP ->
+                EffectShaders.transitionSpinOut(durationUs, clipDurationUs)
+            TransitionType.CIRCLE_OPEN, TransitionType.RADIAL_WIPE ->
+                EffectShaders.transitionCircleClose(durationUs, clipDurationUs)
+            // All other exotic transitions: generic fade to black
+            else -> EffectShaders.transitionFadeOut(durationUs, clipDurationUs)
+        }
+    }
+
+    /**
      * Add opacity and transform effects (static or keyframe-animated) for a clip.
      */
     fun MutableList<androidx.media3.common.Effect>.addOpacityAndTransformEffects(clip: Clip) {

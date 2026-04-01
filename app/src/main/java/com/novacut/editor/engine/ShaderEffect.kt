@@ -1207,6 +1207,124 @@ object EffectShaders {
         "  float b = texture(uTexSampler, clamp(uvB, 0.0, 1.0)).b;\n" +
         "  fragColor = vec4(vec3(r, g, b) * progress, 1.0);\n}"
 
+    // ─── Transition-OUT shaders (applied at end of outgoing clip) ──
+
+    // Shared transition-out header: includes uClipDurationUs for end-of-clip timing
+    private const val HO = "#version 300 es\nprecision mediump float;\n" +
+        "uniform sampler2D uTexSampler;\nin vec2 vTexCoord;\nout vec4 fragColor;\n" +
+        "uniform float uDurationUs;\nuniform float uClipDurationUs;\nuniform float uTime;\n"
+
+    fun transitionFadeOut(durationUs: Float, clipDurationUs: Float, fadeToWhite: Boolean = false) = ShaderEffect(
+        if (fadeToWhite) FRAG_FADE_OUT_WHITE else FRAG_FADE_OUT_BLACK,
+        mapOf("uDurationUs" to durationUs, "uClipDurationUs" to clipDurationUs)
+    )
+
+    fun transitionWipeOut(durationUs: Float, clipDurationUs: Float, dirX: Float, dirY: Float) = ShaderEffect(
+        FRAG_WIPE_OUT, mapOf("uDurationUs" to durationUs, "uClipDurationUs" to clipDurationUs,
+            "uDirX" to dirX, "uDirY" to dirY)
+    )
+
+    fun transitionSlideOut(durationUs: Float, clipDurationUs: Float, dirX: Float, dirY: Float) = ShaderEffect(
+        FRAG_SLIDE_OUT, mapOf("uDurationUs" to durationUs, "uClipDurationUs" to clipDurationUs,
+            "uDirX" to dirX, "uDirY" to dirY)
+    )
+
+    fun transitionCircleClose(durationUs: Float, clipDurationUs: Float) = ShaderEffect(
+        FRAG_CIRCLE_CLOSE, mapOf("uDurationUs" to durationUs, "uClipDurationUs" to clipDurationUs)
+    )
+
+    fun transitionZoomOutExit(durationUs: Float, clipDurationUs: Float) = ShaderEffect(
+        FRAG_ZOOM_OUT_EXIT, mapOf("uDurationUs" to durationUs, "uClipDurationUs" to clipDurationUs)
+    )
+
+    fun transitionSpinOut(durationUs: Float, clipDurationUs: Float) = ShaderEffect(
+        FRAG_SPIN_OUT, mapOf("uDurationUs" to durationUs, "uClipDurationUs" to clipDurationUs)
+    )
+
+    private const val FRAG_FADE_OUT_BLACK = HO +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = c; return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  fragColor = vec4(c.rgb * (1.0 - progress), c.a);\n}"
+
+    private const val FRAG_FADE_OUT_WHITE = HO +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = c; return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  fragColor = vec4(mix(c.rgb, vec3(1.0), progress), c.a);\n}"
+
+    private const val FRAG_WIPE_OUT = HO +
+        "uniform float uDirX;\nuniform float uDirY;\n" +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = c; return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  float pos = vTexCoord.x * uDirX + vTexCoord.y * uDirY;\n" +
+        "  float lo = min(uDirX, 0.0) + min(uDirY, 0.0);\n" +
+        "  float hi = max(uDirX, 0.0) + max(uDirY, 0.0);\n" +
+        "  float edge = (pos - lo) / max(hi - lo, 0.001);\n" +
+        "  float p = progress * 1.04 - 0.02;\n" +
+        "  float conceal = smoothstep(p - 0.02, p + 0.02, edge);\n" +
+        "  fragColor = vec4(c.rgb * conceal, c.a);\n}"
+
+    private const val FRAG_SLIDE_OUT = HO +
+        "uniform float uDirX;\nuniform float uDirY;\n" +
+        "void main() {\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = texture(uTexSampler, vTexCoord); return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  vec2 offset = vec2(uDirX, uDirY) * progress;\n" +
+        "  vec2 uv = vTexCoord + offset;\n" +
+        "  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)\n" +
+        "    fragColor = vec4(0.0, 0.0, 0.0, 1.0);\n" +
+        "  else fragColor = texture(uTexSampler, uv);\n}"
+
+    private const val FRAG_CIRCLE_CLOSE = HO +
+        "void main() {\n" +
+        "  vec4 c = texture(uTexSampler, vTexCoord);\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = c; return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  float dist = length(vTexCoord - 0.5);\n" +
+        "  float radius = (1.0 - progress) * 0.75;\n" +
+        "  float mask = smoothstep(radius + 0.02, radius - 0.02, dist);\n" +
+        "  fragColor = vec4(c.rgb * mask, c.a);\n}"
+
+    private const val FRAG_ZOOM_OUT_EXIT = HO +
+        "void main() {\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = texture(uTexSampler, vTexCoord); return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  float scale = mix(1.0, 3.0, progress);\n" +
+        "  vec2 uv = (vTexCoord - 0.5) * scale + 0.5;\n" +
+        "  vec4 c = texture(uTexSampler, clamp(uv, 0.0, 1.0));\n" +
+        "  fragColor = vec4(c.rgb * (1.0 - progress), c.a);\n}"
+
+    private const val FRAG_SPIN_OUT = HO +
+        "void main() {\n" +
+        "  float timeUs = uTime * 1000000.0;\n" +
+        "  float transStart = uClipDurationUs - uDurationUs;\n" +
+        "  if (timeUs < transStart) { fragColor = texture(uTexSampler, vTexCoord); return; }\n" +
+        "  float progress = clamp((timeUs - transStart) / uDurationUs, 0.0, 1.0);\n" +
+        "  float angle = progress * 6.28318;\n" +
+        "  float sc = max(1.0 - progress, 0.01);\n" +
+        "  vec2 uv = vTexCoord - 0.5;\n" +
+        "  float cs = cos(angle), sn = sin(angle);\n" +
+        "  uv = vec2(uv.x * cs - uv.y * sn, uv.x * sn + uv.y * cs) / sc + 0.5;\n" +
+        "  vec4 col = texture(uTexSampler, clamp(uv, 0.0, 1.0));\n" +
+        "  fragColor = vec4(col.rgb * (1.0 - progress), col.a);\n}"
+
     // ─── Mask fragment shaders ───────────────────────────────────────
 
     private const val FRAG_RECT_MASK = H +
