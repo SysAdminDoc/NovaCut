@@ -10,6 +10,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.*
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.*
 import com.novacut.editor.engine.EffectBuilder.addColorGradingEffects
@@ -34,6 +36,10 @@ class VideoEngine @Inject constructor(
 ) {
     private var player: ExoPlayer? = null
     private var playerListener: Player.Listener? = null
+    private var transitionListener: Player.Listener? = null
+
+    // Clips for per-clip effect switching during playback
+    private var videoClips: List<Clip> = emptyList()
     // Memory-bounded bitmap cache — uses 1/8 of available heap
     // Don't recycle evicted bitmaps — they may still be referenced by Compose Image nodes
     private val thumbnailCache = object : android.util.LruCache<String, Bitmap>(
@@ -67,9 +73,24 @@ class VideoEngine @Inject constructor(
      * Get or create ExoPlayer. Must be called from main thread.
      * ExoPlayer requires a Looper for creation and all API calls.
      */
+    @androidx.annotation.OptIn(UnstableApi::class)
     fun getPlayer(): ExoPlayer {
         if (player == null) {
-            player = ExoPlayer.Builder(context).build()
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    /* minBufferMs */ 5_000,
+                    /* maxBufferMs */ 50_000,
+                    /* bufferForPlaybackMs */ 1_500,
+                    /* bufferForPlaybackAfterRebufferMs */ 3_000
+                )
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .build()
+            val renderersFactory = DefaultRenderersFactory(context)
+                .setEnableDecoderFallback(true)
+            player = ExoPlayer.Builder(context)
+                .setLoadControl(loadControl)
+                .setRenderersFactory(renderersFactory)
+                .build()
         }
         return player!!
     }
@@ -102,7 +123,7 @@ class VideoEngine @Inject constructor(
     @androidx.annotation.OptIn(UnstableApi::class)
     fun prepareTimeline(tracks: List<Track>) {
         val p = getPlayer()
-        val videoClips = tracks.filter { it.type == TrackType.VIDEO && it.isVisible }.flatMap { it.clips }
+        videoClips = tracks.filter { it.type == TrackType.VIDEO && it.isVisible }.flatMap { it.clips }
         if (videoClips.isEmpty()) {
             p.clearMediaItems()
             clipDurationsMs = emptyList()
@@ -123,6 +144,18 @@ class VideoEngine @Inject constructor(
         }
         p.setMediaItems(mediaItems)
         p.prepare()
+
+        // Install per-clip effect switching listener
+        transitionListener?.let { p.removeListener(it) }
+        transitionListener = object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                applyEffectsForCurrentClip()
+            }
+        }
+        p.addListener(transitionListener!!)
+
+        // Apply effects for the initial clip
+        applyEffectsForCurrentClip()
     }
 
     fun seekTo(positionMs: Long) {
@@ -253,8 +286,10 @@ class VideoEngine @Inject constructor(
             val videoTrack = visibleVideoTracks.first()
             val (targetW, targetH) = config.resolution.forAspect(config.aspectRatio)
 
-            val editedItems = videoTrack.clips.map { clip ->
-                buildEditedMediaItem(clip, videoTrack.isMuted, tracks, config, targetW, targetH, textOverlays, lottieOverlays)
+            val clips = videoTrack.clips
+            val editedItems = clips.mapIndexed { index, clip ->
+                val nextTransition = clips.getOrNull(index + 1)?.transition
+                buildEditedMediaItem(clip, videoTrack.isMuted, tracks, config, targetW, targetH, textOverlays, lottieOverlays, nextTransition)
             }
             @Suppress("DEPRECATION")
             val videoSequence = EditedMediaItemSequence.Builder().addItems(editedItems).build()
@@ -297,7 +332,8 @@ class VideoEngine @Inject constructor(
         targetW: Int,
         targetH: Int,
         textOverlays: List<com.novacut.editor.model.TextOverlay>,
-        lottieOverlays: List<LottieOverlaySpec>
+        lottieOverlays: List<LottieOverlaySpec>,
+        nextClipTransition: Transition? = null
     ): EditedMediaItem {
         val mediaItem = MediaItem.Builder()
             .setUri(clip.sourceUri)
@@ -346,6 +382,8 @@ class VideoEngine @Inject constructor(
             }
 
             clip.transition?.let { add(EffectBuilder.buildTransitionEffect(it)) }
+            // Transition-out if the next clip has a transition
+            nextClipTransition?.let { add(EffectBuilder.buildTransitionOutEffect(it, clip.durationMs)) }
             addOpacityAndTransformEffects(clip)
 
             val clipStart = clip.timelineStartMs
@@ -580,6 +618,7 @@ class VideoEngine @Inject constructor(
     /**
      * Apply visual effects to ExoPlayer preview for the given clip.
      * Builds RgbMatrix/GlEffect effects from the clip's enabled effects, opacity, and transforms.
+     * Includes transition-in for this clip and transition-out if the next clip has a transition.
      * Does NOT include speed (handled via PlaybackParameters), text overlays, Presentation, or FrameDropEffect.
      */
     @androidx.annotation.OptIn(UnstableApi::class)
@@ -589,27 +628,68 @@ class VideoEngine @Inject constructor(
             p.setVideoEffects(emptyList())
             return
         }
-        val effects = buildList<androidx.media3.common.Effect> {
-            // User effects (skip BG_REMOVAL in preview — per-frame segmentation is too slow for realtime)
-            for (effect in clip.effects.filter { it.enabled && it.type != EffectType.BG_REMOVAL }) {
-                EffectBuilder.buildVideoEffect(effect, segmentationEngine)?.let { add(it) }
-            }
-            // Color grading (lift/gamma/gain + HSL + LUT)
-            addColorGradingEffects(clip)
-            // Blend mode
-            if (clip.blendMode != com.novacut.editor.model.BlendMode.NORMAL) {
-                add(EffectShaders.blendMode(clip.blendMode, clip.opacity))
-            }
-            // Transition-in
-            clip.transition?.let { add(EffectBuilder.buildTransitionEffect(it)) }
-            // Opacity + transform (keyframe-animated or static)
-            addOpacityAndTransformEffects(clip)
-        }
+        // Find the next clip's transition for transition-out on this clip
+        val clipIndex = videoClips.indexOfFirst { it.id == clip.id }
+        val nextClipTransition = if (clipIndex >= 0) videoClips.getOrNull(clipIndex + 1)?.transition else null
+
+        val effects = buildPreviewEffectsForClip(clip, nextClipTransition)
         try {
             p.setVideoEffects(effects)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to apply preview effects", e)
         }
+    }
+
+    /**
+     * Apply effects for the currently playing clip during playback.
+     * Called automatically by the media item transition listener.
+     */
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private fun applyEffectsForCurrentClip() {
+        val p = player ?: return
+        val index = p.currentMediaItemIndex
+        if (index < 0 || index >= videoClips.size) return
+        val clip = videoClips[index]
+        val nextClipTransition = videoClips.getOrNull(index + 1)?.transition
+
+        val effects = buildPreviewEffectsForClip(clip, nextClipTransition)
+        try {
+            p.setVideoEffects(effects)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to apply effects for clip $index", e)
+        }
+    }
+
+    /**
+     * Build the complete effect chain for a clip preview, including:
+     * - User effects (filters, color grading, blend modes)
+     * - Transition-in (if this clip has a transition)
+     * - Transition-out (if the next clip has a transition)
+     * - Opacity and transform
+     */
+    @UnstableApi
+    private fun buildPreviewEffectsForClip(
+        clip: Clip,
+        nextClipTransition: Transition?
+    ): List<androidx.media3.common.Effect> = buildList {
+        // User effects (skip BG_REMOVAL in preview — per-frame segmentation is too slow for realtime)
+        for (effect in clip.effects.filter { it.enabled && it.type != EffectType.BG_REMOVAL }) {
+            EffectBuilder.buildVideoEffect(effect, segmentationEngine)?.let { add(it) }
+        }
+        // Color grading (lift/gamma/gain + HSL + LUT)
+        addColorGradingEffects(clip)
+        // Blend mode
+        if (clip.blendMode != com.novacut.editor.model.BlendMode.NORMAL) {
+            add(EffectShaders.blendMode(clip.blendMode, clip.opacity))
+        }
+        // Transition-in for this clip
+        clip.transition?.let { add(EffectBuilder.buildTransitionEffect(it)) }
+        // Transition-out if the next clip has a transition (fade/wipe out at end of this clip)
+        nextClipTransition?.let {
+            add(EffectBuilder.buildTransitionOutEffect(it, clip.durationMs))
+        }
+        // Opacity + transform (keyframe-animated or static)
+        addOpacityAndTransformEffects(clip)
     }
 
     /**
@@ -672,8 +752,11 @@ class VideoEngine @Inject constructor(
 
     fun release() {
         removePlayerListener()
+        transitionListener?.let { player?.removeListener(it) }
+        transitionListener = null
         player?.release()
         player = null
+        videoClips = emptyList()
         clearThumbnailCache()
     }
 
