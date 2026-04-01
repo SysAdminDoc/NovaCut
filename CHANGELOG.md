@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.24.0 — Transitions & Smooth Playback
+
+### Transition System Overhaul
+- **Per-clip effects during playback** — Transitions now preview live as playback crosses clip boundaries (previously only visible on selected clip)
+- **Transition-out effects** — Outgoing clips now fade/wipe out to match the incoming clip's transition-in, creating seamless visual transitions
+- **7 transition-out shader types** — Fade-out (black/white), wipe-out, slide-out, circle-close, zoom-out, and spin-out shaders activated at the end of outgoing clips
+- **Export transition-out** — Transition-out effects now also apply during Transformer export, not just preview
+
+### Smooth Playback
+- **Custom ExoPlayer buffer config** — Increased buffer sizes (5s min, 50s max, 1.5s playback, 3s rebuffer) for gapless multi-clip playback
+- **Decoder fallback** — Enabled `DefaultRenderersFactory.setEnableDecoderFallback(true)` so playback recovers from codec failures instead of stopping
+- **Reduced clip boundary stutter** — Larger pre-buffer window allows ExoPlayer to pre-decode the next clip before the current one ends
+
+### Timeline UI
+- **Transition zone overlays** — Transition-in regions show a yellow gradient overlay with swap icon at the clip start; transition-out regions show a matching gradient at the outgoing clip's end
+- **Duration-proportional indicators** — Transition zones scale with the actual transition duration instead of using a fixed 12dp square
+
 ## v3.23.0 — Comprehensive Audit: 24 Bug Fixes
 
 ### Crash Fixes
