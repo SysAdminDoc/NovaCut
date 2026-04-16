@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.30.0 — UI Polish & Panel Hardening
+
+### UI Improvements
+- **Editor panels overhauled** — 25 panel composables refined: improved layouts, consistent Catppuccin Mocha theming, better accessibility content descriptions, and expanded string resources (259 new i18n entries).
+- **Launcher icon reverted** — Restored halo + full letterform design.
+- **KeyframeCurveEditor** — Richer curve visualization with grid lines, property-colored dots, and improved hit detection.
+- **SpeedCurveEditor** — Enhanced canvas with reference line, higher-fidelity curve rendering (200 sample steps), and preset chip row.
+- **VideoScopes** — Histogram, waveform, and vectorscope panels refined with better scaling and color accuracy.
+- **TextTemplateGallery** — Expanded animated template library with category filtering and preview cards.
+- **ToolPanel** — Smarter clip/project mode switching, sub-menu grid layout, and disabled-state feedback for clip-only actions.
+
+### Data Model
+- **SpeedCurve.averageSpeed()** — New utility for sampling average speed across a curve with configurable sample count.
+
+### Housekeeping
+- `versionCode 90 → 91`, `versionName 3.29.0 → 3.30.0`
+- Room schema v5 export added
+
 ## v3.29.0 — Audit Phase 2: Data Persistence, Thread Safety & Database Optimization
 
 ### Data Persistence Fixes
