@@ -17,6 +17,9 @@ local.properties
 .env
 .zombie-build/
 .kotlin/
+# JVM hotspot crash dumps from local Gradle / Android Studio
+hs_err_pid*.log
+replay_pid*.log
 
 # Private docs — keep local only
 CLAUDE.md

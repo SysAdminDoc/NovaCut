@@ -38,14 +38,17 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
 import com.novacut.editor.engine.ExportState
@@ -246,7 +249,9 @@ fun ExportSheet(
                 progressLabel = "$percent%",
                 secondaryBody = etaLabel,
                 primaryLabel = stringResource(R.string.export_cancel),
-                onPrimary = onCancel
+                onPrimary = onCancel,
+                // Cancel during export should not look like a celebrate-the-result CTA.
+                primaryStyle = PrimaryStyle.Destructive
             )
             return
         }
@@ -262,7 +267,8 @@ fun ExportSheet(
                 secondaryLabel = stringResource(R.string.export_save_to_gallery),
                 onSecondary = onSaveToGallery,
                 tertiaryLabel = stringResource(R.string.done),
-                onTertiary = onClose
+                onTertiary = onClose,
+                primaryStyle = PrimaryStyle.Filled
             )
             return
         }
@@ -274,7 +280,9 @@ fun ExportSheet(
                 title = stringResource(R.string.export_cancelled),
                 body = stringResource(R.string.export_subtitle),
                 primaryLabel = stringResource(R.string.done),
-                onPrimary = onClose
+                onPrimary = onClose,
+                // "Done" after a user-initiated cancel is informational, not celebratory.
+                primaryStyle = PrimaryStyle.Quiet
             )
             return
         }
@@ -288,7 +296,8 @@ fun ExportSheet(
                 primaryLabel = stringResource(R.string.retry),
                 onPrimary = onStartExport,
                 secondaryLabel = stringResource(R.string.close),
-                onSecondary = onClose
+                onSecondary = onClose,
+                primaryStyle = PrimaryStyle.Filled
             )
             return
         }
@@ -941,6 +950,13 @@ private fun ExportToggleRow(
     }
 }
 
+/**
+ * Visual treatment for the primary CTA button on an [ExportStateCard]. Picking the right
+ * style is purely semantic — "Share completed export" is a confident success action, while
+ * "Cancel running export" is a destructive-ish action that should never look like a CTA.
+ */
+private enum class PrimaryStyle { Filled, Destructive, Quiet }
+
 @Composable
 private fun ExportStateCard(
     icon: ImageVector,
@@ -955,7 +971,8 @@ private fun ExportStateCard(
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
     tertiaryLabel: String? = null,
-    onTertiary: (() -> Unit)? = null
+    onTertiary: (() -> Unit)? = null,
+    primaryStyle: PrimaryStyle = PrimaryStyle.Filled
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -978,60 +995,122 @@ private fun ExportStateCard(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Surface(
-                    color = tint.copy(alpha = 0.14f),
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, tint.copy(alpha = 0.22f))
-                ) {
-                    Box(
-                        modifier = Modifier.padding(18.dp),
-                        contentAlignment = Alignment.Center
+                // Two-layer halo: outer translucent ring + inner filled disc with the icon.
+                // The ring gives the icon a sense of presence/depth without resorting to a
+                // hard shadow that would conflict with the surrounding gradient surface.
+                Box(contentAlignment = Alignment.Center) {
+                    Surface(
+                        color = Color.Transparent,
+                        shape = CircleShape,
+                        border = BorderStroke(1.dp, tint.copy(alpha = 0.18f)),
+                        modifier = Modifier.size(80.dp)
+                    ) {}
+                    Surface(
+                        color = tint.copy(alpha = 0.16f),
+                        shape = CircleShape,
+                        border = BorderStroke(1.dp, tint.copy(alpha = 0.28f))
                     ) {
-                        Icon(
-                            icon,
-                            contentDescription = title,
-                            tint = tint,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Box(
+                            modifier = Modifier.padding(18.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                icon,
+                                contentDescription = title,
+                                tint = tint,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(title, color = Mocha.Text, style = MaterialTheme.typography.headlineMedium)
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(body, color = Mocha.Subtext0, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = body,
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
 
                 if (progress != null) {
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    // Smoothly animate the bar so it doesn't snap on each Transformer progress tick.
+                    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = progress.coerceIn(0f, 1f),
+                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
+                        label = "exportProgress"
+                    )
                     LinearProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
+                        progress = { animatedProgress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp),
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(com.novacut.editor.ui.theme.Radius.pill)),
                         color = tint,
-                        trackColor = Mocha.PanelHighest
+                        trackColor = Mocha.PanelHighest.copy(alpha = 0.8f)
                     )
                 }
                 if (progressLabel != null) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(progressLabel, color = Mocha.Text, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        progressLabel,
+                        color = Mocha.Text,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
                 }
                 if (!secondaryBody.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(secondaryBody, color = tint, style = MaterialTheme.typography.labelLarge)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = onPrimary,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (tint == Mocha.Red) Mocha.Red else Mocha.Rosewater,
-                        contentColor = if (tint == Mocha.Red) Mocha.Crust else Mocha.Midnight
-                    ),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(18.dp))
+                when (primaryStyle) {
+                    PrimaryStyle.Destructive -> {
+                        // Cancel during export: outlined Peach. Reads as available-but-not-celebratory.
+                        OutlinedButton(
+                            onClick = onPrimary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            border = BorderStroke(1.dp, tint.copy(alpha = 0.6f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = tint),
+                            shape = RoundedCornerShape(com.novacut.editor.ui.theme.Radius.lg)
+                        ) {
+                            Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    PrimaryStyle.Quiet -> {
+                        OutlinedButton(
+                            onClick = onPrimary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            border = BorderStroke(1.dp, Mocha.CardStrokeStrong),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Text),
+                            shape = RoundedCornerShape(com.novacut.editor.ui.theme.Radius.lg)
+                        ) {
+                            Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    PrimaryStyle.Filled -> {
+                        Button(
+                            onClick = onPrimary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (tint == Mocha.Red) Mocha.Red else Mocha.Rosewater,
+                                contentColor = if (tint == Mocha.Red) Mocha.Crust else Mocha.Midnight
+                            ),
+                            shape = RoundedCornerShape(com.novacut.editor.ui.theme.Radius.lg)
+                        ) {
+                            Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
 
                 if (secondaryLabel != null && onSecondary != null) {

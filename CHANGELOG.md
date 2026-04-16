@@ -1,5 +1,231 @@
 # Changelog
 
+## v3.37.0 — Audit Phase 8: TTS/Voiceover Persistence, Camera Cleanup Directory, Empty-Output Guard & Reverse-Clip Diagnostic
+
+### Persistence
+- **`addClipToTrack` (TTS / voiceover helper) now persists** ([EditorViewModel.kt:2116-2152](app/src/main/java/com/novacut/editor/ui/editor/EditorViewModel.kt#L2116-L2152)) — The private 3-arg helper used by both TTS synthesis and voiceover record was missing both `rebuildPlayerTimeline()` and `saveProject()`. Worst case, a freshly recorded voiceover or TTS clip (and any auto-created AUDIO track holding it) would be lost on app crash before the next 30-second auto-save tick. Also rejects `durationMs <= 0` up front so a TTS file with no reported duration can't violate `Clip.init`'s `trimEndMs <= sourceDurationMs` invariant. Removed the now-redundant explicit `rebuildTimeline()` + `saveProject()` calls at the TTS callsite.
+
+### Resource hygiene
+- **MediaPicker camera cleanup pointed at the right directory** ([MediaPicker.kt:151-162](app/src/main/java/com/novacut/editor/ui/mediapicker/MediaPicker.kt#L151-L162)) — Camera capture saves files to `filesDir/media` (line 125), but the LaunchedEffect cleanup was scanning `cacheDir/camera` — a path that doesn't exist in this app. Result: orphaned recordings from app crashes, force-stops, or the user backing out of the camera mid-record were never cleaned up and accumulated indefinitely. Now scans the correct directory and tolerates `delete()` failures.
+
+### Export integrity
+- **VideoEngine `onCompleted` rejects 0-byte output files** ([VideoEngine.kt:840-867](app/src/main/java/com/novacut/editor/engine/VideoEngine.kt#L840-L867)) — Transformer's COMPLETE callback was previously trusted unconditionally. On certain hardware-encoder edge cases (malformed input, codec init failure that the encoder didn't surface as an error), the file on disk could be 0 bytes despite the COMPLETE callback firing. Surfacing this as success let users share / save an unplayable artifact and trust it worked. Now treats `outputFile.length() <= 0` as ERROR with message "Export produced an empty file" and fires `onError`.
+
+### Diagnostics
+- **Reverse-clip export warning** ([VideoEngine.kt:349-358](app/src/main/java/com/novacut/editor/engine/VideoEngine.kt#L349-L358)) — Media3 Transformer doesn't natively support reverse playback, so any `Clip.isReversed = true` exports forward today. Added a `Log.w` listing the count of reversed clips so logs / bug reports surface the limitation when the visible result doesn't match expectations. (Full reverse implementation would need FFmpeg-side re-encoding and is out of scope for this round.)
+
+### Audit findings verified as already-correct (false positives this round)
+- **`VoiceoverRecorder.stopRecording` "silent failure"** — the catch block already cleans up the orphaned file and returns `null`; the EditorViewModel caller checks for null and toasts "Voiceover recording failed".
+- **`VoiceoverRecorder` timestamp collision** — file naming uses `voiceover_${System.currentTimeMillis()}.m4a`; collision requires two recordings in the exact same millisecond on the same device, which the `@Synchronized` start/stop already serializes.
+- **MediaPicker public `addClipToTrack` (delegate, 2-arg)** — `if (duration <= 0) { showToast; return }` guards against malformed media before the Clip is constructed; image clips return `DEFAULT_STILL_IMAGE_DURATION_MS = 3000L` from `getMediaDuration`.
+- **Empty-timeline export crash** — the `IllegalStateException("No video clips to export")` is caught by the outer try at [VideoEngine.kt:386](app/src/main/java/com/novacut/editor/engine/VideoEngine.kt#L386) and surfaced as ERROR state with the exception message; not a crash.
+- **`AppModule.provideProjectDao` missing `@Singleton`** — Room caches the DAO instance internally regardless of how many times Hilt provides it; no real perf impact.
+- **`@Insert(onConflict = REPLACE)` race** — REPLACE is well-defined SQLite behavior; concurrent inserts of the same id are serialized by Room's writer thread.
+- **Project delete cascade for proxy files** — proxies in `cacheDir/proxies/` are keyed by SHA-256 of source URI and shared across projects; correct cleanup needs reference counting (out of scope) and `cacheDir` is auto-managed by Android's storage manager.
+- **Coil VideoFrameDecoder explicit registration** — Coil 2.x auto-discovers the `coil-video` artifact's decoder when the dep is on the classpath; no manual `ImageLoader.Builder` needed.
+
+### Verification
+- `./gradlew compileDebugKotlin` passes.
+
+### Housekeeping
+- `versionCode 97 → 98`, `versionName 3.36.0 → 3.37.0`
+- `NovaCutApp.VERSION`, `app_version` string, README badge all synced.
+
+## v3.36.0 — Audit Phase 7: Batch Cancel, MediaStore Strict Update, GPU Resolution Floor, Segmenter Leak & Duplicate Atomicity
+
+### Batch export
+- **Cancel now stops the queue** ([ExportDelegate.kt:330](app/src/main/java/com/novacut/editor/ui/editor/ExportDelegate.kt#L330)) — Previously, tapping the export-notification Cancel during a batch only cancelled the current item; the loop continued onto the next, ignoring the user's clear "stop" intent. The result-status case now distinguishes `CANCELLED` and breaks out of the loop. Failures still don't break (each batch item is independent and a long queue should tolerate per-item errors).
+- **Per-item progress normalized to status** — `BatchExportItem.progress` is now explicitly set to `1f` on `COMPLETED` and `0f` on `FAILED` / `CANCELLED`. Without this, the queue UI would show "85% FAILED" on a job that errored partway through, and the COMPLETE row could stall at 0.99 because the progress collector got cancelled before observing the final tick.
+
+### Save-to-gallery integrity
+- **MediaStore IS_PENDING update is now strict** ([ExportDelegate.kt:423](app/src/main/java/com/novacut/editor/ui/editor/ExportDelegate.kt#L423)) — `resolver.update(...)` returning 0 (no rows updated) means the file is still flagged pending and stays invisible to Gallery / Photos apps even though we showed the user a "Saved to gallery" success toast. Now treats `updated < 1` as an explicit failure so the catch block fires the `delete(contentUri)` cleanup path.
+
+### GPU resolution floor
+- **`ShaderEffect.drawFrame` floors resolution at 1×1** ([ShaderEffect.kt:52](app/src/main/java/com/novacut/editor/engine/ShaderEffect.kt#L52)) — Several shader programs (sharpen, blur, vignette, scanlines, …) compute `1.0 / uResolution` and would produce per-pixel `Infinity` if Media3 ever calls `drawFrame` before `configure()` populated `width` / `height`. Coercing both to `≥ 1` at the uniform site protects every shader at once with no per-shader edits.
+
+### GPU resource leak
+- **`SegmentationGlEffect.drawFrame` `segBitmap` leak hardened** ([SegmentationGlEffect.kt:87-100](app/src/main/java/com/novacut/editor/engine/segmentation/SegmentationGlEffect.kt#L87-L100)) — If MediaPipe's `engine.segment()` throws (bad-input frame, model tensor mismatch), the scaled bitmap leaked. Wrapped in try/finally so per-export-frame leaks under sustained errors can't exhaust GPU/native heap. The earlier v3.35 fix to `SegmentationEngine.segmentFrame` covered the picker preview path; this covers the hot export-render path.
+
+### Duplicate atomicity
+- **`ProjectListViewModel.duplicateProject` rolls back on auto-save copy failure** ([ProjectListViewModel.kt:255-270](app/src/main/java/com/novacut/editor/ui/projects/ProjectListViewModel.kt#L255-L270)) — Previously did `insertProject` then `copyAutoSave` with no error handling. If the file copy failed (disk full, source missing), the Room row remained and opened as an empty project — the user would think "duplicate worked but lost my edits". Now wraps in try/catch and runs `deleteById(newId)` to roll back the orphaned row.
+
+### Audit findings verified as already-correct (false positives this round)
+- `MainActivity` rotation re-import — manifest's `configChanges="orientation|screenSize|screenLayout|keyboardHidden"` prevents activity recreation on rotation; `onCreate` doesn't re-fire.
+- `NovaCutApp.createNotificationChannels` API guard — `minSdk = 26` matches the API level where `NotificationChannel` was added; no guard needed.
+- `SettingsRepository` corruption handling — DataStore's `CorruptionException` extends `IOException`, so the existing `if (error is IOException)` catch covers it.
+- `EffectBuilder` EXPOSURE `Math.pow(2.0, value)` — `value.coerceIn(-2f, 2f)` directly above bounds the input; `pow` result ∈ [0.25, 4].
+- `SegmentationGlEffect` `glReadPixels` reading wrong FBO — agent misread the call order; readback happens BEFORE the saved FBO is restored at line 77.
+- `EditorScreen` keyboard intercepting Space/Delete in TextFields — focused TextField consumes input keys before the parent's `onKeyEvent` fires; key auto-repeat for undo/seek is acceptable behavior.
+- `ProjectListViewModel.renameProject` race with auto-save — `EditorViewModel`'s viewModelScope (and its auto-save coroutine) is cancelled when the user navigates back to the project list.
+
+### Verification
+- `./gradlew compileDebugKotlin` passes.
+
+### Housekeeping
+- `versionCode 96 → 97`, `versionName 3.35.0 → 3.36.0` (build.gradle.kts, NovaCutApp.VERSION, README badge, app_version string, CLAUDE.md, MEMORY.md).
+
+## v3.35.0 — Audit Phase 6: Keyframe Range Safety, Color Curve NaN Guard, Bitmap Leak & Caption Validation
+
+### Math correctness
+- **`KeyframeEngine.getValueAt` clamps OPACITY and VOLUME to safe ranges** — Bezier curves with handles outside the unit square (and the `ELASTIC` / `BACK` / `SPRING` easings) can legitimately overshoot `[0, 1]`. For position / scale / rotation the overshoot is the desired effect (springy motion); for OPACITY and VOLUME it's a contract violation: opacity < 0 means "less than transparent", opacity > 1 brightens via `RgbMatrix`, and negative volume in `VolumeAudioProcessor` inverts phase. A new private `clampForProperty(value, property)` is now applied to every return path of `getValueAt`, so every consumer (preview, export, scopes) sees the same legal value.
+- **`ColorCurves.evaluateCurve` guards against duplicate-x curve points** — If two adjacent points share the same x coordinate, `(input - p0.x) / (p1.x - p0.x)` divided by zero, producing NaN that propagated through the cubic-bezier into the color output (renders as black or wraps on GPU). Users could create this by dragging a curve handle exactly onto a neighbour, or via legacy auto-saves. Falls back to `p0.y` (visually-correct vertical step).
+
+### Resource leak
+- **`SegmentationEngine.segmentFrame` bitmap leak hardened** — The original `frame` returned by `MediaMetadataRetriever.getFrameAtTime()` and the `scaled` copy were only recycled in the success path. If `Bitmap.createScaledBitmap` OOM'd or `segment(scaled)` threw partway through, both bitmaps leaked (~10 MB per call). Tracked via outer `var frame`/`var scaled` so the `finally` block guarantees recycling regardless of where the failure happens. Also corrected `targetMs * 1000` to `targetMs * 1000L` for explicit Long-multiplication intent.
+
+### Caption validation
+- **`CaptionEditorPanel` Save buttons gated on non-blank text** — Both Save buttons (collapsed and expanded mode) now have `enabled = text.isNotBlank()`, and the saved value is `text.trim()`. Previously a user could save an all-whitespace caption that would render as nothing in the export but still consume timeline space. Trimming on save also normalizes captions like `"   Hello   "`.
+
+### Audit findings verified as already-correct (false positives this round)
+- **MultiCamEngine.kt:91 `bestOffset.toLong() * 1000 / sampleRate`** — `Long * Int` is Long in Kotlin; no narrowing.
+- **AiFeatures.kt:204 `sum / windowSamples`** — `windowSamples` is `(sampleRate / 10).coerceAtLeast(1)`, so divisor is always ≥ 1.
+- **AiFeatures.kt:556 / 983 motion-estimation `bestDx / w`** — both call sites are guarded by `if (w < 8 || h < 8) return 0f to 0f` directly above.
+- **AiFeatures.kt:2357 `coerceIn(1, halfSize - 1)`** — `halfSize` is at least 32 because of the `if (fftSize < 64) return` guard at line 2320.
+- **AudioEngine.kt:194 `totalSamples` Int truncation** — would only matter for ≥ 6-hour audio mixes, where the FloatArray allocation (~7.6 GB) would OOM long before the Int overflowed; not a real concern in a video editor's mix path.
+- **`RadialActionMenu` `LaunchedEffect(Unit) { visible = true }`** — composable is gated by `if (showRadialMenu)` in EditorScreen, so it's recreated each show; the `Unit` key is correct here.
+- **EffectBuilder `buildVideoEffect` exhaustiveness** — every `EffectType` is covered; `SPEED` / `REVERSE` correctly map to `null` (not shaders).
+
+### Verification
+- `./gradlew compileDebugKotlin` passes.
+
+### Housekeeping
+- `versionCode 95 → 96`, `versionName 3.34.0 → 3.35.0`
+- `NovaCutApp.VERSION`, `app_version` string, README badge all synced.
+
+## v3.34.0 — Audit Phase 5: CAS Safety, Backup Coverage, Performance Hot Path & Stale-String Cleanup
+
+### Concurrency safety
+- **Hoisted UUIDs out of `_state.update {}` closures** — `MutableStateFlow.update` re-executes its lambda on each CAS-retry. Generating UUIDs inside the closure means a retry mints fresh IDs that don't match what any prior closure attempt observed. Fixed two real cases:
+  - **Paste-effects** (`EditorViewModel.kt:723`) — pre-mints `freshEffects` from `state.copiedEffects` once, then the closure just inserts them.
+  - **Freeze-frame** (`EditorViewModel.kt:3300`) — pre-mints `freezeClipId` and `secondHalfId` so the inserted freeze clip and the second-half clip have stable identities across retries.
+  - Practical impact is small (single-threaded UI, low CAS contention), but it's the kind of latent bug that surfaces only under load and is hard to diagnose later.
+
+### Backup coverage
+- **`tts_output/` and `noise_reduced/` now in `backup_rules.xml` and `data_extraction_rules.xml`** — these directories were referenced by `file_paths.xml` and held real media that clips could reference, but were excluded from cloud backup and device transfer. After a restore, project clips that pointed at TTS-generated voiceovers or denoised audio would silently disappear from the timeline (post-v3.31 the load path skips dangling URIs cleanly, but the user still loses the clip). Both rule files now include them so projects round-trip across devices.
+
+### Performance hot path
+- **`PreviewPanel` background brushes hoisted to `remember`** — Two `Brush.verticalGradient(listOf(...))` allocations inside `Column.background(...)` and the inner `Card`'s `Box.background(...)` were running on every recomposition. PreviewPanel recomposes on every playhead tick during playback (~30 Hz), so each frame was producing ~2 List + 2 Brush allocations purely for the GC.
+- **`Timeline` per-clip selection brush hoisted to `remember(isSelected, isMultiSelected, clipColor)`** — the clip-rendering loop was allocating a fresh `Brush.horizontalGradient(listOf(...))` per visible clip per recomposition. With a busy timeline and Timeline recomposing on `scrollOffsetMs` updates, this was the dominant per-frame allocation. Now reused until selection or track-color state actually changes.
+
+### Stale-string cleanup
+- **`@string/app_version` synced to `3.34.0`** — the resource was stuck on `v3.30.0` for several releases. It's not currently referenced from code (Settings already uses `NovaCutApp.VERSION`), but it's the kind of surface that appears in Play Store screenshots / accessibility scans when stale.
+
+### Audit findings verified as already-correct (false positives this round)
+- `ExportConfig.videoBitrate` — computed property whose `when` exhaustively covers every `Resolution × ExportQuality` combination with positive bitrates; the `init { require(videoBitrate > 0) }` cannot trip.
+- `Project.thumbnailUri` from `clips.firstOrNull()?.sourceUri?.toString()` — chained safe-calls, and `Clip.sourceUri` is rejected at deserialize time if empty (since v3.31). Returns `null` cleanly when there are no clips.
+- `selectedClipIds` after `deleteMultiSelectedClips` — already reset to `emptySet()` at line 2730 in the same `_state.update`.
+- `ExportService` Cancel-action path — `PendingIntent.getService()` only fires while the service is already in the foreground from the prior export start, so the Cancel branch returning before `startForeground()` is safe.
+- Manifest `<queries>` for ACTION_SEND — `Intent.createChooser()` is exempt from Android 11+ package-visibility restrictions; no resolver calls in the codebase.
+- Room `MIGRATION_4_5` — `CREATE INDEX IF NOT EXISTS` is idempotent; SQLite DDL is atomic. Sort order works regardless of index presence.
+
+### Verification
+- `./gradlew compileDebugKotlin` passes.
+
+### Housekeeping
+- `versionCode 94 → 95`, `versionName 3.33.0 → 3.34.0` (build.gradle.kts, NovaCutApp.VERSION, README badge, app_version string, CLAUDE.md, MEMORY.md).
+
+## v3.33.0 — Premium Polish: Design Tokens, Animated Snackbar, Onboarding Refresh & Export-State Hierarchy
+
+### Design system foundations
+- **`ui/theme/Tokens.kt`** — New centralized design-token module exposing `Spacing`, `Radius`, `Elevation`, `Motion`, and `TouchTarget` scales. Replaces the ad-hoc `8.dp` / `tween(120)` / `RoundedCornerShape(14.dp)` literals scattered across panels. Future panels should reach for tokens rather than inventing one-off values, so the editor's rhythm stays coherent.
+
+### New components
+- **`PremiumSnackbarHost` (`PremiumSnackbar.kt`)** — Animated, severity-aware Mocha-styled snackbar replacing the bare Material 3 `Snackbar` in the editor. Features:
+  - Slide-up + fade-in entrance / fade-out exit driven by the new `Motion` tokens
+  - Severity stripe (Info / Success / Warning / Error) with matching outlined icon — color is never the only signal (a11y)
+  - PanelHighest surface + hairline border, consistent with the rest of the editor's floating chrome
+  - Accent-tinted horizontal gradient that hints status without shouting
+  - `inferSeverity(message)` heuristic so the dozens of existing `showToast("…")` callsites get appropriate styling automatically; explicit `showToast(msg, ToastSeverity.Error)` is also available
+  - Adaptive duration: errors stay 4.5s, warnings 3.5s, info 2.8s
+- **`PremiumHairlineDivider`** — Thin, slightly translucent divider for sectioning content inside `PremiumPanelCard`. Drops into existing card layouts with one line.
+
+### Onboarding refresh (`FirstRunTutorial.kt`)
+- **Backdrop** — Replaced the flat 85% `Crust` scrim with a soft radial mauve→crust vignette. Reads as cinematic stage lighting instead of "the screen is dimmed".
+- **Card** — Upgraded from a flat `Surface0` block to a bordered `PanelHighest` surface with a subtle vertical accent gradient and `12.dp` shadow elevation. Gives the tutorial card visible weight against the new vignette.
+- **Step indicator** — Replaced equal-sized dots with an animated connected pill bar where the current step expands to 24dp (was: just got slightly bigger). Reads as "you are here" much faster.
+- **Skip** — Bare `Text` upgraded to a translucent pill with a hairline border. Discoverable affordance instead of an ambiguous floating word.
+- **Step transitions** — Now driven by the shared `Motion.DecelerateEasing` / `AccelerateEasing` tokens so it feels coherent with the rest of the app's motion language.
+- **Typography** — Migrated from hardcoded `18.sp` / `13.sp` to `MaterialTheme.typography.headlineMedium` / `bodyMedium` for consistency with the rest of the editor.
+
+### ExportSheet — semantic primary-button styling
+- **New `PrimaryStyle` enum** (`Filled`, `Destructive`, `Quiet`) routed to `ExportStateCard`. Each export state now picks a button treatment that matches its meaning:
+  - **Exporting → Cancel** — outlined Peach (was: filled Rosewater, indistinguishable from "Share completed export")
+  - **Complete → Share** — filled Rosewater (celebratory)
+  - **Cancelled → Done** — outlined neutral (informational, not celebratory)
+  - **Error → Retry** — filled Red (clear primary)
+- **Animated progress bar** — `LinearProgressIndicator` is now driven through `animateFloatAsState` so it doesn't snap on each Transformer progress tick. Bar is also taller (10dp), pill-clipped, and uses a slightly translucent track for better contrast.
+- **Percent label** — Bumped from `titleMedium` to `headlineMedium SemiBold` so the "47%" reads as the focal data point of the exporting card.
+- **Icon halo** — Replaced single-circle treatment with a layered halo (outer translucent ring + inner filled disc) for visible depth without resorting to a hard shadow that would clash with the gradient surface.
+- **Body text** — Now center-aligned, fixing prior visual imbalance with the centered headline above it.
+
+### Component refinement
+- **`PremiumPanelCard`** — Trimmed the 3-stop accent gradient to a single soft fade. The previous middle stop produced a visible "fold" line halfway down every card; the new fade reads as restrained tinted glass.
+- **`PremiumPanelCard`** — Standardized on `Radius.xl` / `Spacing.lg` / `Spacing.md` from the new token module instead of inline `24.dp` / `16.dp` / `12.dp`.
+- **`PremiumEditorPanel` drag handle** — Slimmed from `44dp × 4dp` to `36dp × 3dp` and dimmed alpha from 0.8 to 0.55. Reads as a quiet gesture hint rather than a competing UI element.
+- **EditorTopBar rename dialog** — Normalized unfocused border from `Mocha.Surface1` (too bright) to `Mocha.CardStroke`, matching the rest of the editor's input fields.
+
+### Snackbar message contrast
+- Snackbar body uses primary `Mocha.Text` instead of `Mocha.Subtext1`. Status meaning is carried by the leading icon and accent stripe, leaving the message itself fully legible — important for short-duration toasts where users have ~3 seconds to read and decide.
+
+### Verification
+- `./gradlew compileDebugKotlin` passes.
+
+### Housekeeping
+- `versionCode 93 → 94`, `versionName 3.32.0 → 3.33.0`
+- `NovaCutApp.VERSION` updated.
+
+## v3.32.0 — Audit Phase 4: Encoder Edges, DSP Parameter Hardening & Audio-Format Guards
+
+### Export / Encoder
+- **GIF runaway-frame guard** — `gifFrameRate` is now coerced into `[1, 60]` and `frameIntervalMs` is floored at `1L`. Previously a stale or experimental >1000 fps value produced `1000 / fps == 0`, which made `frameCount = totalDurationMs / 0`, triggering an infinite frame loop, OOM, and an export that never returned.
+
+### Audio Engines
+- **VolumeAudioProcessor channel guard** — `onConfigure` now also rejects `channelCount <= 0`, not just `sampleRate == 0`. A malformed audio track previously slipped through and divided by zero in the per-sample loop (`processedFrames / channelCount`), leaving an orphaned partial export file mid-render.
+- **AudioEffectsEngine compressor parameter coercion** — `attack`, `release`, `knee`, `ratio`, and `sampleRate` are now floored at safe positive minima before being fed into `exp(-1f / (attackMs * sampleRate / 1000f))`. A zero `attack` previously produced `exp(-Infinity) = 0` (instant peak follow); a negative attack from corrupt state produced `exp(+Infinity) = NaN` and silently corrupted the audio buffer.
+
+### UX
+- **TtsPanel input cap** — TTS script field is now bounded at 2,000 characters with an inline `len / 2000` indicator (Mocha.Peach when at limit). Prevents accidental paste-bombs from running unbounded synthesis jobs and OOM'ing the engine.
+
+### Audit Findings That Turned Out To Be Already-Correct
+Spent careful verification against source rather than implementing every agent suggestion. False positives this round: GIF color-quantization operator precedence (Kotlin infix `shr`/`and` left-associativity already evaluates correctly), LoudnessEngine short-term loop bounds, BeatDetectionEngine BPM divide-by-zero (intervals already bounded to 200..2000ms), EffectsDelegate.updateEffect missing undo (debounced via `beginEffectAdjust()` by design), AiToolsDelegate stale clip refs (already re-validates inside coroutine and dispatches `currentClip`), MediaStore IS_PENDING handling in `saveExportedFile` (already deletes on exception), batch-export reset ordering (`resetExportState()` already runs before each item's `startExport`), and the four "missing contentDescription" reports (all decorative icons inside buttons / list items with adjacent text labels — adding cd would produce redundant TalkBack output).
+
+### Verification
+- `./gradlew compileDebugKotlin` passes.
+
+### Housekeeping
+- `versionCode 92 → 93`, `versionName 3.31.0 → 3.32.0`
+- `NovaCutApp.VERSION` updated.
+
+## v3.31.0 — Audit Phase 3: Persistence Parity, Resource Leaks & Defensive Deserialization
+
+### Data Loss Fixes (CRITICAL)
+- **ColorGrade.curves not serialized** — `ColorGrade.curves` (master/red/green/blue channel curves with per-point bezier handles) was completely missing from `ProjectAutoSave`. Users lost all RGB curve adjustments on project recovery / app restart. Now fully serialized via new `serializeColorCurves` / `deserializeColorCurves` helpers with bounds-coerced curve points.
+- **ColorGrade.colorMatchRef not serialized** — Reference clip ID for "match color to reference" workflow was lost on recovery. Now persisted.
+
+### Defensive Deserialization
+- **Clip fade bounds coerced** — `fadeInMs` and `fadeOutMs` are now coerced into `[0, clipDurationMs]` with `fadeIn + fadeOut <= clipDurationMs`. Previously raw values from corrupted auto-save could exceed clip duration and produce truncated/glitched fades on export.
+- **Clip rejected for non-positive `sourceDurationMs`** — Previously zero-duration clips would silently load and break timeline math (division-by-zero risk). Now logged + skipped.
+- **Safe URI parse** — `Clip.sourceUri`, `Clip.proxyUri`, and `ImageOverlay.sourceUri` now wrap `Uri.parse` in try/catch. Malformed URIs from a corrupt auto-save no longer take down the whole project recovery.
+- **Format version bookkeeping** — `deserialize()` now reads the file's `version` field and logs a warning when an auto-save was written by a newer schema than the current build, instead of silently mis-parsing it.
+- **Empty `sourceUri` clip drop logged** — Previously silent; now `Log.w` with clip ID for diagnostics.
+
+### Resource Leak Fixes
+- **WhisperEngine encoder output leak** — `runEncoder` now closes both `OrtSession.Result` and `OnnxTensor` input in a `finally` block. Previously a `runDecoder` exception would orphan the encoder output OnnxTensor (~MB of native memory per chunk leaked on transcription failure).
+- **WhisperEngine encoder result leak** — `runEncoder` previously closed `results` only on the success-cast path. Now uses unified try/finally, so the `OrtSession.Result` is closed on every exit including the `as? OnnxTensor` null path.
+- **ColorMatchEngine bitmap leak** — `MediaMetadataRetriever.getFrameAtTime()` returns a bitmap that was never recycled (only the scaled copy made inside `analyzeBitmap` was). Now recycled in finally. Also corrected `timeMs * 1000` to `timeMs * 1000L` to make the long-multiplication intent explicit.
+
+### UI Hardening
+- **PreviewPanel still-image `contentDescription`** — Now reads `R.string.cd_preview_still_image` instead of `null` (a11y).
+- **PreviewPanel listener lifecycle** — `DisposableEffect` now captures the player reference up front and wraps `removeListener` in try/catch so a player released between attach and dispose can't crash the editor.
+- **EditorScreen clip label picker keyed to selection** — `showClipLabelPicker` is now `remember(state.selectedClipId) { ... }`. Previously the picker stayed open after the user changed clip selection or deselected, painting the picker over the wrong (or no) clip.
+
+### Verification
+- `./gradlew compileDebugKotlin` passes cleanly with the above changes.
+
+### Housekeeping
+- `versionCode 91 → 92`, `versionName 3.30.0 → 3.31.0`
+- `NovaCutApp.VERSION` updated to match for HTTP user-agent strings on model downloads
+
 ## v3.30.0 — UI Polish & Panel Hardening
 
 ### UI Improvements

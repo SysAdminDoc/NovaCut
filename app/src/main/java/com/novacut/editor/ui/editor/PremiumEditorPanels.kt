@@ -58,16 +58,21 @@ fun PremiumEditorPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Mocha.Panel, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(
+                Mocha.Panel,
+                RoundedCornerShape(topStart = com.novacut.editor.ui.theme.Radius.xxl, topEnd = com.novacut.editor.ui.theme.Radius.xxl)
+            )
             .then(scrollModifier)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = com.novacut.editor.ui.theme.Spacing.lg, vertical = 14.dp)
     ) {
+        // Drag handle — slightly slimmer + dimmer than before. Premium sheets use a quiet,
+        // single-pixel-feeling pill that suggests gesture without competing for attention.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
-                .width(44.dp)
-                .height(4.dp)
-                .background(Mocha.Surface2.copy(alpha = 0.8f), RoundedCornerShape(999.dp))
+                .width(36.dp)
+                .height(3.dp)
+                .background(Mocha.Surface2.copy(alpha = 0.55f), RoundedCornerShape(com.novacut.editor.ui.theme.Radius.pill))
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -137,27 +142,49 @@ fun PremiumPanelCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(24.dp),
+        // Slightly tighter radius (was 24) — feels more disciplined and matches the
+        // shared Radius.xl token used elsewhere in the system.
+        shape = RoundedCornerShape(com.novacut.editor.ui.theme.Radius.xl),
         border = BorderStroke(1.dp, Mocha.CardStrokeStrong.copy(alpha = 0.9f))
     ) {
         Box(
             modifier = Modifier.background(
+                // Restrained accent wash: just a hint of color at the top edge that fades out.
+                // The previous 3-stop gradient produced a visible "fold" line in the middle of
+                // every panel card; this single soft fade reads as premium tinted-glass instead.
                 Brush.verticalGradient(
-                    listOf(
-                        accent.copy(alpha = 0.12f),
-                        Mocha.PanelHighest,
-                        Mocha.PanelRaised.copy(alpha = 0.95f)
+                    colorStops = arrayOf(
+                        0f to accent.copy(alpha = 0.10f),
+                        0.55f to Mocha.PanelHighest,
+                        1f to Mocha.PanelHighest
                     )
                 )
             )
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(com.novacut.editor.ui.theme.Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(com.novacut.editor.ui.theme.Spacing.md),
                 content = content
             )
         }
     }
+}
+
+/**
+ * Thin hairline divider for separating sections inside a PremiumPanelCard.
+ * Slightly translucent to layer cleanly over the card's accent gradient.
+ */
+@Composable
+fun PremiumHairlineDivider(
+    modifier: Modifier = Modifier,
+    color: Color = Mocha.CardStroke
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(color.copy(alpha = 0.6f))
+    )
 }
 
 @Composable

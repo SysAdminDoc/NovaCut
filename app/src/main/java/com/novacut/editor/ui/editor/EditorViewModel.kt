@@ -108,6 +108,7 @@ data class EditorState(
     val undoStack: List<UndoAction> = emptyList(),
     val redoStack: List<UndoAction> = emptyList(),
     val toastMessage: String? = null,
+    val toastSeverity: ToastSeverity = ToastSeverity.Info,
     val aiProcessingTool: String? = null,
     val lastExportedFilePath: String? = null,
     val copiedEffects: List<Effect> = emptyList(),
@@ -716,10 +717,16 @@ class EditorViewModel @Inject constructor(
         val selectedId = state.selectedClipId ?: return
         if (state.copiedEffects.isEmpty()) return
         saveUndoState("Paste effects")
+        // Generate new effect IDs OUTSIDE the _state.update {} closure so that a CAS retry
+        // doesn't allocate a fresh UUID set on each attempt. Without this, intermediate
+        // closure executions would mint different IDs than the final committed state — fine
+        // for in-state consistency but bad for any logging/snapshot observer that captures
+        // the first attempt.
+        val freshEffects = state.copiedEffects.map { it.copy(id = java.util.UUID.randomUUID().toString()) }
         _state.update { s ->
             s.copy(tracks = s.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
-                    if (clip.id == selectedId) clip.copy(effects = s.copiedEffects.map { it.copy(id = java.util.UUID.randomUUID().toString()) })
+                    if (clip.id == selectedId) clip.copy(effects = freshEffects)
                     else clip
                 })
             })
@@ -1919,9 +1926,8 @@ class EditorViewModel @Inject constructor(
                 // Query actual duration from the generated audio file
                 val durationMs = videoEngine.getVideoDuration(uri).takeIf { it > 0 } ?: 3000L
                 saveUndoState("Add TTS voice")
+                // Helper now performs rebuildPlayerTimeline() + saveProject() internally.
                 addClipToTrack(uri, durationMs, TrackType.AUDIO)
-                rebuildTimeline()
-                saveProject()
                 showToast("Voice added to audio track")
                 hideTts()
             } else {
@@ -2105,8 +2111,14 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    // Helper: add clip to a track by type (used by TTS)
+    // Helper: add clip to a track by type (used by TTS / voiceover).
     private fun addClipToTrack(uri: android.net.Uri, durationMs: Long, trackType: TrackType) {
+        // Refuse degenerate inputs that would otherwise violate Clip's `trimEndMs <= sourceDurationMs`
+        // invariant the moment the user touched the new clip (e.g., a TTS file reporting 0 ms).
+        if (durationMs <= 0L) {
+            android.util.Log.w("EditorViewModel", "addClipToTrack ignored: non-positive durationMs=$durationMs for $uri")
+            return
+        }
         val currentTracks = _state.value.tracks
         val track = currentTracks.firstOrNull { it.type == trackType }
             ?: Track(type = trackType, index = currentTracks.size)
@@ -2129,6 +2141,12 @@ class EditorViewModel @Inject constructor(
                 if (t.id == track.id) t.copy(clips = t.clips + clip) else t
             })
         }
+        // Rebuild the preview so the new TTS / voiceover clip is audible immediately, and
+        // persist so an app crash or quick background-then-kill doesn't lose the clip
+        // (auto-save is on a 30s timer; without this call, the user would have to wait
+        // for the next tick before the new audio is durable).
+        rebuildPlayerTimeline()
+        saveProject()
     }
 
     // --- Editor Mode ---
@@ -3050,10 +3068,20 @@ class EditorViewModel @Inject constructor(
     private var toastJob: Job? = null
 
     fun showToast(message: String) {
+        showToast(message, inferSeverity(message))
+    }
+
+    fun showToast(message: String, severity: ToastSeverity) {
         toastJob?.cancel()
-        _state.update { it.copy(toastMessage = message) }
+        _state.update { it.copy(toastMessage = message, toastSeverity = severity) }
+        // Errors deserve more reading time than info; success/warning use the standard window.
+        val durationMs = when (severity) {
+            ToastSeverity.Error -> 4500L
+            ToastSeverity.Warning -> 3500L
+            else -> 2800L
+        }
         toastJob = viewModelScope.launch {
-            delay(3000)
+            delay(durationMs)
             _state.update { it.copy(toastMessage = null) }
         }
     }
@@ -3273,6 +3301,11 @@ class EditorViewModel @Inject constructor(
 
             saveUndoState("Freeze frame")
 
+            // Pre-mint UUIDs OUTSIDE the _state.update {} closure so a CAS retry doesn't
+            // allocate fresh IDs on every attempt and produce ID drift relative to anything
+            // that observed the in-flight intermediate state.
+            val freezeClipId = UUID.randomUUID().toString()
+            val secondHalfId = UUID.randomUUID().toString()
             // Split at playhead, then insert freeze frame between halves
             _state.update { s ->
                 val tracks = s.tracks.map { track ->
@@ -3284,7 +3317,7 @@ class EditorViewModel @Inject constructor(
 
                     val firstHalf = c.copy(trimEndMs = splitInSource)
                     val freezeClip = Clip(
-                        id = UUID.randomUUID().toString(),
+                        id = freezeClipId,
                         sourceUri = frameUri,
                         sourceDurationMs = freezeDurationMs,
                         timelineStartMs = firstHalf.timelineEndMs,
@@ -3292,7 +3325,7 @@ class EditorViewModel @Inject constructor(
                         trimEndMs = freezeDurationMs
                     )
                     val secondHalf = c.copy(
-                        id = UUID.randomUUID().toString(),
+                        id = secondHalfId,
                         timelineStartMs = freezeClip.timelineEndMs,
                         trimStartMs = splitInSource
                     )

@@ -200,6 +200,11 @@ class SegmentationEngine @Inject constructor(
         timestampMs: Long = -1
     ): SegmentationResult? = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
+        // Track both bitmaps so the outer finally can guarantee recycling even when
+        // createScaledBitmap OOMs or segment() throws partway through. Without this,
+        // a single failed segmentation could leak ~10 MB of bitmap memory.
+        var frame: android.graphics.Bitmap? = null
+        var scaled: android.graphics.Bitmap? = null
         try {
             retriever.setDataSource(context, videoUri)
             val durationMs = retriever.extractMetadata(
@@ -207,25 +212,24 @@ class SegmentationEngine @Inject constructor(
             )?.toLongOrNull() ?: return@withContext null
 
             val targetMs = if (timestampMs < 0) durationMs / 2 else timestampMs
-            val frame = retriever.getFrameAtTime(
-                targetMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            frame = retriever.getFrameAtTime(
+                targetMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
             ) ?: return@withContext null
 
             // Downscale for faster segmentation
             val scale = 256f / maxOf(frame.width, frame.height)
             val scaledW = (frame.width * scale).toInt().coerceAtLeast(1)
             val scaledH = (frame.height * scale).toInt().coerceAtLeast(1)
-            val scaled = Bitmap.createScaledBitmap(frame, scaledW, scaledH, true)
-            if (scaled !== frame) frame.recycle()
+            scaled = Bitmap.createScaledBitmap(frame, scaledW, scaledH, true)
 
-            val result = segment(scaled)
-            scaled.recycle()
-            result
+            segment(scaled)
         } catch (e: Exception) {
             android.util.Log.w("SegmentationEngine", "Frame segmentation failed for $videoUri", e)
             null
         } finally {
-            retriever.release()
+            try { scaled?.takeIf { it !== frame }?.recycle() } catch (_: Exception) { /* already recycled */ }
+            try { frame?.recycle() } catch (_: Exception) { /* already recycled */ }
+            try { retriever.release() } catch (e: Exception) { android.util.Log.w("SegmentationEngine", "retriever release failed", e) }
         }
     }
 

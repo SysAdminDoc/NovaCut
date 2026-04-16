@@ -32,7 +32,15 @@ data class ColorCurves(
             if (input >= sorted[i].x && input <= sorted[i + 1].x) {
                 val p0 = sorted[i]
                 val p1 = sorted[i + 1]
-                val t = (input - p0.x) / (p1.x - p0.x)
+                // Guard: two adjacent points with identical x would otherwise produce
+                // (input - x) / 0 = NaN, and that NaN propagates through the bezier into
+                // the color output (renders as black or wrap on GPU). Users can create
+                // duplicate-x curve points by dragging a handle exactly onto a neighbour;
+                // legacy auto-saves can also contain them. Falling back to p0.y is the
+                // visually-correct degenerate behavior (vertical step).
+                val span = p1.x - p0.x
+                if (span <= 0f) return p0.y
+                val t = (input - p0.x) / span
                 return SpeedCurve.cubicBezierInterpolate(
                     p0.y, p0.handleOutY, p1.handleInY, p1.y, t
                 )

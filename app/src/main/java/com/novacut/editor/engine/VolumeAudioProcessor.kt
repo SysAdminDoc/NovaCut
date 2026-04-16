@@ -25,7 +25,11 @@ internal class VolumeAudioProcessor(
     private var processedFrames: Long = 0L
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.sampleRate == 0 ||
+        // Reject formats that would divide-by-zero in the per-sample loop. Without this guard,
+        // a malformed track reporting channelCount=0 would crash on `processedFrames / channelCount`
+        // mid-export, leaving an orphaned partial output file.
+        if (inputAudioFormat.sampleRate <= 0 ||
+            inputAudioFormat.channelCount <= 0 ||
             inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
         }

@@ -901,6 +901,29 @@ fun Timeline(
                                     val clipContentPaddingHorizontal = if (compactClipBadges) 6.dp else 8.dp
                                     val clipContentPaddingVertical = if (compactClipBadges) 6.dp else 7.dp
 
+                                    // Hoist the per-clip background brush. Timeline recomposes on every
+                                    // playhead tick (~30 Hz during playback); without this, each visible
+                                    // clip allocates a fresh List + Brush per frame. Keying on the three
+                                    // values that actually drive the gradient lets Compose reuse the same
+                                    // Brush instance until selection or track-color state changes.
+                                    val clipBackgroundBrush = remember(isSelected, isMultiSelected, clipColor) {
+                                        Brush.horizontalGradient(
+                                            when {
+                                                isSelected -> listOf(
+                                                    clipColor.copy(alpha = 0.64f),
+                                                    Mocha.PanelHighest.copy(alpha = 0.94f)
+                                                )
+                                                isMultiSelected -> listOf(
+                                                    Mocha.Peach.copy(alpha = 0.58f),
+                                                    Mocha.PanelHighest.copy(alpha = 0.9f)
+                                                )
+                                                else -> listOf(
+                                                    clipColor.copy(alpha = 0.44f),
+                                                    Mocha.Panel.copy(alpha = 0.92f)
+                                                )
+                                            }
+                                        )
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .offset(x = with(density) { clipStartPx.toDp() })
@@ -908,24 +931,7 @@ fun Timeline(
                                             .fillMaxHeight()
                                             .padding(vertical = 4.dp, horizontal = 1.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    when {
-                                                        isSelected -> listOf(
-                                                            clipColor.copy(alpha = 0.64f),
-                                                            Mocha.PanelHighest.copy(alpha = 0.94f)
-                                                        )
-                                                        isMultiSelected -> listOf(
-                                                            Mocha.Peach.copy(alpha = 0.58f),
-                                                            Mocha.PanelHighest.copy(alpha = 0.9f)
-                                                        )
-                                                        else -> listOf(
-                                                            clipColor.copy(alpha = 0.44f),
-                                                            Mocha.Panel.copy(alpha = 0.92f)
-                                                        )
-                                                    }
-                                                )
-                                            )
+                                            .background(clipBackgroundBrush)
                                             .alpha(if (track.isLocked) 0.7f else 1f)
                                             .then(
                                                 Modifier.border(
