@@ -1,6 +1,9 @@
 package com.novacut.editor.ui.editor
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,6 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.R
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.Motion
+import com.novacut.editor.ui.theme.Radius
+import com.novacut.editor.ui.theme.Spacing
 
 private data class TutorialStepDef(
     val titleRes: Int,
@@ -66,138 +73,188 @@ fun FirstRunTutorial(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Mocha.Crust.copy(alpha = 0.85f))
+            // Layered backdrop: solid Crust with a soft mauve vignette glow at the top.
+            // Reads as cinematic / intentional rather than a flat dimmer.
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Mocha.Mauve.copy(alpha = 0.10f),
+                        Mocha.Crust.copy(alpha = 0.92f)
+                    ),
+                    radius = 1400f
+                )
+            )
     ) {
-        // Skip button
-        Text(
-            text = stringResource(R.string.tutorial_skip),
-            color = Mocha.Subtext0,
-            fontSize = 14.sp,
+        // Skip — quiet pill button. Bare text on a translucent backdrop is hard to discover
+        // and easy to misclick; a subtle pill treatment gives it a clear affordance without
+        // competing with the primary "Next" CTA.
+        Surface(
+            color = Mocha.Surface0.copy(alpha = 0.6f),
+            shape = RoundedCornerShape(Radius.pill),
+            border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.6f)),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .clickable { onComplete() }
-        )
+                .padding(Spacing.lg)
+                .clickable(onClick = onComplete)
+        ) {
+            Text(
+                text = stringResource(R.string.tutorial_skip),
+                color = Mocha.Subtext1,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+            )
+        }
 
         // Center card with animated content
         AnimatedContent(
             targetState = currentStep,
             transitionSpec = {
-                (fadeIn() + slideInHorizontally { it / 3 })
-                    .togetherWith(fadeOut() + slideOutHorizontally { -it / 3 })
+                (fadeIn(tween(Motion.DurationMedium, easing = Motion.DecelerateEasing)) +
+                    slideInHorizontally(tween(Motion.DurationMedium, easing = Motion.DecelerateEasing)) { it / 4 })
+                    .togetherWith(
+                        fadeOut(tween(Motion.DurationFast, easing = Motion.AccelerateEasing)) +
+                            slideOutHorizontally(tween(Motion.DurationFast, easing = Motion.AccelerateEasing)) { -it / 4 }
+                    )
             },
             modifier = Modifier.align(Alignment.Center),
             label = "tutorial_step"
         ) { step ->
             val tutorialStep = tutorialStepDefs[step]
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Surface(
                 modifier = Modifier
-                    .padding(horizontal = 32.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Mocha.Surface0)
-                    .padding(24.dp)
-                    .widthIn(max = 320.dp)
+                    .padding(horizontal = Spacing.xxl)
+                    .widthIn(max = 340.dp),
+                color = Mocha.PanelHighest,
+                shape = RoundedCornerShape(Radius.xxl),
+                border = BorderStroke(1.dp, Mocha.CardStrokeStrong.copy(alpha = 0.85f)),
+                shadowElevation = 12.dp
             ) {
-                // Direction arrow
-                Icon(
-                    imageVector = tutorialStep.arrowIcon,
-                    contentDescription = stringResource(R.string.cd_tutorial_direction),
-                    tint = Mocha.Mauve,
-                    modifier = Modifier.size(32.dp)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Step icon
-                Box(
-                    contentAlignment = Alignment.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Mocha.Mauve.copy(alpha = 0.15f))
-                ) {
-                    Icon(
-                        imageVector = tutorialStep.icon,
-                        contentDescription = stringResource(tutorialStep.titleRes),
-                        tint = Mocha.Mauve,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Title
-                Text(
-                    text = stringResource(tutorialStep.titleRes),
-                    color = Mocha.Text,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Description
-                Text(
-                    text = stringResource(tutorialStep.descriptionRes),
-                    color = Mocha.Subtext1,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Step indicator dots
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    repeat(tutorialStepDefs.size) { index ->
-                        Box(
-                            modifier = Modifier
-                                .size(if (index == step) 10.dp else 8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (index == step) Mocha.Mauve else Mocha.Surface1
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0f to Mocha.Mauve.copy(alpha = 0.08f),
+                                    0.6f to Mocha.PanelHighest,
+                                    1f to Mocha.PanelHighest
                                 )
+                            )
+                        )
+                        .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)
+                ) {
+                    // Direction arrow — kept but smaller and quieter so it's a hint, not a focal point.
+                    Icon(
+                        imageVector = tutorialStep.arrowIcon,
+                        contentDescription = stringResource(R.string.cd_tutorial_direction),
+                        tint = Mocha.Mauve.copy(alpha = 0.85f),
+                        modifier = Modifier.size(24.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    // Step icon — added a subtle ring border for depth and an inner glow ring.
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        Mocha.Mauve.copy(alpha = 0.22f),
+                                        Mocha.Mauve.copy(alpha = 0.08f)
+                                    )
+                                )
+                            )
+                    ) {
+                        Icon(
+                            imageVector = tutorialStep.icon,
+                            contentDescription = stringResource(tutorialStep.titleRes),
+                            tint = Mocha.Mauve,
+                            modifier = Modifier.size(30.dp)
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(Spacing.lg))
 
-                // Next / Get Started button
-                val isLastStep = step == tutorialStepDefs.size - 1
-                Button(
-                    onClick = {
-                        if (isLastStep) {
-                            onComplete()
-                        } else {
-                            currentStep++
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Mocha.Mauve,
-                        contentColor = Mocha.Crust
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
                     Text(
-                        text = stringResource(if (isLastStep) R.string.tutorial_get_started else R.string.tutorial_next),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        text = stringResource(tutorialStep.titleRes),
+                        color = Mocha.Text,
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center
                     )
-                    if (!isLastStep) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = stringResource(R.string.cd_tutorial_next),
-                            modifier = Modifier.size(16.dp)
+
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+
+                    Text(
+                        text = stringResource(tutorialStep.descriptionRes),
+                        color = Mocha.Subtext1,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(Spacing.xl))
+
+                    // Step indicator — connected pill segments. The current step is wider and
+                    // accented, which reads as "you are here" much faster than equal-sized dots.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(tutorialStepDefs.size) { index ->
+                            val width by animateDpAsState(
+                                targetValue = if (index == step) 24.dp else 8.dp,
+                                animationSpec = tween(Motion.DurationStandard, easing = Motion.StandardEasing),
+                                label = "tutorial_dot_width_$index"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(width)
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(Radius.pill))
+                                    .background(
+                                        if (index == step) Mocha.Mauve
+                                        else Mocha.Surface1.copy(alpha = 0.7f)
+                                    )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.xl))
+
+                    // Next / Get Started button
+                    val isLastStep = step == tutorialStepDefs.size - 1
+                    Button(
+                        onClick = {
+                            if (isLastStep) {
+                                onComplete()
+                            } else {
+                                currentStep++
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Mocha.Mauve,
+                            contentColor = Mocha.Crust
+                        ),
+                        shape = RoundedCornerShape(Radius.lg),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = stringResource(if (isLastStep) R.string.tutorial_get_started else R.string.tutorial_next),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                         )
+                        if (!isLastStep) {
+                            Spacer(modifier = Modifier.width(Spacing.sm))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = stringResource(R.string.cd_tutorial_next),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

@@ -24,12 +24,12 @@ object KeyframeEngine {
             .distinctBy { it.timeOffsetMs }
 
         if (relevant.isEmpty()) return null
-        if (relevant.size == 1) return relevant[0].value
+        if (relevant.size == 1) return clampForProperty(relevant[0].value, property)
 
         // Before first keyframe
-        if (timeOffsetMs <= relevant.first().timeOffsetMs) return relevant.first().value
+        if (timeOffsetMs <= relevant.first().timeOffsetMs) return clampForProperty(relevant.first().value, property)
         // After last keyframe
-        if (timeOffsetMs >= relevant.last().timeOffsetMs) return relevant.last().value
+        if (timeOffsetMs >= relevant.last().timeOffsetMs) return clampForProperty(relevant.last().value, property)
 
         // Find surrounding keyframes
         var prev = relevant.first()
@@ -44,11 +44,11 @@ object KeyframeEngine {
         }
 
         val duration = (next.timeOffsetMs - prev.timeOffsetMs).toFloat()
-        if (duration <= 0f) return prev.value
+        if (duration <= 0f) return clampForProperty(prev.value, property)
 
         val t = (timeOffsetMs - prev.timeOffsetMs).toFloat() / duration
 
-        return when (prev.interpolation) {
+        val raw = when (prev.interpolation) {
             KeyframeInterpolation.HOLD -> prev.value
             KeyframeInterpolation.LINEAR -> lerp(prev.value, next.value, t)
             KeyframeInterpolation.BEZIER -> {
@@ -59,6 +59,30 @@ object KeyframeEngine {
                 )
                 lerp(prev.value, next.value, easedT)
             }
+        }
+        return clampForProperty(raw, property)
+    }
+
+    /**
+     * Clamp the interpolated value to the legal range for its property type.
+     *
+     * Bezier handles outside the unit square — and easing functions like ELASTIC / BACK /
+     * SPRING — can legitimately overshoot [0,1]. For position / scale / rotation / anchor
+     * values that overshoot is the desired effect (springy motion). For OPACITY and VOLUME
+     * those overshoots are bugs: opacity < 0 means "less than transparent", opacity > 1
+     * means "brighter than source", volume < 0 inverts phase. Both also violate the
+     * invariants the export pipeline (RgbMatrix, VolumeAudioProcessor) assumes.
+     *
+     * Centralising the clamp here means every callsite — preview, export, scope render —
+     * sees the same legal value.
+     */
+    private fun clampForProperty(value: Float, property: KeyframeProperty): Float {
+        return when (property) {
+            KeyframeProperty.OPACITY -> value.coerceIn(0f, 1f)
+            // Volume is allowed up to 2x amplification per the audio engine; below 0
+            // would invert phase which is never user-intent.
+            KeyframeProperty.VOLUME -> value.coerceIn(0f, 2f)
+            else -> value
         }
     }
 

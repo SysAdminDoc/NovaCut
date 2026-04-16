@@ -162,14 +162,17 @@ object AudioEffectsEngine {
 
     private fun applyCompressor(buffer: FloatArray, sampleRate: Int, channels: Int, params: Map<String, Float>): FloatArray {
         val threshold = 10f.pow((params["threshold"] ?: -20f) / 20f)
-        val ratio = params["ratio"] ?: 4f
-        val attackMs = params["attack"] ?: 10f
-        val releaseMs = params["release"] ?: 100f
-        val knee = params["knee"] ?: 6f
+        val ratio = (params["ratio"] ?: 4f).coerceAtLeast(1f)
+        // Floor attack/release at 0.1 ms so a stale/corrupt 0 (or negative) doesn't produce
+        // exp(-Infinity)=0 (instant peak follow) or exp(+Infinity)=NaN (silent corruption).
+        val attackMs = (params["attack"] ?: 10f).coerceAtLeast(0.1f)
+        val releaseMs = (params["release"] ?: 100f).coerceAtLeast(0.1f)
+        val knee = (params["knee"] ?: 6f).coerceAtLeast(0.01f)
         val makeupGain = 10f.pow((params["makeupGain"] ?: 0f) / 20f)
+        val safeSampleRate = sampleRate.coerceAtLeast(1)
 
-        val attackCoeff = exp(-1f / (attackMs * sampleRate / 1000f))
-        val releaseCoeff = exp(-1f / (releaseMs * sampleRate / 1000f))
+        val attackCoeff = exp(-1f / (attackMs * safeSampleRate / 1000f))
+        val releaseCoeff = exp(-1f / (releaseMs * safeSampleRate / 1000f))
 
         val output = buffer.copyOf()
         var envelope = 0f

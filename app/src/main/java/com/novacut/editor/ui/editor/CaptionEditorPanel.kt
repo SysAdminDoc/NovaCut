@@ -624,7 +624,7 @@ private fun CaptionEditForm(
                     onClick = {
                         onUpdate(
                             caption.copy(
-                                text = text,
+                                text = text.trim(),
                                 startTimeMs = (startTime * 1000f).toLong(),
                                 endTimeMs = (endTime * 1000f).toLong(),
                                 style = caption.style.copy(
@@ -636,6 +636,7 @@ private fun CaptionEditForm(
                         )
                         onDone()
                     },
+                    enabled = text.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve),
                     shape = RoundedCornerShape(18.dp)
@@ -662,7 +663,7 @@ private fun CaptionEditForm(
                     onClick = {
                         onUpdate(
                             caption.copy(
-                                text = text,
+                                text = text.trim(),
                                 startTimeMs = (startTime * 1000f).toLong(),
                                 endTimeMs = (endTime * 1000f).toLong(),
                                 style = caption.style.copy(
@@ -674,6 +675,7 @@ private fun CaptionEditForm(
                         )
                         onDone()
                     },
+                    enabled = text.isNotBlank(),
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve),
                     shape = RoundedCornerShape(18.dp)

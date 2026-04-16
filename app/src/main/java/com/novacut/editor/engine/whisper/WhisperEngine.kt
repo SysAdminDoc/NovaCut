@@ -253,10 +253,13 @@ class WhisperEngine @Inject constructor(
                     ?: continue
                 onProgress(0.20f + 0.3f * (chunk + 0.6f) / numChunks)
 
-                // Run decoder (greedy with timestamps)
-                val segments = runDecoder(env, decoderSession, encoderOutput, v, chunkOffsetMs)
-                encoderOutput.close()
-                allSegments.addAll(segments)
+                // Run decoder (greedy with timestamps). Always close encoderOutput, even on exception.
+                try {
+                    val segments = runDecoder(env, decoderSession, encoderOutput, v, chunkOffsetMs)
+                    allSegments.addAll(segments)
+                } finally {
+                    try { encoderOutput.close() } catch (e: Exception) { Log.w("WhisperEngine", "encoderOutput close failed", e) }
+                }
                 onProgress(0.20f + 0.3f * (chunk + 1f) / numChunks)
             }
         } finally {
@@ -279,26 +282,22 @@ class WhisperEngine @Inject constructor(
         val inputBuffer = FloatBuffer.wrap(mel)
         val inputTensor = OnnxTensor.createTensor(env, inputBuffer, inputShape)
 
+        var results: OrtSession.Result? = null
         return try {
-            val results = session.run(mapOf("input_features" to inputTensor))
-            val output = results.firstOrNull()?.value
-            if (output is OnnxTensor) {
-                // Clone the tensor data before closing results
-                val data = output.floatBuffer
-                val cloned = FloatArray(data.remaining())
-                data.get(cloned)
-                val shape = output.info.shape
-                results.close()
-                inputTensor.close()
-                OnnxTensor.createTensor(env, FloatBuffer.wrap(cloned), shape)
-            } else {
-                results.close()
-                inputTensor.close()
-                null
-            }
+            results = session.run(mapOf("input_features" to inputTensor))
+            val output = results.firstOrNull()?.value as? OnnxTensor ?: return null
+            // Clone the tensor data before closing results so caller owns a fresh OnnxTensor.
+            val data = output.floatBuffer
+            val cloned = FloatArray(data.remaining())
+            data.get(cloned)
+            val shape = output.info.shape
+            OnnxTensor.createTensor(env, FloatBuffer.wrap(cloned), shape)
         } catch (e: Exception) {
-            inputTensor.close()
+            Log.w("WhisperEngine", "Encoder run failed", e)
             null
+        } finally {
+            try { results?.close() } catch (e: Exception) { Log.w("WhisperEngine", "results close failed", e) }
+            try { inputTensor.close() } catch (e: Exception) { Log.w("WhisperEngine", "inputTensor close failed", e) }
         }
     }
 

@@ -84,8 +84,17 @@ private class SegmentationShaderProgram(
             val segBitmap = Bitmap.createScaledBitmap(bitmap, segW, segH, true)
             bitmap.recycle()
 
-            val result = engine.segment(segBitmap)
-            segBitmap.recycle()
+            // Wrap in try/finally so a MediaPipe segmenter exception (bad-input frame, model
+            // tensor mismatch) can't leak segBitmap. This effect runs once per export frame,
+            // so a per-frame leak under sustained errors would exhaust GPU/native bitmap heap.
+            val result = try {
+                engine.segment(segBitmap)
+            } catch (e: Exception) {
+                android.util.Log.w("SegmentationGlEffect", "segment() failed for export frame", e)
+                null
+            } finally {
+                try { segBitmap.recycle() } catch (_: Exception) { /* already recycled */ }
+            }
 
             if (result != null) {
                 uploadMaskTexture(result)

@@ -49,7 +49,10 @@ private class ShaderProgram(
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, inputTexId)
         uniform1i("uTexSampler", 0)
-        uniform2f("uResolution", width.toFloat(), height.toFloat())
+        // Floor resolution at 1×1 so the several shader programs that compute
+        // `1.0 / uResolution` (sharpen, blur, vignette, scanlines, …) can never produce
+        // GLSL Infinity if Media3 ever calls drawFrame before configure() set width/height.
+        uniform2f("uResolution", width.coerceAtLeast(1).toFloat(), height.coerceAtLeast(1).toFloat())
         uniform1f("uTime", presentationTimeUs / 1_000_000f)
         for ((name, value) in uniforms) uniform1f(name, value)
         GLES30.glBindVertexArray(vao)

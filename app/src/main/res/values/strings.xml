@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.30.0</string>
+    <string name="app_version">v3.37.0</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -1118,6 +1118,9 @@
     <string name="cd_multicam_angle">Camera angle</string>
     <string name="cd_multicam_selected">Selected angle</string>
     <string name="cd_preview_empty">Video library</string>
+    <string name="cd_preview_still_image">Still image preview</string>
+    <string name="projects_empty_title">No projects yet</string>
+    <string name="projects_empty_subtitle">Tap the + button to create your first video project.</string>
     <string name="cd_smart_reframe">Smart reframe</string>
     <string name="cd_clip_thumbnail">Clip thumbnail</string>
     <string name="cd_tts_preview">Preview speech</string>

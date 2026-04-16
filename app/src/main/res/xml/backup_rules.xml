@@ -4,5 +4,10 @@
     <include domain="file" path="autosave" />
     <include domain="file" path="freeze_frames" />
     <include domain="file" path="voiceovers" />
+    <!-- Preserve TTS-generated and denoised audio so projects round-trip cleanly across
+         device transfers. Without these, a restored project's clips that reference these
+         files would resolve to dangling URIs and disappear from the timeline. -->
+    <include domain="file" path="tts_output" />
+    <include domain="file" path="noise_reduced" />
     <exclude domain="file" path="autosave/*.tmp" />
 </full-backup-content>

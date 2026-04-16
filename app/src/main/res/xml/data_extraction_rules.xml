@@ -5,6 +5,8 @@
         <include domain="file" path="autosave" />
         <include domain="file" path="freeze_frames" />
         <include domain="file" path="voiceovers" />
+        <include domain="file" path="tts_output" />
+        <include domain="file" path="noise_reduced" />
         <exclude domain="file" path="autosave/*.tmp" />
     </cloud-backup>
     <device-transfer>
@@ -12,6 +14,8 @@
         <include domain="file" path="autosave" />
         <include domain="file" path="freeze_frames" />
         <include domain="file" path="voiceovers" />
+        <include domain="file" path="tts_output" />
+        <include domain="file" path="noise_reduced" />
         <exclude domain="file" path="autosave/*.tmp" />
     </device-transfer>
 </data-extraction-rules>

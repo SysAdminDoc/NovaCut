@@ -101,7 +101,11 @@ class ExportDelegate(
                     val targetGifFile = gifFile ?: return@launch
                     val allClips = tracks.flatMap { it.clips }.sortedBy { it.timelineStartMs }
                     val totalDurationMs = allClips.maxOfOrNull { it.timelineStartMs + it.durationMs } ?: 0L
-                    val frameIntervalMs = (1000 / configWithChapters.gifFrameRate.coerceAtLeast(1)).toLong()
+                    // Cap frameRate at 60 fps (sane GIF limit) and floor frameInterval at 1 ms so
+                    // a misconfigured >1000 fps value can't produce a 0-ms interval, infinite frame
+                    // count, OOM, and an export loop that never terminates.
+                    val gifFps = configWithChapters.gifFrameRate.coerceIn(1, 60)
+                    val frameIntervalMs = (1000L / gifFps).coerceAtLeast(1L)
                     val frameCount = (totalDurationMs / frameIntervalMs).toInt().coerceIn(1, 300)
                     val maxWidth = configWithChapters.gifMaxWidth
 
@@ -327,12 +331,26 @@ class ExportDelegate(
                     } finally {
                         progressJob.cancel()
                     }
-                    val newStatus = if (result == ExportState.COMPLETE) BatchExportStatus.COMPLETED else BatchExportStatus.FAILED
+                    val newStatus = when (result) {
+                        ExportState.COMPLETE -> BatchExportStatus.COMPLETED
+                        ExportState.CANCELLED -> BatchExportStatus.CANCELLED
+                        else -> BatchExportStatus.FAILED
+                    }
+                    // Normalize the per-item progress to 100% on success and 0% on failure /
+                    // cancel. Without this, the queue UI would show "85% FAILED" on a job that
+                    // errored partway through, and "99% COMPLETED" on a job whose progress
+                    // collector got cancelled before observing the final 1.0 tick.
+                    val finalProgress = if (result == ExportState.COMPLETE) 1f else 0f
                     stateFlow.update { s ->
                         s.copy(batchExportQueue = s.batchExportQueue.map {
-                            if (it.id == item.id) it.copy(status = newStatus) else it
+                            if (it.id == item.id) it.copy(status = newStatus, progress = finalProgress) else it
                         })
                     }
+                    // Stop the batch when the user explicitly cancels — continuing onto the
+                    // next item would feel like the cancel button was ignored. Failures don't
+                    // break the batch (each item is independent and the user may want
+                    // partial-success behaviour for a long queue).
+                    if (result == ExportState.CANCELLED) break
                 }
             } finally {
                 stateFlow.update { it.copy(exportConfig = originalConfig) }
@@ -402,7 +420,13 @@ class ExportDelegate(
 
                 values.clear()
                 values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-                resolver.update(contentUri, values, null, null)
+                // If MediaStore reports zero rows updated, the file remains marked pending
+                // and stays invisible in Gallery / Photos apps. Treat as a failure rather
+                // than silently lying to the user that the save succeeded.
+                val updated = resolver.update(contentUri, values, null, null)
+                if (updated < 1) {
+                    throw IllegalStateException("MediaStore failed to clear IS_PENDING (rows=$updated)")
+                }
                 "Saved to gallery: ${file.name}"
             } catch (e: Exception) {
                 resolver.delete(contentUri, null, null)

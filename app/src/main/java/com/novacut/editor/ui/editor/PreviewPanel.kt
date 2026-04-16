@@ -68,18 +68,20 @@ fun PreviewPanel(
     val showGapState = totalDurationMs > 0L && currentTimelineClip == null && !isPlaying
     val showGapPlaybackFrame = totalDurationMs > 0L && currentTimelineClip == null && isPlaying
 
+    // Both gradients are static — colors don't change with state. Hoist them into `remember`
+    // so we don't allocate new Brush + List instances on every recomposition (PreviewPanel
+    // recomposes on every playhead tick during playback, ~30 fps).
+    val outerGradient = remember {
+        Brush.verticalGradient(listOf(Mocha.Midnight, Mocha.Base, Mocha.Midnight))
+    }
+    val previewGradient = remember {
+        Brush.verticalGradient(listOf(Mocha.PanelHighest.copy(alpha = 0.9f), Mocha.Panel))
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Mocha.Midnight,
-                        Mocha.Base,
-                        Mocha.Midnight
-                    )
-                )
-            )
+            .background(outerGradient)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -97,14 +99,7 @@ fun PreviewPanel(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Mocha.PanelHighest.copy(alpha = 0.9f),
-                                Mocha.Panel
-                            )
-                        )
-                    )
+                    .background(previewGradient)
                     .padding(10.dp)
             ) {
                 BoxWithConstraints(
@@ -139,14 +134,18 @@ fun PreviewPanel(
                     ) {
                         var isBuffering by remember { mutableStateOf(false) }
                         DisposableEffect(engine) {
-                            val player = engine.getPlayer()
+                            // Capture the player reference once; reuse on dispose to avoid
+                            // attaching/removing on different player instances if engine state changes.
+                            val capturedPlayer = engine.getPlayer()
                             val listener = object : Player.Listener {
                                 override fun onPlaybackStateChanged(state: Int) {
                                     isBuffering = state == Player.STATE_BUFFERING
                                 }
                             }
-                            player.addListener(listener)
-                            onDispose { player.removeListener(listener) }
+                            capturedPlayer.addListener(listener)
+                            onDispose {
+                                try { capturedPlayer.removeListener(listener) } catch (_: Exception) { /* player released */ }
+                            }
                         }
 
                         when {
@@ -169,7 +168,7 @@ fun PreviewPanel(
                             currentClipIsStillImage && currentTimelineUri != null -> {
                                 SubcomposeAsyncImage(
                                     model = currentTimelineUri,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.cd_preview_still_image),
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier.fillMaxSize(),
                                     loading = {

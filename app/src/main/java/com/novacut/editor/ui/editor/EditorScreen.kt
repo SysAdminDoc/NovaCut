@@ -94,7 +94,9 @@ fun EditorScreen(
         }
     }
 
-    var showClipLabelPicker by remember { mutableStateOf(false) }
+    // Reset picker visibility when the user changes clip selection so a previously
+    // open label picker doesn't reappear over a newly selected (or deselected) clip.
+    var showClipLabelPicker by remember(state.selectedClipId) { mutableStateOf(false) }
 
     // Radial menu state
     var showRadialMenu by remember { mutableStateOf(false) }
@@ -1709,20 +1711,15 @@ fun EditorScreen(
             }
         }
 
-        // Toast messages
-        state.toastMessage?.let { message ->
-            Snackbar(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 120.dp, start = 16.dp, end = 16.dp)
-                    .zIndex(10f),
-                containerColor = Mocha.Surface0,
-                contentColor = Mocha.Text,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(message, fontSize = 13.sp)
-            }
-        }
+        // Toast messages — animated, severity-aware Mocha snackbar.
+        PremiumSnackbarHost(
+            message = state.toastMessage,
+            severity = state.toastSeverity,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 120.dp, start = 16.dp, end = 16.dp)
+                .zIndex(10f)
+        )
     }
 }
 
@@ -1827,7 +1824,9 @@ private fun EditorTopBar(
                         unfocusedTextColor = Mocha.Text,
                         cursorColor = Mocha.Mauve,
                         focusedBorderColor = Mocha.Mauve,
-                        unfocusedBorderColor = Mocha.Surface1
+                        // Normalized to match the editor's other input borders so the rename
+                        // dialog feels like part of the same surface system rather than a fork.
+                        unfocusedBorderColor = Mocha.CardStroke
                     )
                 )
             },

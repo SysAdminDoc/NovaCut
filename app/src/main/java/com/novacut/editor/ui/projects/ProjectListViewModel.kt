@@ -255,7 +255,17 @@ class ProjectListViewModel @Inject constructor(
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 projectDao.insertProject(newProject)
-                autoSave.copyAutoSave(project.id, newId)
+                // If the auto-save file copy fails (disk full, source corrupt, etc.) we
+                // would otherwise leave an orphaned Room row that opens as an empty
+                // project — confusing the user, who expected a duplicate. Roll the row
+                // back so the failure is observable and re-tryable rather than silent.
+                try {
+                    autoSave.copyAutoSave(project.id, newId)
+                } catch (e: Exception) {
+                    android.util.Log.w("ProjectListVM", "Failed to copy auto-save for duplicate; rolling back row", e)
+                    runCatching { projectDao.deleteById(newId) }
+                    throw e
+                }
             }
         }
     }
