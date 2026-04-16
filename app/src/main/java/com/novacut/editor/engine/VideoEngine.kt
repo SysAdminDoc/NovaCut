@@ -347,6 +347,13 @@ class VideoEngine @Inject constructor(
             val (targetW, targetH) = config.resolution.forAspect(config.aspectRatio)
 
             val clips = videoTrack.clips.sortedBy { it.timelineStartMs }
+            // Diagnostic: Media3 Transformer doesn't natively support reverse playback. Any
+            // clip flagged isReversed exports forward — log so users / logs can surface this
+            // limitation when the visible result doesn't match expectations.
+            val reversedCount = clips.count { it.isReversed }
+            if (reversedCount > 0) {
+                Log.w(TAG, "Export: $reversedCount reversed clip(s) will render forward (Transformer limitation)")
+            }
             val editedItems = clips.mapIndexed { index, clip ->
                 val nextTransition = clips.getOrNull(index + 1)?.transition
                 buildEditedMediaItem(
@@ -841,6 +848,20 @@ class VideoEngine @Inject constructor(
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                     // Guard against callbacks arriving after cancellation or timeout
                     if (_exportState.value != ExportState.EXPORTING) return
+                    // Defensive: a 0-byte file means encoding silently produced nothing usable
+                    // (can happen on certain hardware-encoder edge cases when input is malformed).
+                    // Reporting COMPLETE for a 0-byte file would let the user share / save an
+                    // unplayable artifact and trust that it succeeded. Surface as ERROR instead.
+                    if (!outputFile.exists() || outputFile.length() <= 0L) {
+                        Log.e(TAG, "Transformer reported COMPLETE but output file is empty: ${outputFile.absolutePath}")
+                        _exportErrorMessage.value = "Export produced an empty file"
+                        _exportState.value = ExportState.ERROR
+                        _exportProgress.value = 0f
+                        activeExportOutputFile = null
+                        runCatching { outputFile.delete() }
+                        onError(IllegalStateException("Empty output file"))
+                        return
+                    }
                     _exportState.value = ExportState.COMPLETE
                     _exportProgress.value = 1f
                     activeExportOutputFile = null

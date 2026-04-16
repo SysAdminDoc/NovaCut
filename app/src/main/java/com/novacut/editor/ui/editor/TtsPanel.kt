@@ -43,6 +43,8 @@ import com.novacut.editor.R
 import com.novacut.editor.engine.TtsEngine
 import com.novacut.editor.ui.theme.Mocha
 
+private const val TTS_MAX_CHARS = 2000
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TtsPanel(
@@ -137,11 +139,20 @@ fun TtsPanel(
 
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                // Hard-cap input at 2,000 chars (~3 minutes of speech) to keep TTS synthesis
+                // bounded and avoid runaway memory / generation time on accidental paste-bombs.
+                onValueChange = { text = if (it.length <= TTS_MAX_CHARS) it else it.take(TTS_MAX_CHARS) },
                 placeholder = {
                     Text(
                         text = stringResource(R.string.tts_enter_text),
                         color = Mocha.Overlay0
+                    )
+                },
+                supportingText = {
+                    Text(
+                        text = "${text.length} / $TTS_MAX_CHARS",
+                        color = if (text.length >= TTS_MAX_CHARS) Mocha.Peach else Mocha.Subtext0,
+                        style = MaterialTheme.typography.labelSmall
                     )
                 },
                 modifier = Modifier

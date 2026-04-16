@@ -32,13 +32,16 @@ object ColorMatchEngine {
         timeMs: Long
     ): ColorStats? = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
+        var bitmap: Bitmap? = null
         try {
             retriever.setDataSource(context, uri)
-            val bitmap = retriever.getFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST)
+            bitmap = retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST)
             bitmap?.let { analyzeBitmap(it) }
         } catch (e: Exception) {
+            Log.w("ColorMatchEngine", "Frame analysis failed for $uri @${timeMs}ms", e)
             null
         } finally {
+            try { bitmap?.recycle() } catch (_: Exception) { /* already recycled */ }
             try { retriever.release() } catch (e: Exception) { Log.w("ColorMatchEngine", "Failed to release retriever", e) }
         }
     }

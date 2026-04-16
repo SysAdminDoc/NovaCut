@@ -148,12 +148,16 @@ fun MediaPickerSheet(
         }
     }
 
-    // Clean up stale camera temp files (older than 1 hour)
+    // Clean up stale camera temp files (older than 1 hour). The directory must match the
+    // location used by `startCameraCapture()` above (`filesDir/media`) — previously this
+    // pointed at `cacheDir/camera` which never existed, so orphaned recordings from app
+    // crashes would accumulate forever.
     LaunchedEffect(Unit) {
-        val cameraDir = File(context.cacheDir, "camera")
+        val cameraDir = File(context.filesDir, "media")
         if (cameraDir.exists()) {
             val cutoff = System.currentTimeMillis() - 3_600_000L
-            cameraDir.listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.delete() }
+            cameraDir.listFiles()?.filter { it.isFile && it.lastModified() < cutoff }
+                ?.forEach { runCatching { it.delete() } }
         }
     }
 

@@ -274,6 +274,10 @@ data class AutoSaveState(
 
         fun deserialize(raw: String): AutoSaveState {
             val json = JSONObject(raw)
+            val fileVersion = json.optInt("version", 0)
+            if (fileVersion > FORMAT_VERSION) {
+                Log.w(TAG, "Auto-save written by newer format ($fileVersion > $FORMAT_VERSION); attempting best-effort load")
+            }
             val tracks = deserializeTracks(json.optJSONArray("tracks") ?: JSONArray())
             // Clean up orphaned linkedClipId references
             val allClipIds = tracks.flatMap { it.clips.map { c -> c.id } }.toSet()
@@ -300,9 +304,13 @@ data class AutoSaveState(
                     val io = imageOverlaysArr.getJSONObject(i)
                     val srcUri = io.optString("sourceUri", "")
                     if (srcUri.isEmpty()) return@mapNotNull null
+                    val parsedUri = try { android.net.Uri.parse(srcUri) } catch (e: Exception) {
+                        Log.w(TAG, "Skipping image overlay with malformed URI: $srcUri", e)
+                        return@mapNotNull null
+                    }
                     ImageOverlay(
                         id = io.optString("id", java.util.UUID.randomUUID().toString()),
-                        sourceUri = android.net.Uri.parse(srcUri),
+                        sourceUri = parsedUri,
                         startTimeMs = io.optLong("startTimeMs", 0L),
                         endTimeMs = io.optLong("endTimeMs", 5000L),
                         positionX = io.optDouble("positionX", 0.0).toFloat(),
@@ -529,6 +537,8 @@ data class AutoSaveState(
                 put("offsetR", g.offsetR.toDouble()); put("offsetG", g.offsetG.toDouble()); put("offsetB", g.offsetB.toDouble())
                 g.lutPath?.let { put("lutPath", it) }
                 put("lutIntensity", g.lutIntensity.toDouble())
+                g.colorMatchRef?.let { put("colorMatchRef", it) }
+                put("curves", serializeColorCurves(g.curves))
                 g.hslQualifier?.let { hsl ->
                     put("hsl", JSONObject().apply {
                         put("hueCenter", hsl.hueCenter.toDouble()); put("hueWidth", hsl.hueWidth.toDouble())
@@ -536,6 +546,27 @@ data class AutoSaveState(
                         put("lumMin", hsl.lumMin.toDouble()); put("lumMax", hsl.lumMax.toDouble())
                         put("softness", hsl.softness.toDouble())
                         put("adjustHue", hsl.adjustHue.toDouble()); put("adjustSat", hsl.adjustSat.toDouble()); put("adjustLum", hsl.adjustLum.toDouble())
+                    })
+                }
+            }
+        }
+
+        private fun serializeColorCurves(curves: ColorCurves): JSONObject {
+            return JSONObject().apply {
+                put("master", serializeCurvePoints(curves.master))
+                put("red", serializeCurvePoints(curves.red))
+                put("green", serializeCurvePoints(curves.green))
+                put("blue", serializeCurvePoints(curves.blue))
+            }
+        }
+
+        private fun serializeCurvePoints(points: List<CurvePoint>): JSONArray {
+            return JSONArray().apply {
+                points.forEach { p ->
+                    put(JSONObject().apply {
+                        put("x", p.x.toDouble()); put("y", p.y.toDouble())
+                        put("hix", p.handleInX.toDouble()); put("hiy", p.handleInY.toDouble())
+                        put("hox", p.handleOutX.toDouble()); put("hoy", p.handleOutY.toDouble())
                     })
                 }
             }
@@ -754,18 +785,40 @@ data class AutoSaveState(
             val masksArr = json.optJSONArray("masks") ?: JSONArray()
             val audioFxArr = json.optJSONArray("audioEffects") ?: JSONArray()
             val captionsArr = json.optJSONArray("captions") ?: JSONArray()
-            val sourceUri = json.optString("sourceUri", "")
-            if (sourceUri.isEmpty()) return null
+            val sourceUriStr = json.optString("sourceUri", "")
+            if (sourceUriStr.isEmpty()) {
+                Log.w(TAG, "Skipping clip ${json.optString("id", "?")} with empty sourceUri")
+                return null
+            }
+            val parsedSourceUri = try { Uri.parse(sourceUriStr) } catch (e: Exception) {
+                Log.w(TAG, "Skipping clip with malformed sourceUri: $sourceUriStr", e)
+                return null
+            }
             val sourceDurationMs = json.optLong("sourceDurationMs", 0L)
+            if (sourceDurationMs <= 0L) {
+                Log.w(TAG, "Skipping clip ${json.optString("id", "?")} with non-positive sourceDurationMs=$sourceDurationMs")
+                return null
+            }
             val rawTrimEnd = json.optLong("trimEndMs", sourceDurationMs)
             // Coerce trim values to satisfy model invariants (trimEndMs <= sourceDurationMs)
             val trimStartMs = json.optLong("trimStartMs", 0L).coerceIn(0L, sourceDurationMs)
             val trimEndMs = rawTrimEnd.coerceIn(trimStartMs, sourceDurationMs.coerceAtLeast(trimStartMs))
+            // Coerce fade durations: each must fit within remaining clip duration after the other fade.
+            val clipDurationMs = (trimEndMs - trimStartMs).coerceAtLeast(0L)
+            val rawFadeIn = json.optLong("fadeInMs", 0L).coerceAtLeast(0L)
+            val rawFadeOut = json.optLong("fadeOutMs", 0L).coerceAtLeast(0L)
+            val fadeInMs = rawFadeIn.coerceAtMost(clipDurationMs)
+            val fadeOutMs = rawFadeOut.coerceAtMost((clipDurationMs - fadeInMs).coerceAtLeast(0L))
+            val proxyUri = json.optString("proxyUri", "").takeIf { it.isNotEmpty() }?.let { uriStr ->
+                try { Uri.parse(uriStr) } catch (e: Exception) {
+                    Log.w(TAG, "Discarding malformed proxyUri: $uriStr", e); null
+                }
+            }
             return Clip(
                 id = json.optString("id", java.util.UUID.randomUUID().toString()),
-                sourceUri = Uri.parse(sourceUri),
+                sourceUri = parsedSourceUri,
                 sourceDurationMs = sourceDurationMs.coerceAtLeast(trimEndMs),
-                timelineStartMs = json.optLong("timelineStartMs", 0L),
+                timelineStartMs = json.optLong("timelineStartMs", 0L).coerceAtLeast(0L),
                 trimStartMs = trimStartMs,
                 trimEndMs = trimEndMs,
                 volume = json.optDouble("volume", 1.0).toFloat().coerceIn(0f, 2f),
@@ -779,8 +832,8 @@ data class AutoSaveState(
                 positionY = json.optDouble("positionY", 0.0).toFloat(),
                 anchorX = json.optDouble("anchorX", 0.5).toFloat(),
                 anchorY = json.optDouble("anchorY", 0.5).toFloat(),
-                fadeInMs = json.optLong("fadeInMs", 0L),
-                fadeOutMs = json.optLong("fadeOutMs", 0L),
+                fadeInMs = fadeInMs,
+                fadeOutMs = fadeOutMs,
                 blendMode = safeValueOf(json.optString("blendMode", "NORMAL"), BlendMode.NORMAL),
                 isCompound = json.optBoolean("isCompound", false),
                 compoundClips = json.optJSONArray("compoundClips")?.let { arr ->
@@ -813,7 +866,7 @@ data class AutoSaveState(
                 captions = (0 until captionsArr.length()).mapNotNull { i ->
                     try { deserializeCaption(captionsArr.getJSONObject(i)) } catch (e: Exception) { Log.w(TAG, "Failed to deserialize caption $i", e); null }
                 },
-                proxyUri = json.optString("proxyUri", "").takeIf { it.isNotEmpty() }?.let { Uri.parse(it) },
+                proxyUri = proxyUri,
                 motionTrackingData = json.optJSONObject("motionTrackingData")?.let { mtd ->
                     val tpArr = mtd.optJSONArray("trackPoints") ?: JSONArray()
                     MotionTrackingData(
@@ -894,6 +947,8 @@ data class AutoSaveState(
                 offsetR = json.optDouble("offsetR", 0.0).toFloat(), offsetG = json.optDouble("offsetG", 0.0).toFloat(), offsetB = json.optDouble("offsetB", 0.0).toFloat(),
                 lutPath = json.optString("lutPath", "").takeIf { it.isNotEmpty() },
                 lutIntensity = json.optDouble("lutIntensity", 1.0).toFloat(),
+                colorMatchRef = json.optString("colorMatchRef", "").takeIf { it.isNotEmpty() },
+                curves = json.optJSONObject("curves")?.let { deserializeColorCurves(it) } ?: ColorCurves(),
                 hslQualifier = json.optJSONObject("hsl")?.let { hsl ->
                     HslQualifier(
                         hueCenter = hsl.optDouble("hueCenter", 0.0).toFloat(),
@@ -909,6 +964,34 @@ data class AutoSaveState(
                     )
                 }
             )
+        }
+
+        private fun deserializeColorCurves(json: JSONObject): ColorCurves {
+            return ColorCurves(
+                master = deserializeCurvePoints(json.optJSONArray("master")) ?: ColorCurves().master,
+                red = deserializeCurvePoints(json.optJSONArray("red")) ?: ColorCurves().red,
+                green = deserializeCurvePoints(json.optJSONArray("green")) ?: ColorCurves().green,
+                blue = deserializeCurvePoints(json.optJSONArray("blue")) ?: ColorCurves().blue
+            )
+        }
+
+        private fun deserializeCurvePoints(arr: JSONArray?): List<CurvePoint>? {
+            if (arr == null || arr.length() == 0) return null
+            return (0 until arr.length()).mapNotNull { i ->
+                try {
+                    val pt = arr.getJSONObject(i)
+                    val x = pt.optDouble("x", 0.0).toFloat()
+                    val y = pt.optDouble("y", 0.0).toFloat()
+                    CurvePoint(
+                        x = x.coerceIn(0f, 1f),
+                        y = y.coerceIn(0f, 1f),
+                        handleInX = pt.optDouble("hix", x.toDouble()).toFloat(),
+                        handleInY = pt.optDouble("hiy", y.toDouble()).toFloat(),
+                        handleOutX = pt.optDouble("hox", x.toDouble()).toFloat(),
+                        handleOutY = pt.optDouble("hoy", y.toDouble()).toFloat()
+                    )
+                } catch (e: Exception) { Log.w(TAG, "Failed to deserialize curve point $i", e); null }
+            }.takeIf { it.isNotEmpty() }
         }
 
         private fun deserializeSpeedCurve(json: JSONObject): SpeedCurve {
