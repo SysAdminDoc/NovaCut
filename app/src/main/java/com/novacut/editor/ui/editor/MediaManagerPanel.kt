@@ -349,7 +349,7 @@ private fun MediaAssetCard(
     onRelinkMedia: (Uri) -> Unit
 ) {
     val accent = if (asset.isAccessible) Mocha.Blue else Mocha.Red
-    val statusLabel = if (asset.isAccessible) "Online" else "Missing"
+    val statusLabel = stringResource(if (asset.isAccessible) R.string.media_status_online else R.string.media_status_missing)
     val usageLabel = if (asset.usedInClipIds.size == 1) "Used in 1 clip" else "Used in ${asset.usedInClipIds.size} clips"
 
     Surface(
@@ -423,7 +423,7 @@ private fun MediaAssetCard(
 
             if (!asset.isAccessible) {
                 Text(
-                    text = "This source file is unavailable on this device. Restore the original path before export. The relink action below shows the current support status for this build.",
+                    text = stringResource(R.string.media_source_unavailable),
                     style = MaterialTheme.typography.bodySmall,
                     color = Mocha.Subtext0
                 )
@@ -470,7 +470,7 @@ private fun MediaAssetCard(
                                 contentDescription = stringResource(R.string.cd_media_goto)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Go to first use")
+                            Text(text = stringResource(R.string.media_goto_first_use))
                         }
                     }
                 }

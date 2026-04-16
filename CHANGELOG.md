@@ -42,7 +42,7 @@
 - **ProjectAutoSave `release()` deadlock** — Replaced `runBlocking` + mutex with scope cancellation to prevent ANR when Activity destroys.
 - **ProjectAutoSave atomic writes** — Save uses temp file + rename + backup rollback pattern; interrupted saves no longer corrupt project files.
 - **ProjectAutoSave `.bak` recovery** — `loadRecoveryData()` now restores from backup files left by interrupted saves.
-- **AppModule destructive migration removed** — `fallbackToDestructiveMigrationOnDowngrade()` silently deleted all user projects on app downgrade; replaced with safe empty migration.
+- **AppModule destructive migration removed** — `fallbackToDestructiveMigrationOnDowngrade()` silently deleted all user projects on app downgrade; removed so downgrades now surface an error instead of silently deleting data.
 - **VideoEngine export race condition** — Added `synchronized` block around export state check-and-set to prevent concurrent export starts.
 - **AudioEngine MediaCodec resource leak** — Both `extractWaveform()` and `decodeToPCM()` now use `try-finally` with nullable decoder to guarantee `stop()`/`release()` on all paths.
 - **WhisperEngine ONNX tensor lifecycle** — Decoder loop restructured: `OrtSession.Result` and `OnnxTensor` are now closed exactly once via `finally` block, preventing native memory leaks when `session.run()` succeeds but post-processing throws.
