@@ -192,6 +192,7 @@ fun BatchExportPanel(
                                     platformPreset = preset
                                 )
                                 onAddItem(config, preset.displayName)
+                                showPresetPicker = false
                             },
                             label = {
                                 Text(
@@ -221,6 +222,7 @@ fun BatchExportPanel(
                                 ExportConfig(exportAudioOnly = true),
                                 audioOnlyLabel
                             )
+                            showPresetPicker = false
                         }
                     )
                     UtilityExportChip(
@@ -231,6 +233,7 @@ fun BatchExportPanel(
                                 ExportConfig(exportStemsOnly = true),
                                 audioStemsLabel
                             )
+                            showPresetPicker = false
                         }
                     )
                 }

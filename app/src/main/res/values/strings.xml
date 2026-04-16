@@ -1228,6 +1228,10 @@
     <string name="media_stat_missing">Missing</string>
     <string name="media_stat_empty_tracks">Empty Tracks</string>
     <string name="media_used_count">Used %1$dx</string>
+    <string name="media_goto_first_use">Go to first use</string>
+    <string name="media_status_online">Online</string>
+    <string name="media_status_missing">Missing</string>
+    <string name="media_source_unavailable">This source file is unavailable on this device. Restore the original path before export. The relink action below shows the current support status for this build.</string>
     <string name="cd_media_goto">Go to clip</string>
     <string name="cd_media_missing">Missing</string>
 
