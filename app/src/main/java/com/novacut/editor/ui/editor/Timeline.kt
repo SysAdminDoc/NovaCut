@@ -1043,7 +1043,7 @@ fun Timeline(
                                                         drawWaveformPlaceholder(clipColor)
                                                     }
                                                 }
-                                                if (volumeKfs.size >= 2) {
+                                                if (volumeKfs.size >= 2 && clip.durationMs > 0) {
                                                     val path = Path()
                                                     val steps = 100
                                                     for (i in 0..steps) {
@@ -1061,9 +1061,10 @@ fun Timeline(
                                                         Color(0xFFF9E2AF), // Yellow
                                                         style = Stroke(width = 1.5f)
                                                     )
-                                                    // Draw keyframe dots on envelope
+                                                    // Draw keyframe dots on envelope (zero-duration guard above protects the divide).
+                                                    val durF = clip.durationMs.toFloat()
                                                     volumeKfs.forEach { kf ->
-                                                        val x = (kf.timeOffsetMs.toFloat() / clip.durationMs) * size.width
+                                                        val x = (kf.timeOffsetMs.toFloat() / durF) * size.width
                                                         val y = size.height * (1f - (kf.value / 2f).coerceIn(0f, 1f))
                                                         drawCircle(Color(0xFFF9E2AF), 3f, Offset(x, y))
                                                     }

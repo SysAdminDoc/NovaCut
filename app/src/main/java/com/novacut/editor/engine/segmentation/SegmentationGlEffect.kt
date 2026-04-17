@@ -268,8 +268,23 @@ private class SegmentationShaderProgram(
         GLES30.glBindVertexArray(0)
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
 
-        // Mask texture
+        // Mask texture — allocate 1x1 R8 storage up front so the first uploadFallbackMask /
+        // uploadMask call never binds an uninitialized texture. Some drivers mark the texture
+        // "incomplete" if its storage is never defined, which causes the sampler to return zero
+        // (fully masked-out frame) or hard-fails the draw entirely.
         val texs = IntArray(1); GLES30.glGenTextures(1, texs, 0); maskTexture = texs[0]
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, maskTexture)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
+        val seedByte = java.nio.ByteBuffer.allocateDirect(1).order(java.nio.ByteOrder.nativeOrder())
+            .put(0xFF.toByte()).apply { position(0) }
+        GLES30.glTexImage2D(
+            GLES30.GL_TEXTURE_2D, 0, GLES30.GL_R8, 1, 1, 0,
+            GLES30.GL_RED, GLES30.GL_UNSIGNED_BYTE, seedByte
+        )
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
     }
 
     private fun compile(type: Int, src: String): Int {

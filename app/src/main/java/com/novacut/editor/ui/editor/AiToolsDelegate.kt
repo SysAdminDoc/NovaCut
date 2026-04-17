@@ -139,11 +139,16 @@ class AiToolsDelegate(
             return
         }
 
-        stateFlow.update { it.copy(aiProcessingTool = toolId) }
         val clipId = clip.id
 
+        // Cancel the previous job FIRST so its finally block (which clears aiProcessingTool)
+        // runs before we publish our new state — otherwise a trailing `aiProcessingTool = null`
+        // from the cancelled job could race-overwrite our own update and hide the progress indicator.
         aiJob?.cancel()
-        aiJob = scope.launch {
+        stateFlow.update { it.copy(aiProcessingTool = toolId) }
+
+        lateinit var thisJob: kotlinx.coroutines.Job
+        thisJob = scope.launch {
             try {
                 // Re-validate clip still exists (user may have deleted it)
                 val currentClip = stateFlow.value.tracks.flatMap { it.clips }.firstOrNull { it.id == clipId }
@@ -179,10 +184,15 @@ class AiToolsDelegate(
             } catch (e: Exception) {
                 showToast("AI tool failed: ${e.message}")
             } finally {
-                stateFlow.update { it.copy(aiProcessingTool = null) }
-                aiJob = null
+                // Only clear progress state if we are still the active job — protects against
+                // a stale cancelled job overwriting the newly-launched one's progress indicator.
+                if (aiJob === thisJob) {
+                    stateFlow.update { it.copy(aiProcessingTool = null) }
+                    aiJob = null
+                }
             }
         }
+        aiJob = thisJob
     }
 
     fun cancelAiTool() {

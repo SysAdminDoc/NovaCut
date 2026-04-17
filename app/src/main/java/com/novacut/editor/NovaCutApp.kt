@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.novacut.editor.BuildConfig
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -21,7 +22,10 @@ class NovaCutApp : Application(), Configuration.Provider {
 
     companion object {
         const val CHANNEL_EXPORT = "novacut_export"
-        const val VERSION = "v3.39.0"
+        // Source from BuildConfig so the constant can never drift from the gradle versionName.
+        // Consumed by model-download User-Agent headers, crash reports, and the about dialog —
+        // a stale value here would misreport the user's actual build.
+        val VERSION: String = "v${BuildConfig.VERSION_NAME}"
     }
 
     override fun onCreate() {

@@ -292,7 +292,7 @@ fun ExportSheet(
                 icon = Icons.Default.Error,
                 tint = Mocha.Red,
                 title = stringResource(R.string.export_failed),
-                body = errorMessage ?: stringResource(R.string.error),
+                body = errorMessage?.takeIf { it.isNotBlank() } ?: stringResource(R.string.error),
                 primaryLabel = stringResource(R.string.retry),
                 onPrimary = onStartExport,
                 secondaryLabel = stringResource(R.string.close),

@@ -199,9 +199,14 @@ object EffectShaders {
 
     fun chromaKey(keyR: Float, keyG: Float, keyB: Float, threshold: Float, smoothing: Float, spill: Float = 0.5f) =
         ShaderEffect(FRAG_CHROMA_KEY, mapOf(
-            "uKeyR" to keyR, "uKeyG" to keyG, "uKeyB" to keyB,
-            "uThreshold" to threshold, "uSmoothing" to smoothing,
-            "uSpill" to spill
+            "uKeyR" to keyR.coerceIn(0f, 1f),
+            "uKeyG" to keyG.coerceIn(0f, 1f),
+            "uKeyB" to keyB.coerceIn(0f, 1f),
+            "uThreshold" to threshold.coerceIn(0f, 1f),
+            // smoothstep with edge0 == edge1 has undefined behavior in GLSL — floor the window
+            // at a hair's width so the alpha ramp never collapses to a 0-wide step.
+            "uSmoothing" to smoothing.coerceAtLeast(0.001f),
+            "uSpill" to spill.coerceIn(0f, 1f)
         ))
 
     // ─── Transition shaders (applied to clip start/end) ─────────────────

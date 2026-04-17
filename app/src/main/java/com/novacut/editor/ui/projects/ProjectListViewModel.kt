@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +58,10 @@ class ProjectListViewModel @Inject constructor(
     val userTemplates: StateFlow<List<UserTemplate>> = _userTemplates.asStateFlow()
 
     private val allProjects: StateFlow<List<Project>> = projectDao.getAllProjects()
+        // Room re-emits on any table write even when the query result is identical; collapse
+        // those duplicates so the filtered/sorted StateFlow below doesn't force the grid to
+        // recompose on every unrelated project update (e.g. auto-save bumping updatedAt).
+        .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val projects: StateFlow<List<Project>> = combine(

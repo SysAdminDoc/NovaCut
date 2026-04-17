@@ -150,13 +150,23 @@ class LottieTemplateEngine @Inject constructor(
             bitmap.recycle()
             return -1
         }
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texId)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
-        GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
+        // Wrap the GL upload so any driver-thrown exception (OOM, bad format, context lost)
+        // still frees the bitmap and releases the texture instead of leaking both — a Lottie
+        // title export can push 60+ bitmaps/second through this function, so one leak per
+        // failure frame compounds quickly.
+        try {
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texId)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
+            GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
+        } catch (t: Throwable) {
+            GLES30.glDeleteTextures(1, intArrayOf(texId), 0)
+            bitmap.recycle()
+            throw t
+        }
         bitmap.recycle()
         return texId
     }
