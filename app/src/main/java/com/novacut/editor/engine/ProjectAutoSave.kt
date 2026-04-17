@@ -110,10 +110,15 @@ class ProjectAutoSave @Inject constructor(
         val fromFile = getAutoSaveFile(fromProjectId)
         if (!fromFile.exists()) return
         try {
-            val json = saveMutex.withLock { JSONObject(fromFile.readText(Charsets.UTF_8)) }
-            json.put("projectId", toProjectId)
-            json.put("timestamp", System.currentTimeMillis())
+            // Hold the mutex for the entire read→mutate→write sequence. Releasing between
+            // read and write let a concurrent saveState() of the source project overwrite
+            // the file with newer data, after which we'd write stale (but newly-tagged)
+            // JSON to the destination — silently losing the source project's latest edits
+            // from the duplicate.
             saveMutex.withLock {
+                val json = JSONObject(fromFile.readText(Charsets.UTF_8))
+                json.put("projectId", toProjectId)
+                json.put("timestamp", System.currentTimeMillis())
                 writeAutoSaveFileLocked(toProjectId, json.toString(2))
             }
         } catch (e: Exception) {
@@ -137,7 +142,7 @@ class ProjectAutoSave @Inject constructor(
         // doesn't accumulate orphans across process lifetimes (filesDir has quota pressure).
         runCatching {
             autoSaveDir.listFiles { f -> f.isFile && f.name.endsWith(".tmp") }?.forEach { it.delete() }
-        }
+        }.onFailure { e -> Log.w(TAG, "Failed to sweep orphan .tmp files on release()", e) }
     }
 
     private suspend fun saveState(projectId: String, state: AutoSaveState) = saveMutex.withLock {
@@ -316,16 +321,22 @@ data class AutoSaveState(
                         Log.w(TAG, "Skipping image overlay with malformed URI: $srcUri", e)
                         return@mapNotNull null
                     }
+                    // Coerce time range BEFORE constructing so a corrupt save with
+                    // startTimeMs >= endTimeMs doesn't trip the ImageOverlay require()
+                    // block and silently drop the overlay (data loss on recovery).
+                    val ioStart = io.optLong("startTimeMs", 0L).coerceAtLeast(0L)
+                    val rawEnd = io.optLong("endTimeMs", ioStart + 5000L)
+                    val ioEnd = if (rawEnd > ioStart) rawEnd else ioStart + 1L
                     ImageOverlay(
                         id = io.optString("id", java.util.UUID.randomUUID().toString()),
                         sourceUri = parsedUri,
-                        startTimeMs = io.optLong("startTimeMs", 0L),
-                        endTimeMs = io.optLong("endTimeMs", 5000L),
-                        positionX = io.optDouble("positionX", 0.0).toFloat(),
-                        positionY = io.optDouble("positionY", 0.0).toFloat(),
-                        scale = io.optDouble("scale", 0.3).toFloat().coerceAtLeast(0.01f),
-                        rotation = io.optDouble("rotation", 0.0).toFloat(),
-                        opacity = io.optDouble("opacity", 1.0).toFloat().coerceIn(0f, 1f),
+                        startTimeMs = ioStart,
+                        endTimeMs = ioEnd,
+                        positionX = io.optDouble("positionX", 0.0).toFloat().let { if (it.isFinite()) it.coerceIn(-5f, 5f) else 0f },
+                        positionY = io.optDouble("positionY", 0.0).toFloat().let { if (it.isFinite()) it.coerceIn(-5f, 5f) else 0f },
+                        scale = io.optDouble("scale", 0.3).toFloat().let { if (it.isFinite()) it.coerceAtLeast(0.01f) else 0.3f },
+                        rotation = io.optDouble("rotation", 0.0).toFloat().let { if (it.isFinite()) it else 0f },
+                        opacity = io.optDouble("opacity", 1.0).toFloat().let { if (it.isFinite()) it.coerceIn(0f, 1f) else 1f },
                         type = safeValueOf(io.optString("type", "STICKER"), ImageOverlayType.STICKER)
                     )
                 } catch (e: Exception) { Log.w(TAG, "Failed to deserialize image overlay $i", e); null }
@@ -348,14 +359,21 @@ data class AutoSaveState(
                 try {
                     val dp = drawingPathsArr.getJSONObject(i)
                     val pointsArr = dp.optJSONArray("points") ?: return@mapNotNull null
-                    val points = (0 until pointsArr.length()).map { j ->
+                    // Drop NaN/Infinity coordinates — Compose Canvas drawPath silently breaks
+                    // rendering for the whole layer when a single segment contains a
+                    // non-finite coord, dropping every subsequent drawing on the overlay.
+                    val points = (0 until pointsArr.length()).mapNotNull { j ->
                         val pt = pointsArr.getJSONObject(j)
-                        pt.optDouble("x", 0.0).toFloat() to pt.optDouble("y", 0.0).toFloat()
+                        val x = pt.optDouble("x", Double.NaN).toFloat()
+                        val y = pt.optDouble("y", Double.NaN).toFloat()
+                        if (x.isFinite() && y.isFinite()) x to y else null
                     }
+                    if (points.size < 2) return@mapNotNull null
+                    val rawStroke = dp.optDouble("strokeWidth", 4.0).toFloat()
                     com.novacut.editor.model.DrawingPath(
                         points = points,
                         color = dp.optLong("color", 0xFFCBA6F7L),
-                        strokeWidth = dp.optDouble("strokeWidth", 4.0).toFloat()
+                        strokeWidth = (if (rawStroke.isFinite()) rawStroke else 4f).coerceIn(0.5f, 64f)
                     )
                 } catch (e: Exception) { Log.w(TAG, "Failed to deserialize drawing path $i", e); null }
             }
@@ -959,29 +977,38 @@ data class AutoSaveState(
             )
         }
 
+        // NaN/Infinity guard — JSONObject.optDouble can round-trip non-finite values that
+        // a compromised export/import or file-system corruption introduced. Color matrices
+        // and blend math propagate NaN across every pixel, turning clips black on playback
+        // and export. Fall back to each field's natural identity so recovery is silent.
+        private fun safeFloat(value: Double, default: Float): Float {
+            val f = value.toFloat()
+            return if (f.isFinite()) f else default
+        }
+
         private fun deserializeColorGrade(json: JSONObject): ColorGrade {
             return ColorGrade(
                 enabled = json.optBoolean("enabled", true),
-                liftR = json.optDouble("liftR", 0.0).toFloat(), liftG = json.optDouble("liftG", 0.0).toFloat(), liftB = json.optDouble("liftB", 0.0).toFloat(),
-                gammaR = json.optDouble("gammaR", 1.0).toFloat(), gammaG = json.optDouble("gammaG", 1.0).toFloat(), gammaB = json.optDouble("gammaB", 1.0).toFloat(),
-                gainR = json.optDouble("gainR", 1.0).toFloat(), gainG = json.optDouble("gainG", 1.0).toFloat(), gainB = json.optDouble("gainB", 1.0).toFloat(),
-                offsetR = json.optDouble("offsetR", 0.0).toFloat(), offsetG = json.optDouble("offsetG", 0.0).toFloat(), offsetB = json.optDouble("offsetB", 0.0).toFloat(),
+                liftR = safeFloat(json.optDouble("liftR", 0.0), 0f), liftG = safeFloat(json.optDouble("liftG", 0.0), 0f), liftB = safeFloat(json.optDouble("liftB", 0.0), 0f),
+                gammaR = safeFloat(json.optDouble("gammaR", 1.0), 1f), gammaG = safeFloat(json.optDouble("gammaG", 1.0), 1f), gammaB = safeFloat(json.optDouble("gammaB", 1.0), 1f),
+                gainR = safeFloat(json.optDouble("gainR", 1.0), 1f), gainG = safeFloat(json.optDouble("gainG", 1.0), 1f), gainB = safeFloat(json.optDouble("gainB", 1.0), 1f),
+                offsetR = safeFloat(json.optDouble("offsetR", 0.0), 0f), offsetG = safeFloat(json.optDouble("offsetG", 0.0), 0f), offsetB = safeFloat(json.optDouble("offsetB", 0.0), 0f),
                 lutPath = json.optString("lutPath", "").takeIf { it.isNotEmpty() },
-                lutIntensity = json.optDouble("lutIntensity", 1.0).toFloat(),
+                lutIntensity = safeFloat(json.optDouble("lutIntensity", 1.0), 1f).coerceIn(0f, 1f),
                 colorMatchRef = json.optString("colorMatchRef", "").takeIf { it.isNotEmpty() },
                 curves = json.optJSONObject("curves")?.let { deserializeColorCurves(it) } ?: ColorCurves(),
                 hslQualifier = json.optJSONObject("hsl")?.let { hsl ->
                     HslQualifier(
-                        hueCenter = hsl.optDouble("hueCenter", 0.0).toFloat(),
-                        hueWidth = hsl.optDouble("hueWidth", 30.0).toFloat(),
-                        satMin = hsl.optDouble("satMin", 0.0).toFloat(),
-                        satMax = hsl.optDouble("satMax", 1.0).toFloat(),
-                        lumMin = hsl.optDouble("lumMin", 0.0).toFloat(),
-                        lumMax = hsl.optDouble("lumMax", 1.0).toFloat(),
-                        softness = hsl.optDouble("softness", 0.1).toFloat(),
-                        adjustHue = hsl.optDouble("adjustHue", 0.0).toFloat(),
-                        adjustSat = hsl.optDouble("adjustSat", 0.0).toFloat(),
-                        adjustLum = hsl.optDouble("adjustLum", 0.0).toFloat()
+                        hueCenter = safeFloat(hsl.optDouble("hueCenter", 0.0), 0f),
+                        hueWidth = safeFloat(hsl.optDouble("hueWidth", 30.0), 30f),
+                        satMin = safeFloat(hsl.optDouble("satMin", 0.0), 0f),
+                        satMax = safeFloat(hsl.optDouble("satMax", 1.0), 1f),
+                        lumMin = safeFloat(hsl.optDouble("lumMin", 0.0), 0f),
+                        lumMax = safeFloat(hsl.optDouble("lumMax", 1.0), 1f),
+                        softness = safeFloat(hsl.optDouble("softness", 0.1), 0.1f),
+                        adjustHue = safeFloat(hsl.optDouble("adjustHue", 0.0), 0f),
+                        adjustSat = safeFloat(hsl.optDouble("adjustSat", 0.0), 0f),
+                        adjustLum = safeFloat(hsl.optDouble("adjustLum", 0.0), 0f)
                     )
                 }
             )
@@ -1001,15 +1028,19 @@ data class AutoSaveState(
             return (0 until arr.length()).mapNotNull { i ->
                 try {
                     val pt = arr.getJSONObject(i)
-                    val x = pt.optDouble("x", 0.0).toFloat()
-                    val y = pt.optDouble("y", 0.0).toFloat()
+                    val rawX = pt.optDouble("x", 0.0).toFloat()
+                    val rawY = pt.optDouble("y", 0.0).toFloat()
+                    val x = (if (rawX.isFinite()) rawX else 0f).coerceIn(0f, 1f)
+                    val y = (if (rawY.isFinite()) rawY else 0f).coerceIn(0f, 1f)
+                    // NaN handles silently corrupt the bezier evaluator → clips render black.
+                    // Fall back to the anchor point coords so curves stay usable after recovery.
                     CurvePoint(
-                        x = x.coerceIn(0f, 1f),
-                        y = y.coerceIn(0f, 1f),
-                        handleInX = pt.optDouble("hix", x.toDouble()).toFloat(),
-                        handleInY = pt.optDouble("hiy", y.toDouble()).toFloat(),
-                        handleOutX = pt.optDouble("hox", x.toDouble()).toFloat(),
-                        handleOutY = pt.optDouble("hoy", y.toDouble()).toFloat()
+                        x = x,
+                        y = y,
+                        handleInX = safeFloat(pt.optDouble("hix", x.toDouble()), x).coerceIn(-1f, 2f),
+                        handleInY = safeFloat(pt.optDouble("hiy", y.toDouble()), y).coerceIn(-1f, 2f),
+                        handleOutX = safeFloat(pt.optDouble("hox", x.toDouble()), x).coerceIn(-1f, 2f),
+                        handleOutY = safeFloat(pt.optDouble("hoy", y.toDouble()), y).coerceIn(-1f, 2f)
                     )
                 } catch (e: Exception) { Log.w(TAG, "Failed to deserialize curve point $i", e); null }
             }.takeIf { it.isNotEmpty() }
@@ -1107,6 +1138,12 @@ data class AutoSaveState(
             val rawStart = json.optLong("startTimeMs", 0L).coerceAtLeast(0L)
             val rawEnd = json.optLong("endTimeMs", 0L)
             val endTimeMs = if (rawEnd < rawStart) rawStart + 1000L else rawEnd
+            // Defensive: drop word timings that violate their own monotonicity or escape
+            // the parent caption's window. Whisper output is usually well-formed but a
+            // corrupt recovery file or manually-edited JSON can produce garbage that
+            // breaks the karaoke-highlight renderer (it assumes sorted, in-bounds words).
+            val safeFontSize = safeFloat(json.optDouble("fontSize", 36.0), 36f).coerceAtLeast(1f)
+            val safePositionY = safeFloat(json.optDouble("positionY", 0.85), 0.85f).coerceIn(0f, 1f)
             return Caption(
                 id = json.optString("id", java.util.UUID.randomUUID().toString()),
                 text = json.optString("text", ""),
@@ -1114,8 +1151,8 @@ data class AutoSaveState(
                 endTimeMs = endTimeMs,
                 style = CaptionStyle(
                     type = safeValueOf(json.optString("styleType", "SUBTITLE_BAR"), CaptionStyleType.SUBTITLE_BAR),
-                    fontSize = json.optDouble("fontSize", 36.0).toFloat(),
-                    positionY = json.optDouble("positionY", 0.85).toFloat(),
+                    fontSize = safeFontSize,
+                    positionY = safePositionY,
                     fontFamily = json.optString("fontFamily", "sans-serif-medium"),
                     color = json.optLong("color", 0xFFFFFFFFL),
                     backgroundColor = json.optLong("backgroundColor", 0xCC000000L),
@@ -1123,13 +1160,16 @@ data class AutoSaveState(
                     outline = json.optBoolean("outline", true),
                     shadow = json.optBoolean("shadow", false)
                 ),
-                words = (0 until wordsArr.length()).map { i ->
+                words = (0 until wordsArr.length()).mapNotNull { i ->
                     val w = wordsArr.getJSONObject(i)
+                    val wStart = w.optLong("startTimeMs", 0L).coerceAtLeast(0L)
+                    val wEnd = w.optLong("endTimeMs", wStart).coerceAtLeast(wStart)
+                    if (wStart > endTimeMs) return@mapNotNull null
                     CaptionWord(
                         text = w.optString("text", ""),
-                        startTimeMs = w.optLong("startTimeMs", 0L),
-                        endTimeMs = w.optLong("endTimeMs", 0L),
-                        confidence = w.optDouble("confidence", 1.0).toFloat()
+                        startTimeMs = wStart,
+                        endTimeMs = wEnd.coerceAtMost(endTimeMs),
+                        confidence = safeFloat(w.optDouble("confidence", 1.0), 1f).coerceIn(0f, 1f)
                     )
                 }
             )
