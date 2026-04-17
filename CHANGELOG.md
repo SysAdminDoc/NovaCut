@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.44.0 — Audit Phase 16: Persistence NaN Guards, GIF Overflow, Export Races
+
+### Persistence hardening
+- **ColorGrade / HslQualifier NaN propagation** ([ProjectAutoSave.kt#L962](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L962)) — All 22 `liftR/G/B`, `gammaR/G/B`, `gainR/G/B`, `offsetR/G/B`, `lutIntensity`, and the 10 HSL qualifier fields called `.toFloat()` on raw `optDouble` values. A compromised recovery file or manually-edited JSON with `NaN`/`Infinity` propagated directly into the color matrix, turning the entire clip black on playback and export (RgbMatrix multiplies NaN across every channel). New `safeFloat()` helper coerces each field to its identity default when non-finite, plus `lutIntensity` clamped to `[0,1]`. Same pattern applied to `CurvePoint` bezier handles (were previously trusted raw, corrupting color curves on bad input).
+- **ImageOverlay `require(startTimeMs < endTimeMs)` dropped overlay on recovery** ([ProjectAutoSave.kt#L309](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L309)) — Corrupt JSON with equal or inverted time bounds threw in the constructor, the try/catch silently swallowed the exception, and the whole overlay vanished — silent data loss on every recovery cycle. Now coerces `endTimeMs = max(startTimeMs + 1, rawEnd)` before constructing, with `isFinite()` guards on `positionX/Y`, `scale`, `rotation`, `opacity` so NaN coordinates can't corrupt placement math.
+- **DrawingPath NaN coordinates break Compose Canvas** ([ProjectAutoSave.kt#L346](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L346)) — A single non-finite `x` or `y` in a drawing path caused `drawPath` to silently abort rendering for the entire drawing layer (every subsequent path invisible). Now filters non-finite points per path, rejects paths with <2 remaining points, and clamps `strokeWidth` to `[0.5, 64]dp`.
+- **Caption word timings escaped caption bounds** ([ProjectAutoSave.kt#L1105](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L1105)) — `CaptionWord.endTimeMs > Caption.endTimeMs` silently broke the karaoke-highlight renderer which assumes sorted, in-bounds words. Now filters words that start past the caption window and clamps `endTimeMs` to the caption's end. `CaptionStyle.fontSize` / `positionY` get NaN guards plus `positionY ∈ [0,1]`.
+- **copyAutoSave read/write race** ([ProjectAutoSave.kt#L109](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L109)) — `saveMutex` was released between reading the source JSON and writing the renamed copy. A concurrent auto-save of the source project during that gap let the duplicate capture stale data (source would have newer edits than the "duplicate"). Now holds the mutex across the full read→mutate→write sequence.
+
+### Export
+- **GIF export frame-count `toInt()` truncation** ([ExportDelegate.kt#L109](app/src/main/java/com/novacut/editor/ui/editor/ExportDelegate.kt#L109)) — `(totalDurationMs / frameIntervalMs).toInt().coerceIn(1, 300)` narrowed to `Int` before clamping. A pathologically long `totalDurationMs` (duration-math bug or corrupt state) divided by a 1 ms interval exceeded `Int.MAX_VALUE`, `.toInt()` wrapped negative, and `coerceIn` then clamped to 1 — silently skipping export instead of capping at 300 frames. Now clamps in `Long` space before narrowing: `.coerceIn(1L, 300L).toInt()`.
+
+### Diagnostics
+- **ProjectAutoSave.release() silently swallowed temp-file sweep failures** ([ProjectAutoSave.kt#L138](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L138)) — Added `onFailure { Log.w(...) }` so an I/O or permission fault during orphan cleanup is surfaced in logcat rather than silently accumulating `.tmp` files across process lifetimes.
+
 ## v3.43.0 — Audit Phase 15: Version Drift, FCPXML Rounding, Lottie GL Safety
 
 ### Build integrity
