@@ -74,8 +74,11 @@ object AudioEffectsEngine {
     }
 
     private fun lowPassCoeffs(sampleRate: Int, frequency: Float, q: Float): BiquadCoeffs {
+        // Q <= 0 would produce alpha = ±Infinity and poison every coefficient with NaN,
+        // which the IIR state machine then feeds into itself forever — whole track becomes silence/garbage.
+        val safeQ = q.coerceAtLeast(0.01f)
         val w0 = 2f * PI.toFloat() * frequency / sampleRate
-        val alpha = sin(w0) / (2f * q)
+        val alpha = sin(w0) / (2f * safeQ)
         val cosW0 = cos(w0)
         val a0 = 1f + alpha
         return BiquadCoeffs(
@@ -88,8 +91,9 @@ object AudioEffectsEngine {
     }
 
     private fun highPassCoeffs(sampleRate: Int, frequency: Float, q: Float): BiquadCoeffs {
+        val safeQ = q.coerceAtLeast(0.01f)
         val w0 = 2f * PI.toFloat() * frequency / sampleRate
-        val alpha = sin(w0) / (2f * q)
+        val alpha = sin(w0) / (2f * safeQ)
         val cosW0 = cos(w0)
         val a0 = 1f + alpha
         return BiquadCoeffs(
@@ -131,9 +135,10 @@ object AudioEffectsEngine {
     }
 
     private fun peakEqCoeffs(sampleRate: Int, frequency: Float, gain: Float, q: Float): BiquadCoeffs {
+        val safeQ = q.coerceAtLeast(0.01f)
         val a = 10f.pow(gain / 40f)
         val w0 = 2f * PI.toFloat() * frequency / sampleRate
-        val alpha = sin(w0) / (2f * q)
+        val alpha = sin(w0) / (2f * safeQ)
         val cosW0 = cos(w0)
         val a0 = 1f + alpha / a
         return BiquadCoeffs(

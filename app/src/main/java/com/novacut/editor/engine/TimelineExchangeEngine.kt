@@ -546,7 +546,11 @@ class TimelineExchangeEngine @Inject constructor(
     }
 
     private fun msToFcpxmlTime(ms: Long, frameRate: Int): String {
-        val frames = (ms * frameRate) / 1000
+        // Round-to-nearest so a 33 ms offset at 30 fps lands on frame 1, not frame 0.
+        // Truncation accumulates into visible drift on long exports round-tripped through
+        // Final Cut Pro / DaVinci Resolve — symmetric with msToFrames above.
+        if (frameRate <= 0) return "0/30s"
+        val frames = (ms * frameRate + 500L) / 1000L
         return "${frames}/${frameRate}s"
     }
 }

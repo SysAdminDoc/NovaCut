@@ -153,9 +153,19 @@ data class Clip(
             var sumReciprocal = 0f
             for (i in 0 until samples) {
                 val t = i.toLong() * trimRange / samples
-                sumReciprocal += 1f / speedCurve.getSpeedAt(t, trimRange).coerceAtLeast(0.01f)
+                // getSpeedAt can return NaN if the curve has NaN handles (corrupt save);
+                // NaN.coerceAtLeast(x) stays NaN (comparisons against NaN are false),
+                // so guard explicitly before the reciprocal — otherwise the entire duration
+                // goes to 0 silently and the clip disappears from the timeline.
+                val s = speedCurve.getSpeedAt(t, trimRange)
+                val safeS = if (s.isFinite()) s.coerceAtLeast(0.01f) else 1f
+                sumReciprocal += 1f / safeS
             }
-            (samples / sumReciprocal).coerceAtLeast(0.01f)
+            if (sumReciprocal.isFinite() && sumReciprocal > 0f) {
+                (samples / sumReciprocal).coerceAtLeast(0.01f)
+            } else {
+                speed.coerceAtLeast(0.01f)
+            }
         } else {
             speed.coerceAtLeast(0.01f)
         }

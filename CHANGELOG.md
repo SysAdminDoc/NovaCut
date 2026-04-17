@@ -1,5 +1,99 @@
 # Changelog
 
+## v3.43.0 — Audit Phase 15: Version Drift, FCPXML Rounding, Lottie GL Safety
+
+### Build integrity
+- **`NovaCutApp.VERSION` drifted three releases** ([NovaCutApp.kt#L24](app/src/main/java/com/novacut/editor/NovaCutApp.kt#L24)) — The `VERSION` constant was hard-coded to `"v3.39.0"` while the gradle `versionName` was `"3.42.0"`. Model downloads advertised the stale version in their `User-Agent`, the about dialog misreported the build, and any future crash-reporting integration would have mis-tagged reports. Now sourced from `BuildConfig.VERSION_NAME` so it can't drift again; added `buildConfig = true` to `buildFeatures` to enable the generated field.
+
+### FCPXML / OTIO round-trip
+- **`msToFcpxmlTime` truncation drift** ([TimelineExchangeEngine.kt#L548](app/src/main/java/com/novacut/editor/engine/TimelineExchangeEngine.kt#L548)) — The sibling `msToFrames` / `framesToMs` helpers were already using round-to-nearest (fixed in phase 9), but the FCPXML-specific `msToFcpxmlTime` still truncated, so a 33 ms offset at 30 fps emitted `0/30s` instead of `1/30s`. Cumulative drift on a long timeline misaligned clip offsets and asset start/duration when round-tripped through Final Cut Pro or DaVinci Resolve. Now symmetric with the other two: `(ms * frameRate + 500L) / 1000L`, plus a `frameRate <= 0` guard that emits a safe fallback token instead of a divide.
+
+### GL resource safety
+- **Lottie texture upload bitmap leak on GL exception** ([LottieTemplateEngine.kt#L138](app/src/main/java/com/novacut/editor/engine/LottieTemplateEngine.kt#L138)) — `renderFrameToTexture` only recycled its bitmap on the happy path and on the `glGenTextures == 0` guard. If `GLUtils.texImage2D` threw (OOM, context lost, bad format), both the bitmap and the freshly-generated texture ID leaked. Animated-title exports push tens of bitmaps per second through this function; one bad frame per export would still be fine, but any repeated driver failure cascaded into a visible OOM. Now wrapped in try/catch that deletes the texture and recycles the bitmap before re-throwing.
+
+### Audit findings verified as already-correct (false positives this round)
+- **TimelineExchangeEngine other timecode math** — `msToFrames` / `framesToMs` already use the rounding form with `frameRate <= 0` guards from phase 9.
+- **FirstRunTutorial `tutorialStepDefs[step]` out-of-bounds** — `currentStep++` only runs when `!isLastStep`, so the index stays in `0..size-1` for a hard-coded non-empty list. Safe.
+- **RenderPreviewSheet ratio divide** — The `if (summary.totalDurationMs > 0L)` guard already wraps the divide; `segments.isEmpty()` doesn't influence the computation.
+- **SnapshotHistoryPanel `SimpleDateFormat` thread-safety** — The `remember`-d formatter is only consumed from the composable's recompose pass, which runs on the main thread; it never crosses to a background coroutine.
+- **`-dontwarn org.bouncycastle.**` "unused dependency"** — OkHttp references bouncycastle / conscrypt / openjsse as *optional* TLS providers; the warning suppression is needed at link-time even though the classes aren't packaged.
+- **EffectShareEngine LUT filename collision** — Effect exports intentionally reference LUTs by filename only (they don't embed the binary); cross-project namespacing would break the whole sharing feature. Documented as a known limitation of the export format.
+
+## v3.42.0 — Audit Phase 14: Speed Curve NaN, Deserialization Bounds, Graph Cycles, Flow Churn
+
+### Speed curve math
+- **NaN in harmonic mean → zero-duration clip** ([Project.kt#L143](app/src/main/java/com/novacut/editor/model/Project.kt#L143)) — `coerceAtLeast(0.01f)` preserves NaN (comparisons with NaN are false, so the branch that would clamp never fires), so one NaN speed sample poisoned `sumReciprocal`, the harmonic mean returned NaN, and `Clip.durationMs` silently collapsed to 0 — the clip disappeared from the timeline with no error surface. Now explicitly checks `isFinite()` on both the per-sample speed and the final `sumReciprocal` and falls back to the static `speed` field.
+
+### Deserialization hardening
+- **SpeedCurve control-point bounds** ([ProjectAutoSave.kt#L1002](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt#L1002)) — The auto-save parser accepted any `Double` for `position`/`speed`/`handleInY`/`handleOutY`. A corrupted file with `speed = -0.5` or `position = 5.0` passed straight into bezier evaluation and the harmonic-mean divide. Now all four fields are `isFinite()`-checked and clamped to sensible ranges (`position ∈ [0,1]`, speeds ∈ `[0.01, 100]`), matching the UI-side invariants.
+- **Self-referencing `linkedClipId`** ([ProjectAutoSave.kt](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt)) — The orphaned-reference cleanup on load checked `linkedClipId !in allClipIds` but not `linkedClipId == clip.id`. A clip linking to itself would create an infinite loop in any traversal that followed the chain (slip-link propagation, group moves). Now both conditions null the link.
+- **Compound clip serialization cycle** ([ProjectAutoSave.kt](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt)) — `serializeClip` recursed into `clip.compoundClips` without a depth guard. A corrupted graph where a compound clip eventually cycled back to itself would `StackOverflowError` the whole auto-save coroutine (and every subsequent save, since the state stays corrupted). Added a depth counter (limit 8) that emits a shallow representation and a WARN log above the threshold.
+
+### Data layer performance
+- **Project list Flow re-emits on unrelated updates** ([ProjectListViewModel.kt](app/src/main/java/com/novacut/editor/ui/projects/ProjectListViewModel.kt)) — Room's `Flow<List<Project>>` emits on every write to the `projects` table, even when the query result is bit-identical. The downstream combined flow then forced the grid (and every project card, each with a `VideoFrameDecoder` render) to recompose. Added `.distinctUntilChanged()` on the DAO flow upstream of the combine.
+
+### Settings robustness
+- **SettingsRepository over-broad catches** ([SettingsRepository.kt#L78](app/src/main/java/com/novacut/editor/engine/SettingsRepository.kt#L78)) — Three `enumValueOf` sites caught `Exception`, which masks real defects (OOM wrapped errors, reflection failures). Narrowed to `IllegalArgumentException`, matching the style already used in the write path.
+
+### Audit findings verified as already-correct (false positives this round)
+- **`settings_show_waveforms_desc` / `settings_snap_beat_desc` / `settings_snap_markers_desc` missing** — All three (and the default-track-height description) are defined in `strings.xml:1131-1138`. `R` references resolve.
+- **`Project.aspectRatio` / `frameRate` / `resolution` not serialized** — These fields live on the Room `@Entity Project`, not on `AutoSaveState`. They're persisted by Room's `projectDao.updateProject()` call path; the auto-save JSON is deliberately scoped to track/clip/overlay state.
+- **`KeyframeEngine` Newton-Raphson slope = 0** — The `if (abs(currentSlope) < 1e-5f) break` line comes **before** the division that would produce `Inf`, not after. No divide-by-zero possible.
+- **`evaluateCubicBezierTime` return > 1** — The function exposes `cp1y/cp2y.coerceIn(-1f, 2f)` on purpose for spring/back easing overshoot; clamping here would remove a feature, not fix a bug.
+- **`AudioEngine.extractWaveform` "silent audio renders at max height"** — `maxAmplitude` starts at `1f` and is only overwritten when a sample exceeds it; for all-zero PCM the normalization is `0f / 1f = 0f`, not `1f`. Agent misread the init.
+- **`Caption.endTimeMs` silent repair** — The auto-fix-on-invert behavior is correct; losing a caption because one bad `endTimeMs` is worse than nudging it. Not worth adding noise-level logging for.
+
+## v3.41.0 — Audit Phase 13: GL Hardening, Shader Input Bounds, Volume Envelope Safety
+
+### GL / Shader pipeline
+- **LUT intensity NaN poisoning** ([LutEngine.kt](app/src/main/java/com/novacut/editor/engine/LutEngine.kt)) — `LutGlEffect` accepted any `Float` for `intensity` and fed it directly to `glUniform1f`. A NaN intensity (from a corrupted keyframe, a divide-by-zero in the UI slider path, etc.) poisons the `mix(original, graded, uIntensity)` step in the shader and produces NaN pixels across the entire frame. Now clamped to `[0, 1]` with a finite-check fallback at the engine boundary.
+- **LUT 3D texture exceeds device capability** ([LutEngine.kt](app/src/main/java/com/novacut/editor/engine/LutEngine.kt)) — Parser caps LUT size at 256, but GLES 3.0 only guarantees `GL_MAX_3D_TEXTURE_SIZE >= 256`. Some lower-tier GPUs report smaller values; `glTexImage3D` then silently fails and `drawFrame` draws black frames with no error surface. Now queries `GL_MAX_3D_TEXTURE_SIZE` at setup and throws a clear `RuntimeException` if the LUT won't fit, letting the error bubble to the UI with a usable message.
+- **Segmentation mask texture never initialized** ([SegmentationGlEffect.kt](app/src/main/java/com/novacut/editor/engine/segmentation/SegmentationGlEffect.kt)) — `setupGl()` generated the mask texture handle but never defined its storage. On drivers that require `glTexImage2D` to mark a texture "complete", the first frame's sampler read returned zero (fully masked-out / black output) or hard-failed the draw entirely. Now seeded with a 1×1 `R8` opaque pixel and configured with linear + clamp-to-edge so the first frame is safe regardless of how fast or slow ML inference arrives.
+- **Chroma key input bounds** ([ShaderEffect.kt](app/src/main/java/com/novacut/editor/engine/ShaderEffect.kt)) — `smoothstep(uThreshold, uThreshold + uSmoothing, dist)` with `uSmoothing == 0` has undefined GLSL behavior (edge0 == edge1) and produces NaN alpha on some drivers. Also clamped `uKeyR/G/B`, `uThreshold`, `uSpill` to `[0, 1]` — out-of-range RGB values were producing wild keying results when a param slider overshot during a fast drag.
+
+### Timeline
+- **Volume envelope divide-by-zero on zero-duration clip** ([Timeline.kt:1046](app/src/main/java/com/novacut/editor/ui/editor/Timeline.kt#L1046)) — The audio volume envelope path renderer gated on `volumeKfs.size >= 2` but not on `clip.durationMs > 0`. A pathological zero-duration audio clip (possible via rapid trim collision) then hit `kf.timeOffsetMs.toFloat() / clip.durationMs` = `Infinity`, and `drawCircle(... Offset(Infinity, ...))` ANR'd the render thread on some devices. Now guards both conditions.
+
+### Stub engine defensive tightening
+- **SmartReframeEngine EMA divergence** ([SmartReframeEngine.kt](app/src/main/java/com/novacut/editor/engine/SmartReframeEngine.kt)) — `smoothCropTrajectory` accepted any `alpha`. An `alpha > 1` overshoots the target and produces an oscillating/divergent EMA, and `NaN` corrupts every subsequent element via the feedback term. Now coerced to `[0, 1]` with NaN fallback to 0.08, and the single-element edge case is returned unchanged (previously it allocated a new list pointlessly).
+
+### Audit findings verified as already-correct (false positives this round)
+- **ChromaKey shader division-by-zero on `uSpill = 0`** — The shader uses `max(r, b) * (1.0 - uSpill * 0.5)` (multiplicative), not division. No DBZ path exists.
+- **WhisperEngine encoder/decoder tensor leak on empty output** — `runEncoder` and `runDecoder` use `firstOrNull()?.value as? OnnxTensor`, not `first()`, and both have `finally` blocks that close `results`/`inputTensor`/`idTensor`. No leak.
+- **VideoEngine `SpeedProvider` boundary math** — `coerceIn(0.1f, 100f)` is applied to the *returned* value, which is the correct place; the callee's curve evaluation result cannot escape the clamp.
+- **MainActivity intent scheme validation** — Already restricted to `content://` + `video/*` MIME + `openAssetFileDescriptor` read-test in try/catch. Authority whitelisting would reject legitimate third-party content providers (MediaStore URIs come from system providers, not the app).
+- **Volume keyframe dot at `clip.keyframes` path** — Already guarded by `if (clipDuration <= 0) return@Canvas` above the divide.
+- **`Clip` min-duration invariant** — `require(trimEndMs >= trimStartMs)` permits equality by design; the UI layer enforces the practical 100 ms floor in trim handlers, which is the right layer for that policy (lets non-visual markers / audio cue clips exist).
+- **TapSegmentEngine confidence bounds** — Data class is only constructed by unimplemented stub paths; adding `require()` here would throw at runtime if a future backend produced a `0.99999999` edge value due to float drift. Deferred until the engine is wired.
+
+## v3.40.0 — Audit Phase 12: Export Progress, GIF Safety, AI Job Race, DSP NaN Guards
+
+### Export pipeline
+- **Export progress notification stuck between runs** ([ExportService.kt](app/src/main/java/com/novacut/editor/engine/ExportService.kt)) — `lastNotifiedProgress` persisted across exports, so the throttle `progress - lastNotifiedProgress < 2` silently dropped every update from the second export until it caught up past the previous run's value. The progress bar sat frozen at 99% for the entire second export. Now reset on each `startObservingExport()`, and the throttle is one-sided so backward jumps always publish.
+- **GIF export zero-height crash** ([ExportDelegate.kt#L120](app/src/main/java/com/novacut/editor/ui/editor/ExportDelegate.kt#L120)) — `createScaledBitmap(bitmap, maxWidth, 0, true)` throws `IllegalArgumentException` and aborts the whole GIF export on any frame where `bitmap.height * ratio` rounded to `0` (very short source videos or 1-pixel-tall thumbnails). Now bitmaps are skipped when width/height is ≤ 0, and the computed height is floored at 1.
+- **ExportTextOverlay NaN poisoning** ([ExportTextOverlay.kt](app/src/main/java/com/novacut/editor/engine/ExportTextOverlay.kt)) — A corrupted keyframe feeding `NaN` into `positionX/Y/scale/rotation` would produce a NaN-poisoned transform matrix that the GL pipeline rejects mid-export with an opaque "framework error". Added `isFinite` guard that silently parks the overlay off-screen for one frame rather than aborting the render.
+- **ExportSheet blank error body** ([ExportSheet.kt#L295](app/src/main/java/com/novacut/editor/ui/export/ExportSheet.kt#L295)) — An empty-string `errorMessage` (non-null but blank) rendered the error card with a missing body. Now falls back to the localized generic error when blank.
+
+### ViewModel / state correctness
+- **AI tool cancellation race** ([AiToolsDelegate.kt](app/src/main/java/com/novacut/editor/ui/editor/AiToolsDelegate.kt)) — Tapping a second AI tool while another was running published the new `aiProcessingTool` state **before** cancelling the old job; the old job's `finally` block then fired asynchronously and cleared the state to `null`, hiding the progress indicator for the active tool. Now cancels the previous job first, and the `finally` only clears state when it is still the active job.
+- **detectBeats missing undo** ([AudioMixerDelegate.kt](app/src/main/java/com/novacut/editor/ui/editor/AudioMixerDelegate.kt)) — Auto beat detection replaced manually-tapped beat markers without saving undo state, so a user who ran auto-detect to "check" results and got bad ones had no way back. Now records undo before the destructive replacement.
+
+### DSP correctness
+- **Biquad Q → NaN** ([AudioEffectsEngine.kt](app/src/main/java/com/novacut/editor/engine/AudioEffectsEngine.kt)) — `lowPassCoeffs` / `highPassCoeffs` / `peakEqCoeffs` divide `sin(w0) / (2 * q)`; a `q == 0` slider value (or corrupted parameter) produced `alpha = ±Infinity`, which poisoned every coefficient with NaN and — because the IIR state machine feeds outputs back into itself — permanently corrupted every subsequent sample for the rest of the buffer. Q now floored at `0.01f` at the coefficient source.
+- **LoudnessEngine short-clip short-term max** ([LoudnessEngine.kt](app/src/main/java/com/novacut/editor/engine/LoudnessEngine.kt)) — For clips shorter than ~3 seconds we have fewer than 8 loudness blocks; the `for (i in 0..size - 8)` loop then iterates over an empty range (negative upper bound becomes an empty `IntRange`), leaving `shortTermMaxLufs = -70f` regardless of actual loudness. Voiceovers and SFX showed up as silent in the loudness meter. Now falls back to `momentaryMax` when there aren't enough blocks for the 3 s window. Also coerced `sampleRate` in the K-weighting filter so a corrupt `sampleRate = 0` can't produce `Infinity/NaN` filter state.
+
+### Persistence hygiene
+- **Auto-save temp file orphans** ([ProjectAutoSave.kt](app/src/main/java/com/novacut/editor/engine/ProjectAutoSave.kt)) — `release()` cancelled the save scope but didn't sweep any `.tmp` files left by interrupted writes; across many app lifetimes these can accumulate in `filesDir/autosave/`. Now `release()` sweeps `*.tmp` after cancelling the scope.
+
+### Audit findings verified as already-correct (false positives this round)
+- **PreviewPanel `DisposableEffect` null player** — `VideoEngine.getPlayer()` returns a non-nullable `ExoPlayer` that is lazily instantiated; `addListener(listener)` cannot receive null.
+- **`EditorViewModel.setClipLabel` undefined `rebuildTimeline()`** — `rebuildTimeline()` exists on the ViewModel as a thin alias for `rebuildPlayerTimeline()`; no missing symbol.
+- **`ColorGradingDelegate.setClipLut` undo-before-null-check** — `saveUndoState` is already called **after** the `getSelectedClip() ?: return` guard.
+- **`ExportService` `lastNotifiedProgress` non-volatile** — The collect pipeline is pinned to `Dispatchers.Main.immediate` and `updateProgress` runs only from that flow, so the field is single-threaded.
+- **`VoiceoverRecorderEngine` state race** — `startRecording` / `stopRecording` / `release` are all `@Synchronized`.
+- **`HttpURLConnection.disconnect()` missing in download engines** — All three (Whisper, Segmentation, Inpainting) already call `disconnect()` in `finally` from prior audit phases.
+- **ProjectAutoSave `beatMarkers` round-trip data loss** — Omitting the field on empty and defaulting to empty on read is symmetric; non-empty lists are always written and read back faithfully.
+
 ## v3.39.0 — Audit Phase 11: Speed Curve Duration Math, Snap Threshold Floor, Tool Grid Recomposition
 
 ### Math correctness

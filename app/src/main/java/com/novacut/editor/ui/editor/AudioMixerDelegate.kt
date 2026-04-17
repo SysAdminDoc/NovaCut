@@ -124,6 +124,9 @@ class AudioMixerDelegate(
             return
         }
         val sourceUri = audioClips.first().sourceUri
+        // Record undo state before the destructive replacement of beatMarkers so users can
+        // recover their previous (e.g. manually-tapped) markers if auto-detect gives bad results.
+        saveUndoState("Detect beats")
         scope.launch {
             stateFlow.update { it.copy(isAnalyzingBeats = true) }
             showToast("Detecting beats...")

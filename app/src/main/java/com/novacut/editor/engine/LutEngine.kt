@@ -130,8 +130,12 @@ object LutEngine {
 @UnstableApi
 private class LutGlEffect(
     private val lut: LutEngine.Lut3D,
-    private val intensity: Float
+    intensity: Float
 ) : GlEffect {
+    // NaN / out-of-range intensity poisons the uniform (NaN blend) and produces
+    // undefined colors across the frame; clamp at the edge of the engine.
+    private val intensity: Float = if (intensity.isFinite()) intensity.coerceIn(0f, 1f) else 1f
+
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram {
         return LutShaderProgram(lut, intensity, useHdr)
     }
@@ -221,6 +225,15 @@ private class LutShaderProgram(
         GLES30.glEnableVertexAttribArray(t)
         GLES30.glVertexAttribPointer(t, 2, GLES30.GL_FLOAT, false, 16, 8)
         GLES30.glBindVertexArray(0)
+
+        // GLES 3.0 only guarantees GL_MAX_3D_TEXTURE_SIZE >= 256, but some low-tier GPUs
+        // report smaller values. Failing glTexImage3D leaves lutTexture unbacked, which on
+        // draw manifests as black output rather than a clear error — bail early instead.
+        val maxSize = IntArray(1)
+        GLES30.glGetIntegerv(GLES30.GL_MAX_3D_TEXTURE_SIZE, maxSize, 0)
+        if (maxSize[0] > 0 && lut.size > maxSize[0]) {
+            throw RuntimeException("LUT size ${lut.size} exceeds device GL_MAX_3D_TEXTURE_SIZE ${maxSize[0]}")
+        }
 
         // Upload 3D LUT texture
         val texIds = IntArray(1)

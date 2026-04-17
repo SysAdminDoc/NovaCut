@@ -76,11 +76,11 @@ class SettingsRepository @Inject constructor(
         .map { prefs ->
             AppSettings(
                 defaultResolution = prefs[Keys.RESOLUTION]?.let {
-                    try { Resolution.valueOf(it) } catch (_: Exception) { null }
+                    try { Resolution.valueOf(it) } catch (_: IllegalArgumentException) { null }
                 } ?: Resolution.FHD_1080P,
                 defaultFrameRate = (prefs[Keys.FRAME_RATE] ?: 30).coerceIn(1, 120),
                 defaultAspectRatio = prefs[Keys.ASPECT_RATIO]?.let {
-                    try { AspectRatio.valueOf(it) } catch (_: Exception) { null }
+                    try { AspectRatio.valueOf(it) } catch (_: IllegalArgumentException) { null }
                 } ?: AspectRatio.RATIO_16_9,
                 defaultCodec = prefs[Keys.DEFAULT_CODEC]
                     ?.takeIf { codec -> runCatching { VideoCodec.valueOf(codec) }.isSuccess }
@@ -89,7 +89,7 @@ class SettingsRepository @Inject constructor(
                 autoSaveEnabled = prefs[Keys.AUTO_SAVE] ?: true,
                 autoSaveIntervalSec = (prefs[Keys.AUTO_SAVE_INTERVAL] ?: 60).coerceIn(15, 300),
                 proxyResolution = prefs[Keys.PROXY_RES]?.let {
-                    try { ProxyResolution.valueOf(it) } catch (_: Exception) { null }
+                    try { ProxyResolution.valueOf(it) } catch (_: IllegalArgumentException) { null }
                 } ?: ProxyResolution.QUARTER,
                 editorMode = prefs[Keys.EDITOR_MODE]
                     ?.takeIf { it == "Easy" || it == "Pro" }

@@ -69,6 +69,10 @@ class ExportService : Service() {
 
     private fun startObservingExport() {
         observeJob?.cancel()
+        // Reset progress tracker so a new export doesn't inherit the previous run's value
+        // (without this, a second export starts at progress 0 but the update gate
+        // `progress - lastNotifiedProgress < 2` skips until progress catches up to 99+).
+        lastNotifiedProgress = -1
         observeJob = serviceScope.launch {
             combine(
                 videoEngine.exportProgress,
@@ -95,7 +99,8 @@ class ExportService : Service() {
     }
 
     private fun updateProgress(progress: Int) {
-        if (progress - lastNotifiedProgress < 2 && progress < 100) return
+        // Allow backward jumps (new export started); only throttle forward creep.
+        if (progress > lastNotifiedProgress && progress - lastNotifiedProgress < 2 && progress < 100) return
         lastNotifiedProgress = progress
         val nm = getSystemService(NotificationManager::class.java) ?: return
         nm.notify(NOTIFICATION_ID, buildNotification(progress))

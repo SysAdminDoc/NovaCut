@@ -116,15 +116,20 @@ class ExportDelegate(
                         val clip = allClips.lastOrNull { it.timelineStartMs <= timeMs } ?: continue
                         val clipTimeUs = (((timeMs - clip.timelineStartMs) * clip.speed).toLong() + clip.trimStartMs) * 1000
                         val bitmap = videoEngine.extractThumbnail(clip.sourceUri, clipTimeUs)
-                        if (bitmap != null) {
+                        if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
                             val scaled = if (bitmap.width > maxWidth) {
                                 val ratio = maxWidth.toFloat() / bitmap.width
-                                val h = (bitmap.height * ratio).toInt()
+                                // Clamp height to >= 1 — createScaledBitmap throws IllegalArgumentException
+                                // on zero/negative dimensions, which would abort the entire GIF export
+                                // on any single-pixel-tall source frame.
+                                val h = (bitmap.height * ratio).toInt().coerceAtLeast(1)
                                 android.graphics.Bitmap.createScaledBitmap(bitmap, maxWidth, h, true).also {
                                     if (it !== bitmap) bitmap.recycle()
                                 }
                             } else bitmap
                             frames.add(scaled)
+                        } else {
+                            bitmap?.recycle()
                         }
                         stateFlow.update { it.copy(exportProgress = (i + 1).toFloat() / frameCount * 0.9f) }
                     }

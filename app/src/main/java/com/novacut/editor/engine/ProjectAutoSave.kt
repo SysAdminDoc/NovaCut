@@ -133,6 +133,11 @@ class ProjectAutoSave @Inject constructor(
         // This is safe because saveState() is idempotent — an incomplete write
         // leaves only a .tmp file which loadRecoveryData() cleans up on next launch.
         scope.cancel()
+        // Sweep any leftover .tmp files from interrupted saves so the autosave directory
+        // doesn't accumulate orphans across process lifetimes (filesDir has quota pressure).
+        runCatching {
+            autoSaveDir.listFiles { f -> f.isFile && f.name.endsWith(".tmp") }?.forEach { it.delete() }
+        }
     }
 
     private suspend fun saveState(projectId: String, state: AutoSaveState) = saveMutex.withLock {
@@ -279,11 +284,14 @@ data class AutoSaveState(
                 Log.w(TAG, "Auto-save written by newer format ($fileVersion > $FORMAT_VERSION); attempting best-effort load")
             }
             val tracks = deserializeTracks(json.optJSONArray("tracks") ?: JSONArray())
-            // Clean up orphaned linkedClipId references
+            // Clean up orphaned linkedClipId references, and break any self-reference —
+            // a clip linked to itself would produce an infinite loop in any traversal
+            // that follows the chain (e.g. slip-link propagation, group moves).
             val allClipIds = tracks.flatMap { it.clips.map { c -> c.id } }.toSet()
             val cleanedTracks = tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
-                    if (clip.linkedClipId != null && clip.linkedClipId !in allClipIds) {
+                    val linked = clip.linkedClipId
+                    if (linked != null && (linked !in allClipIds || linked == clip.id)) {
                         clip.copy(linkedClipId = null)
                     } else clip
                 })
@@ -406,7 +414,20 @@ data class AutoSaveState(
             }
         }
 
-        private fun serializeClip(clip: Clip): JSONObject {
+        private fun serializeClip(clip: Clip, depth: Int = 0): JSONObject {
+            // Cycles in compoundClips would otherwise stack-overflow here. Depth 8 covers
+            // any realistic nesting a user could construct (picture-in-picture-in-pip etc.);
+            // beyond that something is wrong with the graph.
+            if (depth > 8) {
+                Log.w(TAG, "serializeClip: compound nesting depth exceeded for ${clip.id}; truncating")
+                return JSONObject().apply {
+                    put("id", clip.id)
+                    put("sourceUri", clip.sourceUri.toString())
+                    put("sourceDurationMs", clip.sourceDurationMs)
+                    put("trimStartMs", clip.trimStartMs)
+                    put("trimEndMs", clip.trimEndMs)
+                }
+            }
             return JSONObject().apply {
                 put("id", clip.id)
                 put("sourceUri", clip.sourceUri.toString())
@@ -431,7 +452,7 @@ data class AutoSaveState(
                 put("isCompound", clip.isCompound)
                 if (clip.isCompound && clip.compoundClips.isNotEmpty()) {
                     put("compoundClips", JSONArray().apply {
-                        clip.compoundClips.forEach { put(serializeClip(it)) }
+                        clip.compoundClips.forEach { put(serializeClip(it, depth + 1)) }
                     })
                 }
                 clip.linkedClipId?.let { put("linkedClipId", it) }
@@ -996,13 +1017,24 @@ data class AutoSaveState(
 
         private fun deserializeSpeedCurve(json: JSONObject): SpeedCurve {
             val pointsArr = json.optJSONArray("points") ?: JSONArray()
+            // Corrupted control points (speed<=0, position outside [0,1], NaN handles) feed
+            // directly into the harmonic-mean duration math and the bezier evaluator — clamp
+            // at the edge so downstream callers can trust the data.
             val points = (0 until pointsArr.length()).map { i ->
                 val pt = pointsArr.getJSONObject(i)
+                val rawSpeed = pt.optDouble("speed", 1.0).toFloat()
+                val speed = if (rawSpeed.isFinite()) rawSpeed.coerceIn(0.01f, 100f) else 1f
+                val rawPosition = pt.optDouble("position", 0.0).toFloat()
+                val position = if (rawPosition.isFinite()) rawPosition.coerceIn(0f, 1f) else 0f
+                val rawInY = pt.optDouble("handleInY", pt.optDouble("speed", 1.0)).toFloat()
+                val handleInY = if (rawInY.isFinite()) rawInY.coerceIn(0.01f, 100f) else speed
+                val rawOutY = pt.optDouble("handleOutY", pt.optDouble("speed", 1.0)).toFloat()
+                val handleOutY = if (rawOutY.isFinite()) rawOutY.coerceIn(0.01f, 100f) else speed
                 SpeedPoint(
-                    position = pt.optDouble("position", 0.0).toFloat(),
-                    speed = pt.optDouble("speed", 1.0).toFloat(),
-                    handleInY = pt.optDouble("handleInY", pt.optDouble("speed", 1.0)).toFloat(),
-                    handleOutY = pt.optDouble("handleOutY", pt.optDouble("speed", 1.0)).toFloat()
+                    position = position,
+                    speed = speed,
+                    handleInY = handleInY,
+                    handleOutY = handleOutY
                 )
             }
             return SpeedCurve(points.ifEmpty { listOf(SpeedPoint(0f, 1f), SpeedPoint(1f, 1f)) })

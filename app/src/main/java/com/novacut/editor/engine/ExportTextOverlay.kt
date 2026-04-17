@@ -97,12 +97,7 @@ internal class ExportTextOverlay(
     override fun getVertexTransformation(presentationTimeUs: Long): FloatArray {
         val timeMs = presentationTimeUs / 1000L
         if (timeMs < relStartMs || timeMs > relEndMs) {
-            return floatArrayOf(
-                0f, 0f, 0f, 0f,
-                0f, 0f, 0f, 0f,
-                0f, 0f, 1f, 0f,
-                0f, 0f, 0f, 1f
-            )
+            return offscreenMatrix()
         }
 
         computeAnimationState(timeMs)
@@ -115,6 +110,15 @@ internal class ExportTextOverlay(
         val cos = kotlin.math.cos(rad)
         val sin = kotlin.math.sin(rad)
 
+        // Corrupted project state (e.g. NaN positionX from a bad keyframe import) would
+        // otherwise produce a NaN-poisoned transform matrix that crashes the GL renderer
+        // mid-export with an opaque "framework error". Silently park the overlay off-screen
+        // instead — bad data shouldn't abort the whole render.
+        if (!tx.isFinite() || !ty.isFinite() || !sx.isFinite() || !sy.isFinite() ||
+            !cos.isFinite() || !sin.isFinite()) {
+            return offscreenMatrix()
+        }
+
         return floatArrayOf(
             sx * cos, sx * sin, 0f, 0f,
             -sy * sin, sy * cos, 0f, 0f,
@@ -122,6 +126,13 @@ internal class ExportTextOverlay(
             tx, ty, 0f, 1f
         )
     }
+
+    private fun offscreenMatrix(): FloatArray = floatArrayOf(
+        0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, 0f, 1f
+    )
 
     private var lastComputedTimeMs = -1L
     private var currentOffsetX = 0f

@@ -79,13 +79,17 @@ class SmartReframeEngine @Inject constructor(
         centers: List<Pair<Float, Float>>,
         alpha: Float = 0.08f
     ): List<Pair<Float, Float>> {
-        if (centers.isEmpty()) return centers
-        val smoothed = mutableListOf(centers.first())
+        if (centers.size < 2) return centers
+        // An out-of-range alpha overshoots the target and makes the EMA oscillate or diverge;
+        // NaN destroys every subsequent element via the feedback term.
+        val a = if (alpha.isFinite()) alpha.coerceIn(0f, 1f) else 0.08f
+        val smoothed = ArrayList<Pair<Float, Float>>(centers.size)
+        smoothed.add(centers.first())
         for (i in 1 until centers.size) {
             val prevX = smoothed.last().first
             val prevY = smoothed.last().second
-            val newX = prevX + alpha * (centers[i].first - prevX)
-            val newY = prevY + alpha * (centers[i].second - prevY)
+            val newX = prevX + a * (centers[i].first - prevX)
+            val newY = prevY + a * (centers[i].second - prevY)
             smoothed.add(Pair(newX, newY))
         }
         return smoothed
