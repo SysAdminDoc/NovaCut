@@ -122,14 +122,20 @@ class LoudnessEngine @Inject constructor(
         // Momentary max (from block loudness with 400ms window)
         val momentaryMax = blockLoudness.maxOrNull() ?: -70f
 
-        // Short-term max (3s window = average of ~8 blocks)
+        // Short-term max (3s window = average of ~8 blocks). For clips shorter than 3s we have
+        // fewer than 8 blocks; fall back to the momentary max rather than reporting -70 LUFS,
+        // which would otherwise make the "short-term max" meaningless for short voiceovers/SFX.
         val shortTermBlocks = 8
         var shortTermMax = -70f
-        for (i in 0..blockLoudness.size - shortTermBlocks) {
-            val stPower = blockLoudness.subList(i, i + shortTermBlocks)
-                .sumOf { 10.0.pow(it / 10.0) }
-            val stLoudness = 10f * log10((stPower / shortTermBlocks).toFloat())
-            if (stLoudness > shortTermMax) shortTermMax = stLoudness
+        if (blockLoudness.size >= shortTermBlocks) {
+            for (i in 0..blockLoudness.size - shortTermBlocks) {
+                val stPower = blockLoudness.subList(i, i + shortTermBlocks)
+                    .sumOf { 10.0.pow(it / 10.0) }
+                val stLoudness = 10f * log10((stPower / shortTermBlocks).toFloat())
+                if (stLoudness > shortTermMax) shortTermMax = stLoudness
+            }
+        } else {
+            shortTermMax = momentaryMax
         }
 
         // Loudness Range (simplified: 95th - 10th percentile of short-term)
@@ -172,10 +178,11 @@ class LoudnessEngine @Inject constructor(
      */
     private fun applyKWeighting(samples: FloatArray, sampleRate: Int): FloatArray {
         val output = FloatArray(samples.size)
+        val safeSampleRate = sampleRate.coerceAtLeast(1)
 
         // Simple high-shelf approximation using first-order IIR
         // Boosts high frequencies by ~4dB
-        val fc = 1500f / sampleRate  // Normalized cutoff
+        val fc = 1500f / safeSampleRate  // Normalized cutoff
         val alpha = fc / (fc + 1f)
         var prev = 0f
 
@@ -187,7 +194,7 @@ class LoudnessEngine @Inject constructor(
         }
 
         // Second pass: 60Hz high-pass to remove DC
-        val hpAlpha = 1f - (60f / sampleRate * 2f * Math.PI.toFloat()).let { it / (it + 1f) }
+        val hpAlpha = 1f - (60f / safeSampleRate * 2f * Math.PI.toFloat()).let { it / (it + 1f) }
         prev = 0f
         var prevOut = 0f
         for (i in output.indices) {
