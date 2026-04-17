@@ -106,7 +106,12 @@ class ExportDelegate(
                     // count, OOM, and an export loop that never terminates.
                     val gifFps = configWithChapters.gifFrameRate.coerceIn(1, 60)
                     val frameIntervalMs = (1000L / gifFps).coerceAtLeast(1L)
-                    val frameCount = (totalDurationMs / frameIntervalMs).toInt().coerceIn(1, 300)
+                    // Clamp in Long space BEFORE narrowing to Int. A pathologically long
+                    // totalDurationMs (corrupt state or duration math bug) divided by a 1ms
+                    // interval can exceed Int.MAX_VALUE, and `.toInt()` silently wraps to a
+                    // negative value which `coerceIn` then clamps to 1 — skipping a real
+                    // export instead of capping it at 300 frames.
+                    val frameCount = (totalDurationMs / frameIntervalMs).coerceIn(1L, 300L).toInt()
                     val maxWidth = configWithChapters.gifMaxWidth
 
                     for (i in 0 until frameCount) {
