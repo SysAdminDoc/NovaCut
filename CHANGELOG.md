@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.52.0 — Export + Import Polish
+
+Three features from the backlog: extended filename tokens, export pre-flight warnings, and chronological-order import for multi-volume camera footage.
+
+### Extended filename tokens
+- `{duration}` — timeline duration as `MMmSSs` (e.g. `01m34s`).
+- `{projectFolder}` — directory-safe flavour of the project name (spaces → `_`, strips everything outside `[A-Za-z0-9._-]`). Doesn't collapse to an empty string — falls back to `{name}` when the sanitized form is blank.
+- `{clipCount}` — total clip count across all tracks.
+- `{sizeMB}` — post-export token, left literal through the encoder. `ExportDelegate.finalizeFilenameSize` replaces it with the rendered file size in MB and renames on disk after `onComplete`. If the rename fails (e.g., FS collision), falls back to the unrenamed file rather than losing the export.
+- Two new presets in the Filename Template picker: "Name + Duration" and "Name + Size".
+- `media_picker_audio_only` etc. strings / roadmap descriptions updated to advertise the new tokens.
+
+### Export pre-flight warnings
+- Three static heuristics surface above the Export button in Output Details:
+  - **Long render** — shown when estimated time ≥ 30 min ("Heads up: estimated render time is … Exports run in the background, but plug in to avoid battery drain.")
+  - **Large file** — shown when estimated output ≥ 1 GB ("Most share targets reject files this large — consider a Target File Size preset.")
+  - **AV1 slow** — shown when codec is AV1 ("AV1 is slow on most Android devices. If file size isn't critical, HEVC encodes much faster.")
+- Pure computation against the already-resolved `effectiveConfig`; no state plumbing, no persistence. Surfaces on every recomposition so the warning tracks live changes to the config.
+- New `estimateExportBytes(totalDurationMs, config)` helper reused by both `estimateExportSize` (for display) and the warning logic (for threshold comparison).
+
+### Multi-volume sequence ordering on import
+- `MediaPicker.sortMediaChronologically(context, uris)` sorts a batch of picked URIs by their resolver `DISPLAY_NAME`, with natural-sort digit padding so camera chapter splits land on the timeline in playback order instead of URI-list order. Wired into both `videoPickerLauncher` (legacy `OpenMultipleDocuments`) and `photoPickerMultiLauncher` (Android 13+ Photo Picker). Non-destructive, silent on no-op batches (`size ≤ 1`).
+- Handles the common patterns we see in the wild: GoPro `GH010100.MP4` / `GX010001.MP4`, DJI `DJI_0001.MP4`, Insta360 `VID_20250101_120000_1.MP4`, Samsung `YYYYMMDD_HHMMSS.mp4`, iPhone `IMG_0001.MOV`. The digit-padding approach keeps the comparator cheap (no per-name parser) while matching every format without a bespoke branch.
+
+### Notes
+- No DB schema or dependency changes.
+- Four new string resources: the three pre-flight warnings + an updated filename-template description.
+- Subtitle encoding auto-detect was investigated and dropped from this release — NovaCut has no subtitle IMPORT path, and the existing export already writes UTF-8. Re-evaluate if/when an import path is added (e.g. for the subtitle-aware scene-cut feature at §6.9 in CROSS-PROJECT-ROADMAP.md).
+
 ## v3.51.0 — Post-Audit Follow-ups
 
 Lands the three follow-up items flagged during the v3.50.0 hardening pass.
