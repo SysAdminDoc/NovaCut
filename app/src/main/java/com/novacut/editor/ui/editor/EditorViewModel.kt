@@ -1452,7 +1452,6 @@ class EditorViewModel @Inject constructor(
             try {
                 showToast("Importing backup...")
                 val targetDir = File(appContext.filesDir, "imported_${System.currentTimeMillis()}")
-                targetDir.mkdirs()
                 val state = com.novacut.editor.engine.ProjectArchive.importArchive(appContext, uri, targetDir)
                 if (state != null) {
                     saveUndoState("Import backup")
@@ -2170,24 +2169,31 @@ class EditorViewModel @Inject constructor(
 
     // Helper for beat sync splitting
     private fun splitClipAt(clipId: String, positionMs: Long) {
+        val clipIdsToSplit = linkedClipIds(_state.value.tracks, clipId)
+        val newIdsByOldId = clipIdsToSplit.associateWith { java.util.UUID.randomUUID().toString() }
         _state.update { s ->
             s.copy(tracks = s.tracks.map { track ->
-                val clipIndex = track.clips.indexOfFirst { it.id == clipId }
-                if (clipIndex < 0) return@map track
-                val clip = track.clips[clipIndex]
-                val relativePos = positionMs - clip.timelineStartMs
-                val sourcePos = clip.trimStartMs + (relativePos * clip.speed).toLong()
-                if (sourcePos <= clip.trimStartMs + 100 || sourcePos >= clip.trimEndMs - 100) return@map track
-                val clip1 = clip.copy(trimEndMs = sourcePos, transition = null)
-                val clip2 = clip.copy(
-                    id = java.util.UUID.randomUUID().toString(),
-                    trimStartMs = sourcePos,
-                    timelineStartMs = positionMs,
-                    transition = null
-                )
-                val newClips = track.clips.toMutableList()
-                newClips[clipIndex] = clip1
-                newClips.add(clipIndex + 1, clip2)
+                if (track.clips.none { it.id in clipIdsToSplit }) return@map track
+                val newClips = buildList {
+                    track.clips.forEach { clip ->
+                        val newId = newIdsByOldId[clip.id]
+                        if (newId == null || !canSplitClipAtPosition(clip, positionMs)) {
+                            add(clip)
+                        } else {
+                            val sourcePos = splitPointInSource(clip, positionMs)
+                            add(clip.copy(trimEndMs = sourcePos, transition = null))
+                            add(
+                                clip.copy(
+                                    id = newId,
+                                    trimStartMs = sourcePos,
+                                    timelineStartMs = positionMs,
+                                    transition = null,
+                                    linkedClipId = clip.linkedClipId?.let { linkedId -> newIdsByOldId[linkedId] }
+                                )
+                            )
+                        }
+                    }
+                }
                 track.copy(clips = newClips)
             })
         }
@@ -2274,14 +2280,17 @@ class EditorViewModel @Inject constructor(
     }
 
     fun slipClip(clipId: String, slipAmountMs: Long) {
-        val track = _state.value.tracks.firstOrNull { currentTrack ->
-            currentTrack.clips.any { it.id == clipId }
-        } ?: return
-        if (track.isLocked) return
+        val linkedIds = linkedClipIds(_state.value.tracks, clipId)
+        if (_state.value.tracks.any { track ->
+                track.isLocked && track.clips.any { it.id in linkedIds }
+            }
+        ) {
+            return
+        }
         _state.update { s ->
             s.copy(tracks = s.tracks.map { track ->
                 track.copy(clips = track.clips.map { clip ->
-                    if (clip.id == clipId) {
+                    if (clip.id in linkedIds) {
                         val sourceWindow = (clip.trimEndMs - clip.trimStartMs).coerceAtLeast(100L)
                         val maxTrimStart = (clip.sourceDurationMs - sourceWindow).coerceAtLeast(0L)
                         val newTrimStart = (clip.trimStartMs + slipAmountMs).coerceIn(0L, maxTrimStart)
@@ -2295,62 +2304,48 @@ class EditorViewModel @Inject constructor(
     }
 
     fun slideClip(clipId: String, slideAmountMs: Long) {
-        val track = _state.value.tracks.firstOrNull { currentTrack ->
-            currentTrack.clips.any { it.id == clipId }
-        } ?: return
-        if (track.isLocked) return
+        val tracks = _state.value.tracks
+        val linkedLocation = tracks.findClipLocation(clipId)?.clip?.linkedClipId
+            ?.let { linkedId -> tracks.findClipLocation(linkedId) }
+        val primaryLocation = tracks.findClipLocation(clipId) ?: return
+        if (primaryLocation.track.isLocked || (linkedLocation?.track?.isLocked == true)) return
+
+        val primaryBounds = calculateSlideBounds(primaryLocation.track, clipId) ?: return
+        var minDelta = primaryBounds.minStartMs - primaryBounds.currentStartMs
+        var maxDelta = primaryBounds.maxStartMs - primaryBounds.currentStartMs
+
+        linkedLocation?.let { location ->
+            val linkedBounds = calculateSlideBounds(location.track, location.clip.id) ?: return
+            minDelta = maxOf(minDelta, linkedBounds.minStartMs - linkedBounds.currentStartMs)
+            maxDelta = minOf(maxDelta, linkedBounds.maxStartMs - linkedBounds.currentStartMs)
+        }
+
+        if (maxDelta < minDelta) return
+        val appliedDelta = (primaryBounds.currentStartMs + slideAmountMs)
+            .coerceIn(primaryBounds.minStartMs, primaryBounds.maxStartMs) - primaryBounds.currentStartMs
+        val synchronizedDelta = appliedDelta.coerceIn(minDelta, maxDelta)
+        if (synchronizedDelta == 0L) return
+
         _state.update { s ->
             s.copy(tracks = s.tracks.map { track ->
-                val sortedClips = track.clips.sortedBy { it.timelineStartMs }.toMutableList()
-                val clipIndex = sortedClips.indexOfFirst { it.id == clipId }
-                if (clipIndex < 0) return@map track
-
-                val clip = sortedClips[clipIndex]
-                val prevClip = sortedClips.getOrNull(clipIndex - 1)
-                val nextClip = sortedClips.getOrNull(clipIndex + 1)
-
-                var minStart = 0L
-                var maxStart = Long.MAX_VALUE
-
-                prevClip?.let { previous ->
-                    minStart = maxOf(minStart, previous.timelineStartMs + minimumSlideDurationMs(previous))
-                    maxStart = minOf(maxStart, previous.timelineStartMs + maximumPreviousDurationMs(previous))
+                when {
+                    track.id == primaryLocation.track.id -> {
+                        slideClipOnTrack(
+                            track = track,
+                            clipId = clipId,
+                            newStartMs = primaryBounds.currentStartMs + synchronizedDelta
+                        )
+                    }
+                    linkedLocation != null && track.id == linkedLocation.track.id -> {
+                        val linkedBounds = calculateSlideBounds(track, linkedLocation.clip.id) ?: return@map track
+                        slideClipOnTrack(
+                            track = track,
+                            clipId = linkedLocation.clip.id,
+                            newStartMs = linkedBounds.currentStartMs + synchronizedDelta
+                        )
+                    }
+                    else -> track
                 }
-                nextClip?.let { next ->
-                    minStart = maxOf(minStart, next.timelineEndMs - maximumNextDurationMs(next) - clip.durationMs)
-                    maxStart = minOf(maxStart, next.timelineEndMs - minimumSlideDurationMs(next) - clip.durationMs)
-                }
-
-                if (maxStart < minStart) return@map track
-
-                val proposedStart = (clip.timelineStartMs + slideAmountMs).coerceAtLeast(0L)
-                val newStart = proposedStart.coerceIn(minStart, maxStart)
-                val newEnd = newStart + clip.durationMs
-
-                if (newStart == clip.timelineStartMs) return@map track
-
-                prevClip?.let { previous ->
-                    val desiredDurationMs = (newStart - previous.timelineStartMs).coerceAtLeast(minimumSlideDurationMs(previous))
-                    val newTrimEnd = (previous.trimStartMs + desiredDurationMs * previous.speed.coerceAtLeast(0.01f))
-                        .roundToLong()
-                        .coerceIn(previous.trimStartMs + 100L, previous.sourceDurationMs)
-                    sortedClips[clipIndex - 1] = previous.copy(trimEndMs = newTrimEnd)
-                }
-
-                sortedClips[clipIndex] = clip.copy(timelineStartMs = newStart)
-
-                nextClip?.let { next ->
-                    val desiredDurationMs = (next.timelineEndMs - newEnd).coerceAtLeast(minimumSlideDurationMs(next))
-                    val newTrimStart = (next.trimEndMs - desiredDurationMs * next.speed.coerceAtLeast(0.01f))
-                        .roundToLong()
-                        .coerceIn(0L, next.trimEndMs - 100L)
-                    sortedClips[clipIndex + 1] = next.copy(
-                        timelineStartMs = newEnd,
-                        trimStartMs = newTrimStart
-                    )
-                }
-
-                track.copy(clips = sortedClips)
             })
         }
         rebuildPlayerTimeline()
@@ -2564,9 +2559,23 @@ class EditorViewModel @Inject constructor(
 
     // --- Linked A/V ---
     fun unlinkAudioVideo() {
-        if (_state.value.selectedClipId == null) return
+        val selectedClipId = _state.value.selectedClipId ?: return
+        val linkedIds = linkedClipIds(_state.value.tracks, selectedClipId)
+        if (_state.value.tracks.any { track ->
+                track.isLocked && track.clips.any { it.id in linkedIds }
+            }
+        ) {
+            showToast("Track is locked")
+            return
+        }
         saveUndoState("Unlink A/V")
-        updateSelectedClip { it.copy(linkedClipId = null) }
+        _state.update { state ->
+            state.copy(tracks = state.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id in linkedIds) clip.copy(linkedClipId = null) else clip
+                })
+            })
+        }
         saveProject()
         showToast("Audio/video unlinked")
     }
@@ -3522,6 +3531,18 @@ class EditorViewModel @Inject constructor(
         return kotlin.math.floor(clip.trimEndMs.toDouble() / clip.speed.coerceAtLeast(0.01f).toDouble())
             .toLong()
             .coerceAtLeast(minimumSlideDurationMs(clip))
+    }
+
+    private fun canSplitClipAtPosition(clip: Clip, positionMs: Long): Boolean {
+        if (positionMs <= clip.timelineStartMs || positionMs >= clip.timelineEndMs) return false
+        val sourcePos = splitPointInSource(clip, positionMs)
+        return sourcePos - clip.trimStartMs >= MIN_TIMELINE_CLIP_DURATION_MS &&
+            clip.trimEndMs - sourcePos >= MIN_TIMELINE_CLIP_DURATION_MS
+    }
+
+    private fun splitPointInSource(clip: Clip, positionMs: Long): Long {
+        val relativePos = positionMs - clip.timelineStartMs
+        return clip.trimStartMs + (relativePos * clip.speed).toLong()
     }
 
     override fun onCleared() {

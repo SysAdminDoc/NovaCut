@@ -132,6 +132,8 @@ fun Timeline(
     val headerWidth = if (isCompactTimeline) 132.dp else 140.dp
     val chromePadding = if (isCompactTimeline) 12.dp else 16.dp
     val contentPadding = if (isCompactTimeline) 10.dp else 12.dp
+    val trimHandleVisualWidth = 14.dp
+    val trimHandleTouchWidth = 28.dp
     val videoTrackLabel = stringResource(R.string.editor_video_track)
     val audioTrackLabel = stringResource(R.string.editor_audio_track)
     val overlayTrackLabel = stringResource(R.string.editor_overlay_track)
@@ -953,7 +955,7 @@ fun Timeline(
                                             )
                                             .then(
                                                 if (isSelected && !track.isLocked) Modifier.pointerInput(clip.id, currentIsTrimMode) {
-                                                    val trimHandleWidthPx = 12.dp.toPx()
+                                                    val trimHandleWidthPx = trimHandleTouchWidth.toPx()
                                                     detectDragGestures(
                                                         onDragStart = {
                                                             onClipSelected(clip.id, track.id)
@@ -1175,15 +1177,8 @@ fun Timeline(
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.CenterStart)
-                                                .width(12.dp)
+                                                .width(trimHandleTouchWidth)
                                                 .fillMaxHeight()
-                                                .background(
-                                                    trimHandleColor,
-                                                    RoundedCornerShape(
-                                                        topStart = 12.dp,
-                                                        bottomStart = 12.dp
-                                                    )
-                                                )
                                                 .then(
                                                     if (!track.isLocked) Modifier.pointerInput(clip.id) {
                                                     detectHorizontalDragGestures(
@@ -1207,20 +1202,27 @@ fun Timeline(
                                                     )
                                                 } else Modifier
                                                 )
-                                        )
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.CenterStart)
+                                                    .width(trimHandleVisualWidth)
+                                                    .fillMaxHeight()
+                                                    .background(
+                                                        trimHandleColor,
+                                                        RoundedCornerShape(
+                                                            topStart = 12.dp,
+                                                            bottomStart = 12.dp
+                                                        )
+                                                    )
+                                            )
+                                        }
                                         // Right trim handle
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.CenterEnd)
-                                                .width(12.dp)
+                                                .width(trimHandleTouchWidth)
                                                 .fillMaxHeight()
-                                                .background(
-                                                    trimHandleColor,
-                                                    RoundedCornerShape(
-                                                        topEnd = 12.dp,
-                                                        bottomEnd = 12.dp
-                                                    )
-                                                )
                                                 .then(
                                                     if (!track.isLocked) Modifier.pointerInput(clip.id) {
                                                     detectHorizontalDragGestures(
@@ -1243,7 +1245,21 @@ fun Timeline(
                                                     )
                                                 } else Modifier
                                                 )
-                                        )
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.CenterEnd)
+                                                    .width(trimHandleVisualWidth)
+                                                    .fillMaxHeight()
+                                                    .background(
+                                                        trimHandleColor,
+                                                        RoundedCornerShape(
+                                                            topEnd = 12.dp,
+                                                            bottomEnd = 12.dp
+                                                        )
+                                                    )
+                                            )
+                                        }
 
                                         // Transition-in zone overlay
                                         if (clip.transition != null) {

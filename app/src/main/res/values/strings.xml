@@ -395,6 +395,7 @@
     <string name="media_picker_source_audio">Audio files</string>
     <string name="media_picker_source_kept_local">Imports stay available offline</string>
     <string name="media_picker_camera_permission_required">Camera permission is needed to record video.</string>
+    <string name="media_picker_local_copy_failed">NovaCut couldn\'t keep that media available locally. Try choosing it again.</string>
 
     <!-- ProjectListScreen -->
     <string name="projects_app_title">NovaCut</string>
@@ -1265,6 +1266,9 @@
     <string name="cd_preview_still_image">Still image preview</string>
     <string name="projects_empty_title">No projects yet</string>
     <string name="projects_empty_subtitle">Tap the + button to create your first video project.</string>
+    <string name="project_create_failed">NovaCut couldn\'t create that project right now. Check available storage and try again.</string>
+    <string name="project_duplicate_failed">NovaCut couldn\'t duplicate that project right now.</string>
+    <string name="project_import_copy_failed">NovaCut couldn\'t copy that video into local storage.</string>
     <string name="cd_smart_reframe">Smart reframe</string>
     <string name="cd_clip_thumbnail">Clip thumbnail</string>
     <string name="cd_tts_preview">Preview speech</string>

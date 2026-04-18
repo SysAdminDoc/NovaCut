@@ -1,5 +1,92 @@
 # Changelog
 
+## v3.49.0 — Contact Sheet Export
+
+Ships roadmap §8.1 — **contact-sheet export** (FrameSnap-inspired). Renders a single PNG with one thumbnail per clip, labeled and arranged in a configurable grid. Great for review-decks, social-media teasers, and archival of long projects as a single scannable image.
+
+### ContactSheetExporter engine
+- New `engine/ContactSheetExporter.kt` — single-file Kotlin object rendering clips into an ARGB_8888 bitmap via Canvas, compressed to PNG.
+- Layout: columns-wide × `ceil(clips/cols)` rows. Per-cell: 320×180 thumbnail + 28 px caption strip with clip label (source filename, truncated to 24 chars) and formatted duration (`M:SS`). Catppuccin-Mocha background (`#1E1E2E`), Text colour for labels, Subtext0 for durations.
+- Thumbnails come from `VideoEngine.extractThumbnail()` at each clip's **midpoint relative to trim** — no extra decode pipeline, existing LRU cache accelerates repeated sheet exports.
+- OOM-safe allocation guard on the parent bitmap (explicit `OutOfMemoryError` catch returns false rather than crashing).
+- Coroutine-cancellable: `ensureActive()` between cells so the Cancel button in ExportSheet works.
+
+### ExportConfig extensions
+- `exportAsContactSheet: Boolean = false` — mode flag.
+- `contactSheetColumns: Int = 4` — grid width (UI-clamped to {2, 3, 4, 5, 6}; engine-clamped to [1, 8]).
+- Treated as **mutually exclusive** with the other alt-outputs (GIF / audio-only / stems / frame-capture) via the same cascade reset pattern used by the existing toggles.
+
+### ExportSheet UI
+- New toggle row "Contact Sheet" (Mocha.Flamingo accent, `Icons.Default.GridView`) in the Special Outputs section.
+- When active: column chip row (2/3/4/5/6) + summary pill "Contact sheet · N columns" + export button label swaps to "Export Contact Sheet".
+- Delivery Options + audio codec sections auto-hide when in contact-sheet mode (they're not applicable to a still-image output).
+
+### ExportDelegate dispatch
+- New contact-sheet branch at the top of `startExport` — runs before the GIF branch and before the main Transformer path. Reuses `gifExportJob` coroutine holder for cancel/progress plumbing.
+- Filters tracks to VIDEO + OVERLAY (static clips with visual content); skips AUDIO/TEXT tracks.
+- Uses `createOutputFile` with a `_contact` suffix on the preferred filename, routed through the existing filename-template expansion.
+- PNG output auto-routes to `Pictures/NovaCut/` via the existing `exportUsesImageCollection` check in `saveToGallery()` — no new MediaStore code.
+
+### Notes
+- No DB changes, no new dependencies. Five new string resources.
+- Supports aspect-ratio variance across clips — each thumbnail is scaled to 320×180 (16:9 container); portrait footage is letterboxed, not cropped, because thumbnail extraction respects source aspect.
+- Known limit: the whole sheet is one bitmap in memory. For a 6-column sheet across 100 clips (16 rows), that's ~13 MB ARGB — comfortably under `largeHeap` budget but would need tiling if users ever push to 500+ clips.
+
+## v3.48.0 — Preset Grouping + Scratchpad Sidecar
+
+Builds on v3.47.0. Ships two small Tier-1 wins: roadmap §1.3 preset discoverability and the deferred §6.4 sidecar export.
+
+### Preset grouping (§1.3)
+- **SpeedCurveEditor** — speed presets split into two labeled FlowRows: **Ramps** (Ramp Up, Ramp Down, Pulse) and **Constants** (Slow Mo, 2×, 4×). Previously a single unlabeled row.
+- **KeyframeCurveEditor** — dropdown menu divided into three groups with subtle subheaders: **Cinematic** (Ken Burns, Drift, Zoom In/Out), **Fades** (Fade In, Fade Out), **Emphasis** (Pulse, Shake, Spin 360). `HorizontalDivider` + `MaterialTheme.typography.labelSmall` labels between groups. `applyPreset` lambda extracted to keep each group's `DropdownMenuItem` declaration terse.
+
+### Scratchpad notes sidecar export (§6.4 completion)
+- When the project carries a non-blank `project.notes`, export now drops a `<basename>.notes.txt` file alongside the rendered video. Runs on `Dispatchers.IO` inside the Transformer `onComplete` callback; failure is logged via `Log.w` but does not affect the export completion state.
+- Implementation: `ExportDelegate.startExport` — inline block after the render succeeds, guarded by `currentState.project.notes.isNotBlank()`.
+
+### Notes
+- No model or DB changes. No new dependencies. Five new string resources for preset group labels.
+- Release build of v3.47.0 failed mid-assembly when the preset-grouping changes were edited in during R8; v3.48.0 rolls up the fix and those polish items into one clean release.
+
+## v3.47.0 — Scratchpad Notes + Visible Recovery Dialog (Wave 2 Port)
+
+Continuation of the cross-project port initiative. Ships two Tier-1 features from [CROSS-PROJECT-ROADMAP.md](CROSS-PROJECT-ROADMAP.md): **Scratchpad notes per project (§6.4)** and **Visible crash-recovery dialog (§1.6)**.
+
+### Scratchpad
+- New `Project.notes: String = ""` field persisted in Room. DB schema bumped to v6 with `MIGRATION_5_6` (`ALTER TABLE projects ADD COLUMN notes TEXT NOT NULL DEFAULT ''`).
+- New `ScratchpadSheet` Composable (`ui/editor/ScratchpadSheet.kt`) — free-form notes editor with 180–360 dp OutlinedTextField, yellow Mocha accent, 750 ms-debounced auto-persist via `LaunchedEffect(text)` + `delay()` to avoid hammering Room on every keystroke.
+- Wired into EditorScreen overflow menu as "Scratchpad Notes" (Icons.AutoMirrored.Filled.Notes).
+- `EditorViewModel.showScratchpad()` / `hideScratchpad()` / `updateProjectNotes(notes)` + new `PanelId.SCRATCHPAD`. Uses existing `saveProject()` for Room persistence.
+
+### Recovery dialog
+- Project open flow in `EditorViewModel` now opens a `PanelId.RECOVERY_DIALOG` whenever `autoSave.loadRecoveryData()` returned non-empty tracks/overlays. Previously the restore happened silently — users had no indication that their project was recovered from a prior-session crash.
+- `EditorScreen` renders a Material 3 `AlertDialog` for `RECOVERY_DIALOG`:
+  - **Keep recovered** (default) — dismisses the dialog; recovered state remains applied and continues to auto-save normally.
+  - **Discard** — calls `autoSave.clearRecoveryData(projectId)`; the recovery file is removed so the user can reload the Room-persisted baseline by closing and reopening the project.
+- `EditorViewModel.dismissRecoveryDialog(recover: Boolean)` handles both paths.
+
+### Notes
+- Two new PanelId entries: `SCRATCHPAD`, `RECOVERY_DIALOG`.
+- New strings for scratchpad + recovery dialog in `strings.xml`.
+- No new dependencies.
+
+## v3.46.0 — Cross-Project Feature Port (VideoCrush / FrameSnap / GifText)
+
+Features ported from sibling projects in the Z:\repos tree.
+
+### Export
+- **Target file size presets** (VideoCrush) — New "Target File Size" section in ExportSheet with preset chips for Discord (8/25/100 MB), Gmail (25 MB), Telegram (50 MB), WhatsApp (16 MB), Twitter (512 MB). Picking a preset computes the video bitrate from `(targetBytes * 8 * 1000 / durationMs) - audioBitrate`, with 2% headroom reserved for mp4 container overhead. Bitrate is clamped to `[500 kbps, 150 Mbps]` and resolved at export dispatch time in `ExportDelegate.startExport` via `ExportConfig.resolveTargetSize(totalDurationMs)` so duration changes after selection are honored automatically.
+  - `ExportConfig` gains `targetSizeBytes: Long?` (preset marker) + `bitrateOverride: Int?` (resolved value). `videoBitrate` getter returns `bitrateOverride ?: defaultVideoBitrate` so all downstream consumers (VideoEngine, ExportSheet size/bitrate display) automatically reflect the target.
+- **Pre-flight export ETA** — Output Details card now shows "Est. time: Xm Ys" above the ready-to-export button, derived from timeline duration × resolution-pixel-ratio × codec factor (H.264=1.0, HEVC=1.6, AV1=2.4, VP9=1.9) × fps factor. Base calibration: 1080p30 H.264 ≈ 1.17× real-time on mid-range Android. Pure display — no behavior change to the encoder.
+- **Filename templates with tokens** (AlphaCut / FrameSnap) — New "Filename Template" section with five preset patterns: `{name}`, `{name}_{date}`, `{name}_{date}_{time}`, `{name}_{res}_{fps}`, `{name}_{preset}`. Tokens: `{name} {date} {time} {res} {codec} {fps} {preset}`. Expanded in `ExportDelegate.createOutputFile` via `applyFilenameTemplate` before passing through `sanitizeFileName`. Collision-free numbering (`Name (2).mp4`, `(3).mp4`…) still runs on top of the expanded template.
+
+### Text overlays
+- **Meme-style text templates** (GifText) — Six new entries in `builtInTextTemplates` under the SOCIAL category: Impact Meme (top/bottom text, stroke, condensed), TikTok Caption (black-on-white with slide-up), Reels Hook (glow + bounce "WAIT FOR IT…"), POV Meme (typewriter POV overlay), Neon Glow (blur-in "VIBES"), Word Burst (big single-word elastic pop). All wired to existing `TextAnimation` enum values — no new rendering code required.
+
+### Notes
+- No new dependencies. All changes are local to `ExportConfig`, `ExportSheet`, `ExportDelegate`, `TextTemplateGallery`, and `strings.xml`.
+- Target-size resolution runs at dispatch time, so batch-export items with a `targetSizeBytes` set get their bitrate re-derived per timeline duration (safe for the same timeline with different target-size preset queues).
+
 ## v3.45.0 — Audit Phase 17: GL Attrib Guards, DSP NaN Flush, Gesture Robustness
 
 ### GL pipeline safety

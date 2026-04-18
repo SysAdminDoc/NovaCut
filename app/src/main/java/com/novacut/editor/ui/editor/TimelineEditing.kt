@@ -1,0 +1,292 @@
+package com.novacut.editor.ui.editor
+
+import com.novacut.editor.model.Clip
+import com.novacut.editor.model.Track
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToLong
+
+internal const val MIN_TIMELINE_CLIP_DURATION_MS = 100L
+
+internal data class ClipLocation(
+    val trackIndex: Int,
+    val clipIndex: Int,
+    val track: Track,
+    val clip: Clip
+)
+
+internal data class SlideBounds(
+    val currentStartMs: Long,
+    val minStartMs: Long,
+    val maxStartMs: Long
+)
+
+internal fun List<Track>.findClipLocation(clipId: String): ClipLocation? {
+    forEachIndexed { trackIndex, track ->
+        val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+        if (clipIndex >= 0) {
+            return ClipLocation(
+                trackIndex = trackIndex,
+                clipIndex = clipIndex,
+                track = track,
+                clip = track.clips[clipIndex]
+            )
+        }
+    }
+    return null
+}
+
+internal fun linkedClipIds(tracks: List<Track>, clipId: String): Set<String> {
+    val clip = tracks.findClipLocation(clipId)?.clip ?: return setOf(clipId)
+    val linkedId = clip.linkedClipId ?: return setOf(clipId)
+    return if (tracks.findClipLocation(linkedId) != null) {
+        setOf(clipId, linkedId)
+    } else {
+        setOf(clipId)
+    }
+}
+
+internal fun Track.canFitClipRange(
+    startMs: Long,
+    endMs: Long,
+    excludingClipIds: Set<String> = emptySet()
+): Boolean {
+    return clips
+        .filterNot { it.id in excludingClipIds }
+        .none { existing ->
+            startMs < existing.timelineEndMs && endMs > existing.timelineStartMs
+        }
+}
+
+internal fun preferredAudioTrackIndex(
+    tracks: List<Track>,
+    startMs: Long,
+    endMs: Long
+): Int? {
+    return tracks
+        .withIndex()
+        .filter { (_, track) -> track.type == com.novacut.editor.model.TrackType.AUDIO }
+        .firstOrNull { (_, track) -> track.canFitClipRange(startMs, endMs) }
+        ?.index
+}
+
+internal fun trimClipOnTrack(
+    track: Track,
+    clipId: String,
+    requestedTrimStartMs: Long? = null,
+    requestedTrimEndMs: Long? = null
+): Track {
+    val clipIndex = track.clips.indexOfFirst { it.id == clipId }
+    if (clipIndex < 0) return track
+
+    val previousClip = track.clips.getOrNull(clipIndex - 1)
+    val nextClip = track.clips.getOrNull(clipIndex + 1)
+    var updatedClip = track.clips[clipIndex]
+
+    requestedTrimStartMs?.let { requested ->
+        val clampedRequest = requested.coerceIn(
+            0L,
+            updatedClip.trimEndMs - MIN_TIMELINE_CLIP_DURATION_MS
+        )
+        val desired = updatedClip.copy(trimStartMs = clampedRequest)
+        val minStart = previousClip?.timelineEndMs ?: 0L
+        val maxStart = updatedClip.timelineEndMs - MIN_TIMELINE_CLIP_DURATION_MS
+        val desiredStart = (updatedClip.timelineEndMs - desired.durationMs)
+            .coerceIn(minStart, maxStart)
+        val resolvedTrimStart = trimStartForTimelineStart(
+            clip = updatedClip,
+            targetTimelineStartMs = desiredStart,
+            fallbackTrimStartMs = clampedRequest
+        )
+        updatedClip = updatedClip.copy(
+            timelineStartMs = desiredStart,
+            trimStartMs = resolvedTrimStart
+        )
+    }
+
+    requestedTrimEndMs?.let { requested ->
+        val clampedRequest = requested.coerceIn(
+            updatedClip.trimStartMs + MIN_TIMELINE_CLIP_DURATION_MS,
+            updatedClip.sourceDurationMs
+        )
+        val desired = updatedClip.copy(trimEndMs = clampedRequest)
+        val minEnd = updatedClip.timelineStartMs + MIN_TIMELINE_CLIP_DURATION_MS
+        val maxEnd = nextClip?.timelineStartMs ?: Long.MAX_VALUE
+        val desiredEnd = (updatedClip.timelineStartMs + desired.durationMs)
+            .coerceIn(minEnd, maxEnd)
+        val resolvedTrimEnd = trimEndForTimelineEnd(
+            clip = updatedClip,
+            targetTimelineEndMs = desiredEnd,
+            fallbackTrimEndMs = clampedRequest
+        )
+        updatedClip = updatedClip.copy(trimEndMs = resolvedTrimEnd)
+    }
+
+    val updatedClips = track.clips.toMutableList()
+    updatedClips[clipIndex] = updatedClip
+    return track.copy(clips = updatedClips)
+}
+
+internal fun calculateSlideBounds(track: Track, clipId: String): SlideBounds? {
+    val sortedClips = track.clips.sortedBy { it.timelineStartMs }
+    val clipIndex = sortedClips.indexOfFirst { it.id == clipId }
+    if (clipIndex < 0) return null
+
+    val clip = sortedClips[clipIndex]
+    val previousClip = sortedClips.getOrNull(clipIndex - 1)
+    val nextClip = sortedClips.getOrNull(clipIndex + 1)
+
+    var minStart = 0L
+    var maxStart = Long.MAX_VALUE
+
+    previousClip?.let { previous ->
+        minStart = maxOf(minStart, previous.timelineStartMs + minimumSlideDurationMs(previous))
+        maxStart = minOf(maxStart, previous.timelineStartMs + maximumPreviousDurationMs(previous))
+    }
+    nextClip?.let { next ->
+        minStart = maxOf(
+            minStart,
+            next.timelineEndMs - maximumNextDurationMs(next) - clip.durationMs
+        )
+        maxStart = minOf(
+            maxStart,
+            next.timelineEndMs - minimumSlideDurationMs(next) - clip.durationMs
+        )
+    }
+
+    if (maxStart < minStart) return null
+    return SlideBounds(
+        currentStartMs = clip.timelineStartMs,
+        minStartMs = minStart,
+        maxStartMs = maxStart
+    )
+}
+
+internal fun slideClipOnTrack(
+    track: Track,
+    clipId: String,
+    newStartMs: Long
+): Track {
+    val sortedClips = track.clips.sortedBy { it.timelineStartMs }.toMutableList()
+    val clipIndex = sortedClips.indexOfFirst { it.id == clipId }
+    if (clipIndex < 0) return track
+
+    val clip = sortedClips[clipIndex]
+    if (newStartMs == clip.timelineStartMs) return track.copy(clips = sortedClips)
+
+    val previousClip = sortedClips.getOrNull(clipIndex - 1)
+    val nextClip = sortedClips.getOrNull(clipIndex + 1)
+    val newEndMs = newStartMs + clip.durationMs
+
+    previousClip?.let { previous ->
+        val desiredDurationMs = (newStartMs - previous.timelineStartMs)
+            .coerceAtLeast(minimumSlideDurationMs(previous))
+        val newTrimEnd = (
+            previous.trimStartMs +
+                desiredDurationMs * previous.speed.coerceAtLeast(0.01f)
+            ).roundToLong()
+            .coerceIn(
+                previous.trimStartMs + MIN_TIMELINE_CLIP_DURATION_MS,
+                previous.sourceDurationMs
+            )
+        sortedClips[clipIndex - 1] = previous.copy(trimEndMs = newTrimEnd)
+    }
+
+    sortedClips[clipIndex] = clip.copy(timelineStartMs = newStartMs)
+
+    nextClip?.let { next ->
+        val desiredDurationMs = (next.timelineEndMs - newEndMs)
+            .coerceAtLeast(minimumSlideDurationMs(next))
+        val newTrimStart = (
+            next.trimEndMs -
+                desiredDurationMs * next.speed.coerceAtLeast(0.01f)
+            ).roundToLong()
+            .coerceIn(0L, next.trimEndMs - MIN_TIMELINE_CLIP_DURATION_MS)
+        sortedClips[clipIndex + 1] = next.copy(
+            timelineStartMs = newEndMs,
+            trimStartMs = newTrimStart
+        )
+    }
+
+    return track.copy(clips = sortedClips)
+}
+
+private fun trimStartForTimelineStart(
+    clip: Clip,
+    targetTimelineStartMs: Long,
+    fallbackTrimStartMs: Long
+): Long {
+    val targetDurationMs = (clip.timelineEndMs - targetTimelineStartMs)
+        .coerceAtLeast(MIN_TIMELINE_CLIP_DURATION_MS)
+    var low = 0L
+    var high = clip.trimEndMs - MIN_TIMELINE_CLIP_DURATION_MS
+    var best = fallbackTrimStartMs.coerceIn(low, high)
+    var bestDistance = Long.MAX_VALUE
+
+    while (low <= high) {
+        val mid = low + (high - low) / 2L
+        val duration = clip.copy(trimStartMs = mid).durationMs
+        val distance = abs(duration - targetDurationMs)
+        if (distance < bestDistance) {
+            bestDistance = distance
+            best = mid
+        }
+        if (duration > targetDurationMs) {
+            low = mid + 1L
+        } else {
+            high = mid - 1L
+        }
+    }
+
+    return best
+}
+
+private fun trimEndForTimelineEnd(
+    clip: Clip,
+    targetTimelineEndMs: Long,
+    fallbackTrimEndMs: Long
+): Long {
+    val targetDurationMs = (targetTimelineEndMs - clip.timelineStartMs)
+        .coerceAtLeast(MIN_TIMELINE_CLIP_DURATION_MS)
+    var low = clip.trimStartMs + MIN_TIMELINE_CLIP_DURATION_MS
+    var high = clip.sourceDurationMs
+    var best = fallbackTrimEndMs.coerceIn(low, high)
+    var bestDistance = Long.MAX_VALUE
+
+    while (low <= high) {
+        val mid = low + (high - low) / 2L
+        val duration = clip.copy(trimEndMs = mid).durationMs
+        val distance = abs(duration - targetDurationMs)
+        if (distance < bestDistance) {
+            bestDistance = distance
+            best = mid
+        }
+        if (duration < targetDurationMs) {
+            low = mid + 1L
+        } else {
+            high = mid - 1L
+        }
+    }
+
+    return best
+}
+
+private fun minimumSlideDurationMs(clip: Clip): Long {
+    return ceil(100.0 / clip.speed.coerceAtLeast(0.01f).toDouble())
+        .toLong()
+        .coerceAtLeast(1L)
+}
+
+private fun maximumPreviousDurationMs(clip: Clip): Long {
+    return floor(
+        (clip.sourceDurationMs - clip.trimStartMs).toDouble() /
+            clip.speed.coerceAtLeast(0.01f).toDouble()
+    ).toLong().coerceAtLeast(minimumSlideDurationMs(clip))
+}
+
+private fun maximumNextDurationMs(clip: Clip): Long {
+    return floor(
+        clip.trimEndMs.toDouble() / clip.speed.coerceAtLeast(0.01f).toDouble()
+    ).toLong().coerceAtLeast(minimumSlideDurationMs(clip))
+}

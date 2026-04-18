@@ -52,11 +52,13 @@ class ProjectAutoSave @Inject constructor(
         }
     }
 
-    suspend fun saveNow(projectId: String, state: AutoSaveState) = withContext(Dispatchers.IO) {
+    suspend fun saveNow(projectId: String, state: AutoSaveState): Boolean = withContext(Dispatchers.IO) {
         try {
             saveState(projectId, state)
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Manual save failed for $projectId", e)
+            false
         }
     }
 
@@ -106,10 +108,13 @@ class ProjectAutoSave @Inject constructor(
         getBackupFile(projectId).delete()
     }
 
-    suspend fun copyAutoSave(fromProjectId: String, toProjectId: String) {
+    suspend fun copyAutoSave(fromProjectId: String, toProjectId: String): Boolean {
         val fromFile = getAutoSaveFile(fromProjectId)
-        if (!fromFile.exists()) return
-        try {
+        if (!fromFile.exists()) {
+            Log.w(TAG, "No auto-save found to copy for $fromProjectId")
+            return false
+        }
+        return try {
             // Hold the mutex for the entire read→mutate→write sequence. Releasing between
             // read and write let a concurrent saveState() of the source project overwrite
             // the file with newer data, after which we'd write stale (but newly-tagged)
@@ -121,8 +126,10 @@ class ProjectAutoSave @Inject constructor(
                 json.put("timestamp", System.currentTimeMillis())
                 writeAutoSaveFileLocked(toProjectId, json.toString(2))
             }
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to copy auto-save from $fromProjectId to $toProjectId", e)
+            false
         }
     }
 
@@ -174,16 +181,22 @@ class ProjectAutoSave @Inject constructor(
     }
 
     private fun getAutoSaveFile(projectId: String): File {
-        return File(autoSaveDir, "${projectId}.json")
+        return File(autoSaveDir, "${autoSaveFileStem(projectId)}.json")
     }
 
     private fun getTempFile(projectId: String): File {
-        return File(autoSaveDir, "${projectId}.tmp")
+        return File(autoSaveDir, "${autoSaveFileStem(projectId)}.tmp")
     }
 
     private fun getBackupFile(projectId: String): File {
-        return File(autoSaveDir, "${projectId}.bak")
+        return File(autoSaveDir, "${autoSaveFileStem(projectId)}.bak")
     }
+}
+
+internal fun autoSaveFileStem(projectId: String): String {
+    val safeProjectId = sanitizeFileName(projectId, fallback = "project", maxLength = 96)
+    val stableSuffix = projectId.hashCode().toUInt().toString(16)
+    return "${safeProjectId}_$stableSuffix"
 }
 
 data class AutoSaveState(
