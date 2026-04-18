@@ -43,7 +43,10 @@
     <string name="export_estimated_size_format">Estimated file size: %1$s</string>
     <string name="export_estimated_time_format">Estimated render time: %1$s</string>
     <string name="export_filename_template">Filename Template</string>
-    <string name="export_filename_template_description">Tokens: {name}, {date}, {time}, {res}, {codec}, {fps}, {preset}.</string>
+    <string name="export_filename_template_description">Tokens: {name}, {date}, {time}, {res}, {codec}, {fps}, {preset}, {duration}, {sizeMB}, {clipCount}, {projectFolder}.</string>
+    <string name="export_warning_long_render">Heads up: estimated render time is %1$s. Exports run in the background, but plug in to avoid battery drain.</string>
+    <string name="export_warning_large_file">Estimated output is over 1 GB. Most share targets reject files this large — consider a Target File Size preset.</string>
+    <string name="export_warning_av1_slow">AV1 is slow on most Android devices. If file size isn\'t critical, HEVC encodes much faster.</string>
     <string name="export_current_filename_template">Current template: %1$s</string>
     <string name="export_contact_sheet">Contact Sheet</string>
     <string name="export_contact_sheet_description">Grid of clip thumbnails as a single PNG — great for review decks and teasers.</string>

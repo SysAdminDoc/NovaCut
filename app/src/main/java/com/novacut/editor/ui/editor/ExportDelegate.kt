@@ -56,13 +56,18 @@ class ExportDelegate(
 
     /**
      * Expand filename template tokens. Supported tokens:
-     *   {name} project/base name
-     *   {date} YYYY-MM-DD (device local)
-     *   {time} HHmm (device local, 24h)
-     *   {res}  resolution label (e.g. 1080p)
-     *   {codec} codec label (e.g. H.264)
-     *   {fps}  frame rate
-     *   {preset} platform preset display name (if any) or aspect ratio
+     *   {name}          project/base name
+     *   {date}          YYYY-MM-DD (device local)
+     *   {time}          HHmm (device local, 24h)
+     *   {res}           resolution label (e.g. 1080p)
+     *   {codec}         codec label (e.g. H.264)
+     *   {fps}           frame rate
+     *   {preset}        platform preset display name (if any) or aspect ratio
+     *   {duration}      timeline duration formatted MMmSSs (e.g. 01m34s)
+     *   {projectFolder} sanitized project name (directory-safe, collapses spaces)
+     *   {clipCount}     number of clips across all tracks
+     *   {sizeMB}        post-export placeholder — left literal here and filled in
+     *                   after the encoder finishes knowing the final file size
      */
     private fun applyFilenameTemplate(
         template: String,
@@ -80,6 +85,20 @@ class ExportDelegate(
             now.get(java.util.Calendar.MINUTE)
         )
         val preset = config.platformPreset?.displayName ?: config.aspectRatio.label
+        val state = stateFlow.value
+        val totalDurationMs = state.tracks
+            .flatMap { it.clips }
+            .maxOfOrNull { it.timelineStartMs + it.durationMs } ?: 0L
+        val durationToken = formatDurationToken(totalDurationMs)
+        val clipCount = state.tracks.sumOf { it.clips.size }
+        // projectFolder is a dir-safe flavour of the base name: spaces→_, drop
+        // anything outside [A-Za-z0-9._-]. Empty fallback to `baseName` so the
+        // token never collapses a template like `{projectFolder}/{name}` into
+        // `/`. The filename sanitizer runs downstream anyway.
+        val projectFolder = baseName
+            .replace(Regex("\\s+"), "_")
+            .replace(Regex("[^A-Za-z0-9._-]"), "")
+            .ifBlank { baseName }
         return template
             .replace("{name}", baseName)
             .replace("{date}", date)
@@ -88,8 +107,37 @@ class ExportDelegate(
             .replace("{codec}", config.codec.label)
             .replace("{fps}", config.frameRate.toString())
             .replace("{preset}", preset)
+            .replace("{duration}", durationToken)
+            .replace("{projectFolder}", projectFolder)
+            .replace("{clipCount}", clipCount.toString())
+            // {sizeMB} is post-export — leave literal; `finalizeFilenameSize`
+            // replaces it once the file is written.
             .trim()
             .ifBlank { baseName }
+    }
+
+    private fun formatDurationToken(ms: Long): String {
+        if (ms <= 0L) return "0m00s"
+        val totalSec = ms / 1000
+        val m = totalSec / 60
+        val s = totalSec % 60
+        return "%02dm%02ds".format(m, s)
+    }
+
+    /**
+     * Post-rename helper: if the finalized filename still contains `{sizeMB}`,
+     * replace it with the actual output file size in MB (rounded) and rename
+     * on disk. No-op if the token wasn't used. Returns the final File (possibly
+     * renamed) so the caller can update `lastExportedFilePath`.
+     */
+    private fun finalizeFilenameSize(outputFile: File): File {
+        if (!outputFile.name.contains("{sizeMB}")) return outputFile
+        val mb = (outputFile.length() + 524_288L) / 1_048_576L  // round to nearest MB
+        val renamedName = outputFile.name.replace("{sizeMB}", "${mb}MB")
+        val renamed = File(outputFile.parentFile, renamedName)
+        if (outputFile.renameTo(renamed)) return renamed
+        // Rename failed — fall back to the unrenamed file rather than losing it.
+        return outputFile
     }
 
     fun cancelExport() {
@@ -392,12 +440,17 @@ class ExportDelegate(
                                 android.util.Log.w("ExportDelegate", "Subtitle sidecar write failed", e)
                             }
                         }
+                        // Finalize the `{sizeMB}` filename token (if used) by
+                        // renaming the output to include the actual MB count.
+                        // No-op when the template didn't reference the token,
+                        // so existing templates are unaffected.
+                        val finalizedFile = finalizeFilenameSize(outputFile)
                         stateFlow.update { it.copy(
                             exportState = ExportState.COMPLETE,
                             exportProgress = 1f,
-                            lastExportedFilePath = outputFile.absolutePath
+                            lastExportedFilePath = finalizedFile.absolutePath
                         ) }
-                        showToast("Export complete: ${outputFile.name}")
+                        showToast("Export complete: ${finalizedFile.name}")
                     },
                     onError = { e ->
                         outputFile.delete()

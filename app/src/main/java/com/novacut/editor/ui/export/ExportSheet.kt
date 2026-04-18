@@ -815,6 +815,43 @@ fun ExportSheet(
                     color = Mocha.Blue,
                     style = MaterialTheme.typography.bodySmall
                 )
+                // Pre-flight warnings. These are static heuristics so they run
+                // every recomposition without any state plumbing — the signal
+                // is whether the *currently selected* config will produce an
+                // expensive render, not historical comparison. The goal is to
+                // surface obvious footguns ("4K AV1 in a 2-hour timeline")
+                // before the user hits Export, not to second-guess every
+                // conservative choice.
+                val preflightWarnings = buildList {
+                    // 30-minute render is our "go make coffee" threshold. Below
+                    // that most users tolerate the wait; above it, surfacing a
+                    // heads-up prevents the "is it stuck?" support pattern.
+                    if (etaSec >= 30L * 60L) {
+                        add(stringResource(R.string.export_warning_long_render, formatEtaSeconds(etaSec)))
+                    }
+                    // 1 GB is the practical upper bound for most share targets
+                    // — WhatsApp caps at 16 MB, Telegram 50 MB, Gmail 25 MB,
+                    // and even YouTube/Drive uploads from mobile get painful
+                    // past a gig. Warn so users can pick target-size if they
+                    // intended to share.
+                    val estimatedBytes = estimateExportBytes(totalDurationMs, effectiveConfig)
+                    if (estimatedBytes >= 1_073_741_824L) {
+                        add(stringResource(R.string.export_warning_large_file))
+                    }
+                    // AV1 software encode is brutally slow on most Android
+                    // devices. Hardware AV1 is rare in 2025. Warn so users who
+                    // selected it for file-size reasons can fall back to HEVC.
+                    if (effectiveConfig.codec == VideoCodec.AV1) {
+                        add(stringResource(R.string.export_warning_av1_slow))
+                    }
+                }
+                preflightWarnings.forEach { warning ->
+                    Text(
+                        text = warning,
+                        color = Mocha.Yellow,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
 
@@ -875,7 +912,9 @@ fun ExportSheet(
                         "{name}_{date}" to "Name + Date",
                         "{name}_{date}_{time}" to "Name + Timestamp",
                         "{name}_{res}_{fps}" to "Name + Specs",
-                        "{name}_{preset}" to "Name + Preset"
+                        "{name}_{preset}" to "Name + Preset",
+                        "{name}_{duration}" to "Name + Duration",
+                        "{name}_{sizeMB}" to "Name + Size"
                     ).forEach { (tmpl, label) ->
                         FilterChip(
                             onClick = { onConfigChanged(config.copy(filenameTemplate = tmpl)) },
@@ -1341,14 +1380,19 @@ private fun exportChipColors(accent: Color) = FilterChipDefaults.filterChipColor
     selectedLabelColor = accent
 )
 
+private fun estimateExportBytes(totalDurationMs: Long, config: ExportConfig): Long {
+    if (totalDurationMs <= 0L) return 0L
+    val totalBitrate = config.videoBitrate + config.audioBitrate
+    return (totalBitrate.toLong() * totalDurationMs) / 8000L
+}
+
 private fun estimateExportSize(
     totalDurationMs: Long,
     config: ExportConfig
 ): String? {
     if (totalDurationMs <= 0L) return null
 
-    val totalBitrate = config.videoBitrate + config.audioBitrate
-    val estimatedBytes = (totalBitrate.toLong() * totalDurationMs) / 8000L
+    val estimatedBytes = estimateExportBytes(totalDurationMs, config)
     return when {
         estimatedBytes >= 1_073_741_824L -> "%.1f GB".format(estimatedBytes / 1_073_741_824.0)
         estimatedBytes >= 1_048_576L -> "%.0f MB".format(estimatedBytes / 1_048_576.0)
