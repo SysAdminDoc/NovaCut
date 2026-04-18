@@ -181,6 +181,14 @@ fun SpeedCurveEditor(
                     style = MaterialTheme.typography.bodyMedium,
                     color = Mocha.Subtext0
                 )
+                // Grouped presets — Ramps (time-varying curves) and Constants (uniform speeds).
+                // Sub-headers make presets more discoverable; users who don't know "ramp up" vs.
+                // "constant 2x" can skim the category label first.
+                Text(
+                    text = stringResource(R.string.speed_preset_group_ramps),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Mocha.Subtext0
+                )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -188,7 +196,30 @@ fun SpeedCurveEditor(
                     listOf(
                         stringResource(R.string.speed_preset_ramp_up) to SpeedCurve.rampUp(),
                         stringResource(R.string.speed_preset_ramp_down) to SpeedCurve.rampDown(),
-                        stringResource(R.string.speed_preset_pulse) to SpeedCurve.pulse(),
+                        stringResource(R.string.speed_preset_pulse) to SpeedCurve.pulse()
+                    ).forEach { (label, preset) ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { onSpeedCurveChanged(preset) },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                labelColor = Mocha.Text,
+                                containerColor = Mocha.PanelRaised
+                            )
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.speed_preset_group_constants),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Mocha.Subtext0
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
                         stringResource(R.string.speed_preset_slow_mo) to SpeedCurve.constant(0.25f),
                         stringResource(R.string.speed_preset_double) to SpeedCurve.constant(2f),
                         stringResource(R.string.speed_preset_quad) to SpeedCurve.constant(4f)

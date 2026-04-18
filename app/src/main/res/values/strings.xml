@@ -38,6 +38,18 @@
     <string name="export_delivery_summary">Delivery Summary</string>
     <string name="export_delivery_options">Delivery Options</string>
     <string name="export_delivery_options_description">Adjust the specs NovaCut will use for this export.</string>
+    <string name="export_target_size">Target File Size</string>
+    <string name="export_target_size_description">Constrain output to fit platform upload limits. Auto-picks the bitrate.</string>
+    <string name="export_estimated_size_format">Estimated file size: %1$s</string>
+    <string name="export_estimated_time_format">Estimated render time: %1$s</string>
+    <string name="export_filename_template">Filename Template</string>
+    <string name="export_filename_template_description">Tokens: {name}, {date}, {time}, {res}, {codec}, {fps}, {preset}.</string>
+    <string name="export_current_filename_template">Current template: %1$s</string>
+    <string name="export_contact_sheet">Contact Sheet</string>
+    <string name="export_contact_sheet_description">Grid of clip thumbnails as a single PNG — great for review decks and teasers.</string>
+    <string name="export_contact_sheet_columns">Columns</string>
+    <string name="export_contact_sheet_summary">Contact sheet · %1$d columns</string>
+    <string name="export_contact_sheet_button">Export Contact Sheet</string>
     <string name="export_special_outputs">Special Outputs</string>
     <string name="export_special_outputs_description">Turn on alternate deliverables like subtitles, stems, GIFs, or still captures.</string>
     <string name="export_video_button">Export Video</string>
@@ -166,12 +178,12 @@
     <string name="settings_timeline">Timeline</string>
     <string name="settings_timeline_description">Keep navigation, snapping, and playback feeling crisp.</string>
     <string name="settings_auto_save">Auto-save</string>
-    <string name="settings_auto_save_description">Periodically save project state</string>
+    <string name="settings_auto_save_description">Keep a fresh recovery copy while you edit.</string>
     <string name="settings_auto_save_interval">Auto-save interval</string>
     <string name="settings_proxy_resolution">Proxy Resolution</string>
     <string name="settings_proxy_resolution_description">Controls how lightweight generated proxy media should be.</string>
     <string name="settings_enable_proxy">Enable Proxy Editing</string>
-    <string name="settings_enable_proxy_description">Generate low-res proxies for smoother editing on slower devices</string>
+    <string name="settings_enable_proxy_description">Use lighter preview media when timelines start to feel heavy.</string>
     <string name="settings_ai_models">AI Models</string>
     <string name="settings_ai_models_description">Manage downloaded AI models for on-device processing.</string>
     <string name="settings_whisper_model">Whisper (Speech-to-Text)</string>
@@ -359,6 +371,8 @@
     <string name="batch_export_status_ready">Ready</string>
     <string name="batch_export_status_queued">Queued</string>
     <string name="batch_export_status_in_progress">Export in progress</string>
+    <string name="state_on">On</string>
+    <string name="state_off">Off</string>
 
     <!-- MediaPicker -->
     <string name="media_picker_title">Add Media</string>
@@ -379,6 +393,7 @@
     <string name="media_picker_source_photo_picker">System photo picker</string>
     <string name="media_picker_source_files">File picker</string>
     <string name="media_picker_source_audio">Audio files</string>
+    <string name="media_picker_source_kept_local">Imports stay available offline</string>
     <string name="media_picker_camera_permission_required">Camera permission is needed to record video.</string>
 
     <!-- ProjectListScreen -->
@@ -396,7 +411,7 @@
     <string name="projects_ready_title">Your studio starts here.</string>
     <string name="projects_ready_body">Start with a polished template or open a blank timeline and build something original.</string>
     <string name="projects_create_first">Create First Project</string>
-    <string name="projects_try_different_search">Try a different search</string>
+    <string name="projects_try_different_search">Try another keyword or clear the filter to bring every project back.</string>
     <string name="projects_tap_to_create">Tap + to create your first project</string>
     <string name="projects_updated">Updated %1$s</string>
     <string name="projects_templates_count">%1$d built-in templates</string>
@@ -416,6 +431,8 @@
     <string name="projects_minutes_ago">%1$dm ago</string>
     <string name="projects_hours_ago">%1$dh ago</string>
     <string name="projects_days_ago">%1$dd ago</string>
+    <string name="projects_template_badge">Template</string>
+    <string name="projects_proxy_badge">Proxy</string>
     <string name="project_untitled">Untitled</string>
 
     <!-- ProjectTemplateSheet -->
@@ -632,6 +649,8 @@
     <string name="tool_duration">Duration</string>
     <string name="tool_text_overlays">Text Overlays</string>
     <string name="tool_text_overlay_cd">Text overlay</string>
+    <string name="tool_text_overlays_description">Tap an overlay to refine its copy or timing.</string>
+    <string name="tool_text_overlays_count">%1$d items</string>
     <string name="tool_edit">Edit</string>
     <string name="tool_delete">Delete</string>
     <string name="panel_effects_subtitle">Layer tasteful looks, filters, and stylized treatments.</string>
@@ -685,7 +704,13 @@
     <!-- UndoHistoryPanel -->
     <string name="undo_history_title">History</string>
     <string name="undo_history_close">Close history</string>
+    <string name="undo_history_subtitle">Review the recent edit stack and jump back to a known-good state without repeated undo taps.</string>
     <string name="undo_history_empty">No history yet</string>
+    <string name="undo_history_stack_title">History stack</string>
+    <string name="undo_history_stack_empty_summary">No undoable actions have been recorded in this session yet.</string>
+    <string name="undo_history_stack_ready_summary">The highlighted row is the current state. Tap any earlier step to roll the timeline back in one move.</string>
+    <string name="undo_history_empty_title">No edits to roll back yet</string>
+    <string name="undo_history_empty_body">As soon as you trim, move, or adjust something on the timeline, NovaCut will keep those steps here so you can restore an earlier state confidently.</string>
     <string name="undo_history_live_state">Live state</string>
     <string name="undo_history_step_format">Step %1$d</string>
     <string name="undo_history_newer_count">%1$d newer</string>
@@ -693,6 +718,10 @@
     <string name="undo_history_status_current">Current</string>
     <string name="undo_history_status_newer">Newer</string>
     <string name="undo_history_status_restore">Restore</string>
+    <plurals name="undo_history_action_count">
+        <item quantity="one">%1$d action</item>
+        <item quantity="other">%1$d actions</item>
+    </plurals>
 
     <!-- MarkerListPanel -->
     <string name="marker_list_title">Markers</string>
@@ -772,6 +801,14 @@
     <string name="snapshot_delete">Delete</string>
     <string name="snapshot_restore_cd">Restore snapshot</string>
     <string name="snapshot_delete_cd">Delete snapshot</string>
+    <string name="snapshot_create_cta">Save restore point</string>
+    <string name="snapshot_empty_title">No restore points yet</string>
+    <string name="snapshot_empty_body">Save a snapshot before a risky trim, grade, or timing pass so you can jump back without losing momentum.</string>
+    <string name="snapshot_status_empty">No snapshots yet</string>
+    <string name="snapshot_status_ready">Restore points ready</string>
+    <string name="snapshot_delete_title">Delete snapshot?</string>
+    <string name="snapshot_delete_body">Delete “%1$s” from version history? This cannot be undone.</string>
+    <string name="snapshot_delete_confirm">Delete snapshot</string>
 
     <!-- PipPresetsPanel -->
     <string name="pip_title">Picture-in-Picture</string>
@@ -803,6 +840,31 @@
     <string name="filler_removal_filler_words">Filler Words</string>
     <string name="filler_removal_silences">Silences</string>
     <string name="filler_removal_apply">Remove Selected (%1$d)</string>
+    <string name="filler_removal_subtitle">Spot filler words and dead air, then clean the cut in one pass before you polish pacing by hand.</string>
+    <string name="filler_removal_overview_title">Cleanup pass</string>
+    <string name="filler_removal_status_waiting">Awaiting scan</string>
+    <string name="filler_removal_status_analyzing">Analyzing audio</string>
+    <string name="filler_removal_status_ready">Speech cleanup</string>
+    <plurals name="filler_removal_ready_count">
+        <item quantity="one">%1$d cut ready</item>
+        <item quantity="other">%1$d cuts ready</item>
+    </plurals>
+    <string name="filler_removal_scope_title">Analyze this clip</string>
+    <string name="filler_removal_scope_body">NovaCut looks for filler speech and silent gaps so you can remove the soft spots before the final trim pass.</string>
+    <string name="filler_removal_detection_title">What gets flagged</string>
+    <string name="filler_removal_detection_body">Suggestions stay focused on filler phrases and dead air so the edit stays tight without flattening intentional pauses.</string>
+    <string name="filler_removal_detection_safe">Non-destructive suggestions</string>
+    <string name="filler_removal_empty_title">No cleanup regions yet</string>
+    <string name="filler_removal_empty_body">Run analysis first. If the clip is already tight, NovaCut will leave the pacing untouched.</string>
+    <string name="filler_removal_empty_cta">Run scan</string>
+    <string name="filler_removal_ready_badge">Ready to cut</string>
+    <string name="filler_removal_apply_title">Cleanup suggestions ready</string>
+    <string name="filler_removal_apply_body">Review the suggested filler words and silent gaps, then remove them in one pass to tighten the performance.</string>
+    <string name="filler_removal_analyzing_title">Reviewing speech cadence</string>
+    <string name="filler_removal_analyzing_body">NovaCut is scanning the selected clip for filler speech and dead air so cleanup suggestions feel deliberate instead of aggressive.</string>
+    <string name="filler_removal_waiting_title">Scan the clip first</string>
+    <string name="filler_removal_waiting_body">Start with a quick scan and NovaCut will surface the spots most likely to benefit from cleanup.</string>
+    <string name="filler_removal_disabled_hint">Scan the clip first to unlock one-tap cleanup.</string>
 
     <!-- AutoEditPanel -->
     <string name="auto_edit_title">AI Auto Edit</string>
@@ -828,12 +890,75 @@
     <string name="render_preview_rendering">Rendering preview\u2026</string>
     <string name="render_preview_close_cd">Close render preview</string>
     <string name="render_preview_play_cd">Play rendered preview</string>
+    <string name="render_preview_subtitle">See which sections can stream through untouched and which shots still need a full render pass.</string>
+    <string name="render_preview_outlook_empty_title">Nothing to analyze yet</string>
+    <string name="render_preview_outlook_empty_body">Add clips to the timeline and NovaCut will map which ranges can copy straight through and which still need rendering.</string>
+    <string name="render_preview_outlook_instant_title">Fast path available</string>
+    <string name="render_preview_outlook_instant_body">Every analyzed segment can stream through untouched, so this export should finish closer to a file copy than a full render.</string>
+    <string name="render_preview_outlook_mixed_title">Mixed smart render path</string>
+    <string name="render_preview_outlook_mixed_body">Most of the timeline can copy straight through, with encode time focused only on the ranges you changed.</string>
+    <string name="render_preview_outlook_full_title">Full render required</string>
+    <string name="render_preview_outlook_full_body">Every analyzed segment needs processing, so expect this export to behave like a traditional full render.</string>
+    <string name="render_speedup_instant">Instant</string>
+    <string name="render_speedup_value">%1$.1fx</string>
+    <string name="render_preview_segments_description">Each block shows whether NovaCut can copy that range directly or has to render it again.</string>
+    <string name="render_preview_empty_title">No segments yet</string>
+    <string name="render_preview_empty_body">Once clips are on the timeline, NovaCut will break the sequence into stream-copy and re-encode ranges here.</string>
+    <string name="render_preview_actions_title">Render choices</string>
+    <string name="render_preview_actions_body">Generate a lightweight check render first, or jump straight into the full export flow with the current settings.</string>
+    <string name="render_actions_disabled_hint">Add at least one clip to unlock preview and export actions.</string>
+    <string name="render_segment_pass_through_detail">Stream copied directly with no image-processing work.</string>
+    <string name="render_segment_duration">%1$s span</string>
+    <string name="render_segment_time_range">%1$s - %2$s</string>
 
     <!-- MediaManagerPanel -->
     <string name="media_manager_title">Media Manager</string>
     <string name="media_manager_close_cd">Close media manager</string>
     <string name="media_manager_empty">No media assets in project</string>
     <string name="media_manager_relink_cd">Relink media</string>
+    <string name="media_manager_subtitle">Review linked source files, spot missing footage, and keep the timeline stack lean before export.</string>
+    <string name="media_manager_health_title">Project media health</string>
+    <string name="media_manager_health_description">Check what is linked, what is offline, and whether any empty tracks can be trimmed out of the stack.</string>
+    <string name="media_manager_status_scanning">Scanning</string>
+    <string name="media_manager_status_healthy">Healthy</string>
+    <plurals name="media_manager_status_missing_count">
+        <item quantity="one">%1$d missing</item>
+        <item quantity="other">%1$d missing</item>
+    </plurals>
+    <plurals name="media_manager_status_empty_count">
+        <item quantity="one">%1$d empty</item>
+        <item quantity="other">%1$d empty</item>
+    </plurals>
+    <string name="media_manager_scanning_title">Reviewing linked media</string>
+    <string name="media_manager_scanning_body">NovaCut is checking every source on the timeline so missing footage and cleanup opportunities are surfaced before export.</string>
+    <plurals name="media_manager_missing_title">
+        <item quantity="one">%1$d source needs attention</item>
+        <item quantity="other">%1$d sources need attention</item>
+    </plurals>
+    <string name="media_manager_missing_body">Resolve missing source files before export so previews, renders, and relink decisions stay predictable.</string>
+    <string name="media_manager_ready_title">All linked files are available</string>
+    <string name="media_manager_ready_body">Your source media is available on this device, so preview, export, and handoff workflows should stay reliable.</string>
+    <string name="media_manager_assets_title">Linked files</string>
+    <string name="media_manager_assets_description">Jump straight to the first use of a clip or review missing files before they turn into export surprises.</string>
+    <string name="media_manager_empty_title">No linked media yet</string>
+    <string name="media_manager_empty_body">Imported clips, photos, and audio will appear here as soon as something lands on the timeline.</string>
+    <string name="media_manager_cleanup_title">Timeline cleanup</string>
+    <string name="media_manager_cleanup_ready">No empty non-default tracks are hanging around right now.</string>
+    <string name="media_manager_cleanup_needs_trim">NovaCut found empty non-default tracks that can be removed to tighten the edit stack.</string>
+    <plurals name="media_manager_empty_tracks_count">
+        <item quantity="one">%1$d empty track</item>
+        <item quantity="other">%1$d empty tracks</item>
+    </plurals>
+    <plurals name="media_manager_asset_count">
+        <item quantity="one">%1$d asset</item>
+        <item quantity="other">%1$d assets</item>
+    </plurals>
+    <plurals name="media_used_in_clip_count">
+        <item quantity="one">Used in %1$d clip</item>
+        <item quantity="other">Used in %1$d clips</item>
+    </plurals>
+    <string name="media_file_meta">%1$s • %2$s</string>
+    <string name="media_missing_asset_title">Source unavailable</string>
 
     <!-- SmartReframePanel -->
     <string name="smart_reframe_title">Smart Reframe</string>
@@ -871,6 +996,25 @@
     <string name="panel_cloud_backup_exporting">Exporting\u2026</string>
     <string name="panel_cloud_backup_export">Export Backup</string>
     <string name="panel_cloud_backup_import">Import Backup</string>
+    <string name="panel_cloud_backup_subtitle">Package the project into a portable archive or restore a previous backup without leaving the edit.</string>
+    <string name="panel_cloud_backup_status_title">Backup status</string>
+    <string name="panel_cloud_backup_ready">Ready</string>
+    <string name="panel_cloud_backup_status_empty_title">No backup saved yet</string>
+    <string name="panel_cloud_backup_status_empty_body">Create a project archive before risky changes so you have a clean rollback point that travels with the edit.</string>
+    <string name="panel_cloud_backup_status_exporting_title">Preparing backup archive</string>
+    <string name="panel_cloud_backup_status_exporting_body">NovaCut is packaging the timeline, linked media references, and current project state into a portable archive.</string>
+    <string name="panel_cloud_backup_status_ready_title">Portable archive ready</string>
+    <string name="panel_cloud_backup_status_ready_body">Keep a recent backup on hand before major revisions, device transfers, or client review notes.</string>
+    <string name="panel_cloud_backup_archive_title">Portable project archive</string>
+    <string name="panel_cloud_backup_archive_body">Exports land in Downloads/NovaCut so they are easy to share, move to another device, or keep as rollback points before major edits.</string>
+    <string name="panel_cloud_backup_archive_include_title">What gets packed</string>
+    <string name="panel_cloud_backup_archive_include_body">Each archive keeps the edit portable without baking in a render, so restores stay fast and faithful to the current project state.</string>
+    <string name="panel_cloud_backup_include_timeline">Timeline structure</string>
+    <string name="panel_cloud_backup_include_links">Media links</string>
+    <string name="panel_cloud_backup_include_state">Project state</string>
+    <string name="panel_cloud_backup_actions_title">Backup actions</string>
+    <string name="panel_cloud_backup_actions_body">Create a fresh archive before risky changes, or import one to restore the whole project on this device.</string>
+    <string name="panel_cloud_backup_actions_disabled">Backup actions unlock again as soon as the current export finishes.</string>
 
     <!-- PipPresetsPanel (ChromaKey section) -->
     <string name="panel_chroma_key_title">Chroma Key</string>
@@ -1177,6 +1321,7 @@
 
     <!-- FirstRunTutorial — v3.14.0 -->
     <string name="tutorial_skip">Skip</string>
+    <string name="tutorial_back">Back</string>
     <string name="tutorial_next">Next</string>
     <string name="tutorial_get_started">Get Started</string>
     <string name="tutorial_step_counter">%1$d of %2$d</string>
@@ -1234,7 +1379,7 @@
     <string name="media_goto_first_use">Go to first use</string>
     <string name="media_status_online">Online</string>
     <string name="media_status_missing">Missing</string>
-    <string name="media_source_unavailable">This source file is unavailable on this device. Restore the original path before export. The relink action below shows the current support status for this build.</string>
+    <string name="media_source_unavailable">This source file is missing on this device. Relink it before export so previews and renders do not fall back to missing media.</string>
     <string name="cd_media_goto">Go to clip</string>
     <string name="cd_media_missing">Missing</string>
 
@@ -1257,6 +1402,22 @@
     <!-- ChapterMarkerPanel -->
     <string name="chapter_default_name">Chapter %1$d</string>
 
+    <!-- Scratchpad -->
+    <string name="scratchpad_title">Scratchpad</string>
+    <string name="scratchpad_subtitle_default">Project notes</string>
+    <string name="scratchpad_close_content_description">Close scratchpad</string>
+    <string name="scratchpad_hint">Free-form notes stay with the project. Auto-saved as you type.</string>
+    <string name="scratchpad_placeholder">Ideas, timestamps, review notes…</string>
+    <string name="scratchpad_saved">Saved · %1$d chars</string>
+    <string name="scratchpad_saving">Saving…</string>
+    <string name="scratchpad_menu_label">Scratchpad Notes</string>
+
+    <!-- Recovery dialog -->
+    <string name="recovery_title">Unsaved changes recovered</string>
+    <string name="recovery_message">NovaCut restored this project from the last auto-save. Keep the recovered changes, or discard them and reload the saved version?</string>
+    <string name="recovery_keep">Keep recovered</string>
+    <string name="recovery_discard">Discard</string>
+
     <!-- KeyframeCurveEditor -->
     <string name="cd_keyframe_presets">Presets</string>
     <string name="cd_keyframe_delete">Delete keyframe</string>
@@ -1268,6 +1429,11 @@
     <string name="keyframe_preset_drift">Drift</string>
     <string name="keyframe_preset_spin">Spin 360</string>
     <string name="keyframe_preset_zoom">Zoom In/Out</string>
+    <string name="keyframe_preset_group_cinematic">Cinematic</string>
+    <string name="keyframe_preset_group_fades">Fades</string>
+    <string name="keyframe_preset_group_emphasis">Emphasis</string>
+    <string name="speed_preset_group_ramps">Ramps</string>
+    <string name="speed_preset_group_constants">Constants</string>
 
     <!-- ExportService notifications -->
     <string name="notif_export_complete_title">Export Complete</string>

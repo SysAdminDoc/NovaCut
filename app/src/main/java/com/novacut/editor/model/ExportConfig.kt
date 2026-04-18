@@ -24,11 +24,34 @@ data class ExportConfig(
     val gifFrameRate: Int = 15,
     val gifMaxWidth: Int = 480,
     val captureFrameOnly: Boolean = false,
-    val captureFormat: FrameCaptureFormat = FrameCaptureFormat.PNG
+    val captureFormat: FrameCaptureFormat = FrameCaptureFormat.PNG,
+    val targetSizeBytes: Long? = null,
+    val bitrateOverride: Int? = null,
+    val filenameTemplate: String = "{name}",
+    val exportAsContactSheet: Boolean = false,
+    val contactSheetColumns: Int = 4
 ) {
     init {
         require(videoBitrate > 0) { "Bitrate must be positive" }
         require(audioBitrate > 0) { "Audio bitrate must be positive" }
+    }
+
+    /**
+     * Resolve target-size constraint into a concrete bitrate override for the given
+     * timeline duration. Returns a copy of this config with `bitrateOverride` set so
+     * the encoder produces a file roughly matching `targetSizeBytes`. No-op if no
+     * target size is configured or duration is unusable.
+     */
+    fun resolveTargetSize(totalDurationMs: Long): ExportConfig {
+        val target = targetSizeBytes ?: return this
+        if (totalDurationMs <= 0L) return this
+        // Reserve 2% for container overhead (mp4 atoms, moov box) then subtract audio.
+        val usableBytes = (target * 0.98).toLong()
+        val videoBytes = usableBytes - (audioBitrate.toLong() * totalDurationMs / 8000L)
+        if (videoBytes <= 0L) return copy(bitrateOverride = 500_000)
+        val bitsPerSec = (videoBytes * 8L * 1000L) / totalDurationMs
+        val clamped = bitsPerSec.coerceIn(500_000L, 150_000_000L).toInt()
+        return copy(bitrateOverride = clamped)
     }
 
     companion object {
@@ -84,7 +107,9 @@ data class ExportConfig(
         }
     }
 
-    val videoBitrate: Int get() = when (resolution) {
+    val videoBitrate: Int get() = bitrateOverride ?: defaultVideoBitrate
+
+    private val defaultVideoBitrate: Int get() = when (resolution) {
         Resolution.SD_480P -> when (quality) {
             ExportQuality.LOW -> 2_000_000
             ExportQuality.MEDIUM -> 4_000_000
@@ -184,6 +209,19 @@ enum class SubtitleFormat(val extension: String, val displayName: String) {
     SRT("srt", "SubRip (.srt)"),
     VTT("vtt", "WebVTT (.vtt)"),
     ASS("ass", "Advanced SubStation (.ass)")
+}
+
+enum class TargetSizePreset(
+    val displayName: String,
+    val sizeBytes: Long
+) {
+    DISCORD_8("Discord (8 MB)", 8L * 1024 * 1024),
+    DISCORD_25("Discord Nitro (25 MB)", 25L * 1024 * 1024),
+    DISCORD_100("Discord Boosted (100 MB)", 100L * 1024 * 1024),
+    GMAIL_25("Gmail Attachment (25 MB)", 25L * 1024 * 1024),
+    TELEGRAM_50("Telegram (50 MB)", 50L * 1024 * 1024),
+    WHATSAPP_16("WhatsApp (16 MB)", 16L * 1024 * 1024),
+    TWITTER_512("Twitter/X (512 MB)", 512L * 1024 * 1024);
 }
 
 enum class FrameCaptureFormat(val extension: String, val displayName: String) {

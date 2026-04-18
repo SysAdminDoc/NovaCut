@@ -3,6 +3,7 @@ package com.novacut.editor.ui.editor
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
@@ -67,6 +69,10 @@ fun EditorScreen(
     val segmentationProgress by viewModel.segmentationDownloadProgress.collectAsStateWithLifecycle()
     val scopeFrame by viewModel.scopeFrame.collectAsStateWithLifecycle()
     val showLutPicker by viewModel.showLutPicker.collectAsStateWithLifecycle()
+    val autoSaveTopPadding by animateDpAsState(
+        targetValue = if (state.exportState == ExportState.EXPORTING) 120.dp else 48.dp,
+        label = "autoSaveOverlayOffset"
+    )
     val context = LocalContext.current
     val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -275,7 +281,8 @@ fun EditorScreen(
                 onExport = viewModel::showExportSheet,
                 onSaveTemplate = viewModel::saveAsTemplate,
                 editorMode = state.editorMode,
-                onToggleEditorMode = viewModel::toggleEditorMode
+                onToggleEditorMode = viewModel::toggleEditorMode,
+                onOpenScratchpad = viewModel::showScratchpad
             )
 
             // Empty project onboarding hint
@@ -1239,6 +1246,19 @@ fun EditorScreen(
             )
         }
 
+        // Scratchpad
+        BottomSheetSlot(
+            visible = state.panels.isOpen(PanelId.SCRATCHPAD),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            ScratchpadSheet(
+                initialNotes = state.project.notes,
+                projectName = state.project.name,
+                onNotesChanged = viewModel::updateProjectNotes,
+                onClose = viewModel::hideScratchpad
+            )
+        }
+
         // Chapter Markers
         BottomSheetSlot(
             visible = state.panels.isOpen(PanelId.CHAPTER_MARKERS),
@@ -1252,6 +1272,37 @@ fun EditorScreen(
                 onDeleteChapter = viewModel::deleteChapterMarker,
                 onJumpTo = viewModel::seekTo,
                 onClose = viewModel::hideChapterMarkers
+            )
+        }
+
+        // Recovery dialog — shown on editor open when auto-save data was restored.
+        if (state.panels.isOpen(PanelId.RECOVERY_DIALOG)) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel.dismissRecoveryDialog(recover = true) },
+                title = {
+                    androidx.compose.material3.Text(
+                        text = androidx.compose.ui.res.stringResource(com.novacut.editor.R.string.recovery_title)
+                    )
+                },
+                text = {
+                    androidx.compose.material3.Text(
+                        text = androidx.compose.ui.res.stringResource(com.novacut.editor.R.string.recovery_message)
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { viewModel.dismissRecoveryDialog(recover = true) }) {
+                        androidx.compose.material3.Text(
+                            text = androidx.compose.ui.res.stringResource(com.novacut.editor.R.string.recovery_keep)
+                        )
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { viewModel.dismissRecoveryDialog(recover = false) }) {
+                        androidx.compose.material3.Text(
+                            text = androidx.compose.ui.res.stringResource(com.novacut.editor.R.string.recovery_discard)
+                        )
+                    }
+                }
             )
         }
 
@@ -1597,7 +1648,7 @@ fun EditorScreen(
             state = state.saveIndicator,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 48.dp, end = 8.dp)
+                .padding(top = autoSaveTopPadding, end = 8.dp)
         )
 
         // Text Template Gallery
@@ -1743,7 +1794,8 @@ private fun EditorTopBar(
     onExport: () -> Unit,
     onSaveTemplate: (String) -> Unit = {},
     editorMode: EditorMode = EditorMode.PRO,
-    onToggleEditorMode: () -> Unit = {}
+    onToggleEditorMode: () -> Unit = {},
+    onOpenScratchpad: () -> Unit = {}
 ) {
     var showOverflow by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -1902,22 +1954,42 @@ private fun EditorTopBar(
                         overflow = TextOverflow.Ellipsis
                     )
                     Surface(
+                        onClick = onToggleEditorMode,
                         color = if (editorMode == EditorMode.PRO) Mocha.Mauve.copy(alpha = 0.14f) else Mocha.Sapphire.copy(alpha = 0.14f),
-                        shape = RoundedCornerShape(999.dp)
-                    ) {
-                        Text(
-                            text = if (editorMode == EditorMode.PRO) {
-                                stringResource(R.string.settings_mode_pro)
+                        shape = RoundedCornerShape(999.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (editorMode == EditorMode.PRO) {
+                                Mocha.Mauve.copy(alpha = 0.2f)
                             } else {
-                                stringResource(R.string.settings_mode_easy)
-                            },
-                            color = if (editorMode == EditorMode.PRO) Mocha.Rosewater else Mocha.Sapphire,
-                            style = MaterialTheme.typography.labelSmall,
+                                Mocha.Sapphire.copy(alpha = 0.2f)
+                            }
+                        )
+                    ) {
+                        Row(
                             modifier = Modifier.padding(
                                 horizontal = if (isCompactBar) 7.dp else 8.dp,
                                 vertical = if (isCompactBar) 3.dp else 4.dp
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = if (editorMode == EditorMode.PRO) Mocha.Rosewater else Mocha.Sapphire,
+                                modifier = Modifier.size(12.dp)
                             )
-                        )
+                            Text(
+                                text = if (editorMode == EditorMode.PRO) {
+                                    stringResource(R.string.settings_mode_pro)
+                                } else {
+                                    stringResource(R.string.settings_mode_easy)
+                                },
+                                color = if (editorMode == EditorMode.PRO) Mocha.Rosewater else Mocha.Sapphire,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
 
@@ -2062,6 +2134,19 @@ private fun EditorTopBar(
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Default.SaveAs, contentDescription = stringResource(R.string.editor_save_as_template_cd))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.scratchpad_menu_label)) },
+                                onClick = {
+                                    showOverflow = false
+                                    onOpenScratchpad()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Notes,
+                                        contentDescription = stringResource(R.string.scratchpad_menu_label)
+                                    )
                                 }
                             )
                         }

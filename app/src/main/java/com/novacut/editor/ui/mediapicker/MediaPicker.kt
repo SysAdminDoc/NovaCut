@@ -30,9 +30,13 @@ import com.novacut.editor.R
 import com.novacut.editor.ui.editor.PremiumEditorPanel
 import com.novacut.editor.ui.editor.PremiumPanelCard
 import com.novacut.editor.ui.editor.PremiumPanelPill
+import com.novacut.editor.ui.editor.PremiumSnackbarHost
+import com.novacut.editor.ui.editor.ToastSeverity
 import com.novacut.editor.ui.theme.Mocha
 import java.io.File
+import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MediaPickerSheet(
     onMediaSelected: (Uri, String) -> Unit,
@@ -43,6 +47,7 @@ fun MediaPickerSheet(
     var pendingMediaType by remember { mutableStateOf("video") }
     var cameraVideoUri by remember { mutableStateOf<Uri?>(null) }
     var cameraVideoFile by remember { mutableStateOf<File?>(null) }
+    var permissionMessage by remember { mutableStateOf<String?>(null) }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -138,13 +143,10 @@ fun MediaPickerSheet(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
+            permissionMessage = null
             startCameraCapture()
         } else {
-            android.widget.Toast.makeText(
-                context,
-                context.getString(R.string.media_picker_camera_permission_required),
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
+            permissionMessage = context.getString(R.string.media_picker_camera_permission_required)
         }
     }
 
@@ -167,6 +169,13 @@ fun MediaPickerSheet(
         stringResource(R.string.media_picker_source_files)
     }
 
+    LaunchedEffect(permissionMessage) {
+        if (permissionMessage != null) {
+            delay(3500L)
+            permissionMessage = null
+        }
+    }
+
     PremiumEditorPanel(
         title = stringResource(R.string.media_picker_title),
         subtitle = stringResource(R.string.media_picker_subtitle),
@@ -176,6 +185,15 @@ fun MediaPickerSheet(
         modifier = modifier.heightIn(min = 240.dp, max = 560.dp),
         scrollable = true
     ) {
+        PremiumSnackbarHost(
+            message = permissionMessage,
+            severity = ToastSeverity.Warning,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (permissionMessage != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         PremiumPanelCard(accent = Mocha.Blue) {
             Text(
                 text = stringResource(R.string.media_picker_library_title),
@@ -187,9 +205,16 @@ fun MediaPickerSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = Mocha.Subtext0
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 PremiumPanelPill(text = librarySourceLabel, accent = Mocha.Blue)
                 PremiumPanelPill(text = stringResource(R.string.media_picker_source_audio), accent = Mocha.Peach)
+                PremiumPanelPill(
+                    text = stringResource(R.string.media_picker_source_kept_local),
+                    accent = Mocha.Teal
+                )
             }
 
             MediaSourceActionCard(

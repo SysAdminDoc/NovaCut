@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
+import com.novacut.editor.engine.ContactSheetExporter
 import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.SmartRenderEngine
@@ -47,6 +48,44 @@ class ExportDelegate(
     // --- Export ---
     @Volatile private var gifExportJob: kotlinx.coroutines.Job? = null
 
+    /**
+     * Expand filename template tokens. Supported tokens:
+     *   {name} project/base name
+     *   {date} YYYY-MM-DD (device local)
+     *   {time} HHmm (device local, 24h)
+     *   {res}  resolution label (e.g. 1080p)
+     *   {codec} codec label (e.g. H.264)
+     *   {fps}  frame rate
+     *   {preset} platform preset display name (if any) or aspect ratio
+     */
+    private fun applyFilenameTemplate(
+        template: String,
+        baseName: String,
+        config: com.novacut.editor.model.ExportConfig
+    ): String {
+        val now = java.util.Calendar.getInstance()
+        val date = "%04d-%02d-%02d".format(
+            now.get(java.util.Calendar.YEAR),
+            now.get(java.util.Calendar.MONTH) + 1,
+            now.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+        val time = "%02d%02d".format(
+            now.get(java.util.Calendar.HOUR_OF_DAY),
+            now.get(java.util.Calendar.MINUTE)
+        )
+        val preset = config.platformPreset?.displayName ?: config.aspectRatio.label
+        return template
+            .replace("{name}", baseName)
+            .replace("{date}", date)
+            .replace("{time}", time)
+            .replace("{res}", config.resolution.label)
+            .replace("{codec}", config.codec.label)
+            .replace("{fps}", config.frameRate.toString())
+            .replace("{preset}", preset)
+            .trim()
+            .ifBlank { baseName }
+    }
+
     fun cancelExport() {
         // Cancel GIF export coroutine if one is running
         gifExportJob?.cancel()
@@ -70,7 +109,12 @@ class ExportDelegate(
             return
         }
 
-        val config = currentState.exportConfig.copy(aspectRatio = currentState.project.aspectRatio)
+        val totalDurationMs = currentState.tracks
+            .flatMap { it.clips }
+            .maxOfOrNull { it.timelineStartMs + it.durationMs } ?: 0L
+        val config = currentState.exportConfig
+            .copy(aspectRatio = currentState.project.aspectRatio)
+            .resolveTargetSize(totalDurationMs)
         val configWithChapters = if (config.includeChapterMarkers && config.chapters.isEmpty()) {
             config.copy(chapters = currentState.timelineMarkers
                 .sortedBy { it.timeMs }
@@ -79,6 +123,66 @@ class ExportDelegate(
         } else config
         val tracks = currentState.tracks
         val textOverlays = currentState.textOverlays
+
+        // Contact-sheet export path — renders one PNG grid of clip thumbnails.
+        // Short path because there's no Transformer, no foreground service, no audio.
+        if (configWithChapters.exportAsContactSheet) {
+            stateFlow.update { it.copy(
+                exportStartTime = System.currentTimeMillis(),
+                exportProgress = 0f,
+                exportState = ExportState.EXPORTING,
+                exportErrorMessage = null
+            ) }
+            gifExportJob = scope.launch {
+                try {
+                    withContext(Dispatchers.IO) { outputDir.mkdirs() }
+                    val sheetFile = createOutputFile(
+                        outputDir = outputDir,
+                        extension = "png",
+                        preferredOutputName = (preferredOutputName ?: currentState.project.name) + "_contact"
+                    )
+                    val allClips = tracks
+                        .filter { it.type == com.novacut.editor.model.TrackType.VIDEO || it.type == com.novacut.editor.model.TrackType.OVERLAY }
+                        .flatMap { it.clips }
+                        .sortedBy { it.timelineStartMs }
+                    if (allClips.isEmpty()) {
+                        stateFlow.update { it.copy(exportState = ExportState.ERROR, exportErrorMessage = "No video clips") }
+                        return@launch
+                    }
+                    val ok = ContactSheetExporter.export(
+                        clips = allClips,
+                        columns = configWithChapters.contactSheetColumns,
+                        outputFile = sheetFile,
+                        extractThumb = { uri, timeUs, w, h -> videoEngine.extractThumbnail(uri, timeUs, w, h) },
+                        onProgress = { p -> stateFlow.update { it.copy(exportProgress = p) } }
+                    )
+                    if (ok) {
+                        stateFlow.update { it.copy(
+                            exportState = ExportState.COMPLETE,
+                            exportProgress = 1f,
+                            lastExportedFilePath = sheetFile.absolutePath
+                        ) }
+                        showToast("Contact sheet exported: ${sheetFile.name}")
+                    } else {
+                        stateFlow.update { it.copy(
+                            exportState = ExportState.ERROR,
+                            exportErrorMessage = "Contact sheet render failed"
+                        ) }
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    stateFlow.update { it.copy(exportState = ExportState.CANCELLED, exportProgress = 0f) }
+                } catch (e: Exception) {
+                    android.util.Log.w("ExportDelegate", "Contact sheet export failed", e)
+                    stateFlow.update { it.copy(
+                        exportState = ExportState.ERROR,
+                        exportErrorMessage = e.message ?: "Contact sheet export failed"
+                    ) }
+                } finally {
+                    gifExportJob = null
+                }
+            }
+            return
+        }
 
         // GIF export path
         if (configWithChapters.exportAsGif) {
@@ -214,6 +318,23 @@ class ExportDelegate(
                         stateFlow.update { it.copy(exportProgress = progress) }
                     },
                     onComplete = {
+                        // If the project carries scratchpad notes, drop them next to the render
+                        // as a `.txt` sidecar. Runs on IO to avoid blocking the Transformer
+                        // callback thread; failure is logged but doesn't taint the export.
+                        val notes = currentState.project.notes
+                        if (notes.isNotBlank()) {
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    val sidecar = File(
+                                        outputFile.parentFile,
+                                        "${outputFile.nameWithoutExtension}.notes.txt"
+                                    )
+                                    sidecar.writeText(notes)
+                                } catch (e: Exception) {
+                                    android.util.Log.w("ExportDelegate", "Scratchpad sidecar write failed", e)
+                                }
+                            }
+                        }
                         stateFlow.update { it.copy(
                             exportState = ExportState.COMPLETE,
                             exportProgress = 1f,
@@ -387,7 +508,9 @@ class ExportDelegate(
             .substringBeforeLast('.', missingDelimiterValue = trimmedOutputName)
             .takeIf { it.isNotBlank() }
             ?: "NovaCut"
-        val sanitizedBase = sanitizeFileName(baseName, fallback = "NovaCut", maxLength = 64)
+        val template = stateFlow.value.exportConfig.filenameTemplate.ifBlank { "{name}" }
+        val templated = applyFilenameTemplate(template, baseName, stateFlow.value.exportConfig)
+        val sanitizedBase = sanitizeFileName(templated, fallback = "NovaCut", maxLength = 64)
         var candidate = File(outputDir, "$sanitizedBase.$extension")
         if (!candidate.exists()) {
             return candidate

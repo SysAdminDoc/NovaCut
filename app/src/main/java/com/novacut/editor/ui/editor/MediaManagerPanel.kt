@@ -29,7 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,10 +82,18 @@ fun MediaManagerPanel(
         tracks.count { it.index >= 2 && it.clips.isEmpty() }
     }
     val statusLabel = when {
-        isAnalyzing -> "Scanning"
-        missingCount > 0 -> "$missingCount missing"
-        emptyTrackCount > 0 -> "$emptyTrackCount empty"
-        else -> "Healthy"
+        isAnalyzing -> stringResource(R.string.media_manager_status_scanning)
+        missingCount > 0 -> pluralStringResource(
+            R.plurals.media_manager_status_missing_count,
+            missingCount,
+            missingCount
+        )
+        emptyTrackCount > 0 -> pluralStringResource(
+            R.plurals.media_manager_status_empty_count,
+            emptyTrackCount,
+            emptyTrackCount
+        )
+        else -> stringResource(R.string.media_manager_status_healthy)
     }
     val statusAccent = when {
         isAnalyzing -> Mocha.Blue
@@ -91,10 +101,20 @@ fun MediaManagerPanel(
         emptyTrackCount > 0 -> Mocha.Yellow
         else -> Mocha.Green
     }
+    val assetCountLabel = pluralStringResource(
+        R.plurals.media_manager_asset_count,
+        assets.size,
+        assets.size
+    )
+    val emptyTrackLabel = pluralStringResource(
+        R.plurals.media_manager_empty_tracks_count,
+        emptyTrackCount,
+        emptyTrackCount
+    )
 
     PremiumEditorPanel(
         title = stringResource(R.string.media_manager_title),
-        subtitle = "Review linked source files, spot missing footage, and keep the timeline stack lean before export.",
+        subtitle = stringResource(R.string.media_manager_subtitle),
         icon = Icons.Default.PermMedia,
         accent = if (missingCount > 0) Mocha.Red else Mocha.Blue,
         onClose = onClose,
@@ -110,13 +130,13 @@ fun MediaManagerPanel(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Project media health",
+                        text = stringResource(R.string.media_manager_health_title),
                         style = MaterialTheme.typography.titleMedium,
                         color = Mocha.Text
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Check what is linked, what is offline, and whether any empty tracks can be trimmed out of the stack.",
+                        text = stringResource(R.string.media_manager_health_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Mocha.Subtext0
                     )
@@ -182,7 +202,7 @@ fun MediaManagerPanel(
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        ) {
                         CircularProgressIndicator(
                             modifier = Modifier
                                 .height(18.dp)
@@ -190,60 +210,97 @@ fun MediaManagerPanel(
                             color = Mocha.Blue,
                             strokeWidth = 2.dp
                         )
-                        Text(
-                            text = "Scanning media references on the timeline...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Mocha.Subtext0
-                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.media_manager_scanning_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Mocha.Text,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = stringResource(R.string.media_manager_scanning_body),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Mocha.Subtext0
+                            )
+                        }
                     }
                 }
-            } else if (assets.isNotEmpty() && missingCount == 0) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Mocha.Green.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, Mocha.Green.copy(alpha = 0.18f))
-                ) {
-                    Text(
-                        text = "All linked files are available on this device.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Mocha.Green,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-                    )
-                }
+            } else {
+                MediaManagerMessageCard(
+                    title = when {
+                        missingCount > 0 -> pluralStringResource(
+                            R.plurals.media_manager_missing_title,
+                            missingCount,
+                            missingCount
+                        )
+                        assets.isEmpty() -> stringResource(R.string.media_manager_empty_title)
+                        else -> stringResource(R.string.media_manager_ready_title)
+                    },
+                    body = when {
+                        missingCount > 0 -> stringResource(R.string.media_manager_missing_body)
+                        assets.isEmpty() -> stringResource(R.string.media_manager_empty_body)
+                        else -> stringResource(R.string.media_manager_ready_body)
+                    },
+                    accent = when {
+                        missingCount > 0 -> Mocha.Red
+                        assets.isEmpty() -> Mocha.Blue
+                        else -> Mocha.Green
+                    },
+                    icon = when {
+                        missingCount > 0 -> Icons.Default.BrokenImage
+                        assets.isEmpty() -> Icons.Default.PermMedia
+                        else -> Icons.Default.Link
+                    }
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         PremiumPanelCard(accent = Mocha.Blue) {
-            Text(
-                text = "Linked files",
-                style = MaterialTheme.typography.titleMedium,
-                color = Mocha.Text
-            )
-            Text(
-                text = "Jump straight to the first use of a clip or review missing files before they turn into export surprises.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Mocha.Subtext0
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.media_manager_assets_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Mocha.Text
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.media_manager_assets_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Mocha.Subtext0
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                PremiumPanelPill(
+                    text = assetCountLabel,
+                    accent = when {
+                        missingCount > 0 -> Mocha.Peach
+                        assets.isEmpty() -> Mocha.Overlay0
+                        else -> Mocha.Blue
+                    }
+                )
+            }
 
             when {
                 isAnalyzing -> Unit
                 assets.isEmpty() -> {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Mocha.PanelRaised,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Mocha.CardStroke)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.media_manager_empty),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Mocha.Subtext0,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
+                    MediaManagerMessageCard(
+                        title = stringResource(R.string.media_manager_empty_title),
+                        body = stringResource(R.string.media_manager_empty_body),
+                        accent = Mocha.Blue,
+                        icon = Icons.Default.PermMedia
+                    )
                 }
 
                 else -> {
@@ -267,22 +324,22 @@ fun MediaManagerPanel(
 
         PremiumPanelCard(accent = if (emptyTrackCount > 0) Mocha.Yellow else Mocha.Green) {
             Text(
-                text = "Timeline cleanup",
+                text = stringResource(R.string.media_manager_cleanup_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = Mocha.Text
             )
             Text(
                 text = if (emptyTrackCount > 0) {
-                    "NovaCut found empty non-default tracks that can be removed to tighten the edit stack."
+                    stringResource(R.string.media_manager_cleanup_needs_trim)
                 } else {
-                    "No empty non-default tracks are hanging around right now."
+                    stringResource(R.string.media_manager_cleanup_ready)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = Mocha.Subtext0
             )
 
             PremiumPanelPill(
-                text = "$emptyTrackCount empty track${if (emptyTrackCount == 1) "" else "s"}",
+                text = emptyTrackLabel,
                 accent = if (emptyTrackCount > 0) Mocha.Yellow else Mocha.Green
             )
 
@@ -341,6 +398,60 @@ private fun MediaHealthMetric(
     }
 }
 
+@Composable
+private fun MediaManagerMessageCard(
+    title: String,
+    body: String,
+    accent: Color,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = accent.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                color = accent.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Mocha.Subtext0
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MediaAssetCard(
@@ -350,7 +461,11 @@ private fun MediaAssetCard(
 ) {
     val accent = if (asset.isAccessible) Mocha.Blue else Mocha.Red
     val statusLabel = stringResource(if (asset.isAccessible) R.string.media_status_online else R.string.media_status_missing)
-    val usageLabel = if (asset.usedInClipIds.size == 1) "Used in 1 clip" else "Used in ${asset.usedInClipIds.size} clips"
+    val usageLabel = pluralStringResource(
+        R.plurals.media_used_in_clip_count,
+        asset.usedInClipIds.size,
+        asset.usedInClipIds.size
+    )
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -401,12 +516,11 @@ private fun MediaAssetCard(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${formatFileSize(asset.fileSize)} • ${formatDuration(asset.durationMs)} • ${
-                                stringResource(
-                                    R.string.media_used_count,
-                                    asset.usedInClipIds.size
-                                )
-                            }",
+                            text = stringResource(
+                                R.string.media_file_meta,
+                                formatFileSize(asset.fileSize),
+                                formatDuration(asset.durationMs)
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = Mocha.Subtext0
                         )
@@ -422,10 +536,11 @@ private fun MediaAssetCard(
             }
 
             if (!asset.isAccessible) {
-                Text(
-                    text = stringResource(R.string.media_source_unavailable),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Mocha.Subtext0
+                MediaManagerMessageCard(
+                    title = stringResource(R.string.media_missing_asset_title),
+                    body = stringResource(R.string.media_source_unavailable),
+                    accent = Mocha.Red,
+                    icon = Icons.Default.BrokenImage
                 )
             }
 
@@ -435,7 +550,7 @@ private fun MediaAssetCard(
             ) {
                 PremiumPanelPill(
                     text = usageLabel,
-                    accent = if (asset.usedInClipIds.isEmpty()) Mocha.Yellow else Mocha.Green
+                    accent = if (asset.isAccessible) Mocha.Green else Mocha.Peach
                 )
 
                 FlowRow(
@@ -462,8 +577,8 @@ private fun MediaAssetCard(
                         OutlinedButton(
                             onClick = { onJumpToClip(asset.usedInClipIds.first()) },
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, accent.copy(alpha = 0.25f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = accent)
+                            border = BorderStroke(1.dp, Mocha.Blue.copy(alpha = 0.25f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Blue)
                         ) {
                             androidx.compose.material3.Icon(
                                 imageVector = Icons.Default.MyLocation,

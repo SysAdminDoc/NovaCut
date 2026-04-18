@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
-import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,6 +25,8 @@ import com.novacut.editor.model.TrackType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +57,11 @@ class ProjectListViewModel @Inject constructor(
 
     private val _userTemplates = MutableStateFlow<List<UserTemplate>>(emptyList())
     val userTemplates: StateFlow<List<UserTemplate>> = _userTemplates.asStateFlow()
+
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    private var toastDismissJob: Job? = null
 
     private val allProjects: StateFlow<List<Project>> = projectDao.getAllProjects()
         // Room re-emits on any table write even when the query result is identical; collapse
@@ -430,6 +436,18 @@ class ProjectListViewModel @Inject constructor(
     }
 
     private fun showToast(message: String) {
-        Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
+        toastDismissJob?.cancel()
+        _toastMessage.value = message
+        toastDismissJob = viewModelScope.launch {
+            delay(2800L)
+            if (_toastMessage.value == message) {
+                _toastMessage.value = null
+            }
+        }
+    }
+
+    fun dismissToast() {
+        toastDismissJob?.cancel()
+        _toastMessage.value = null
     }
 }
