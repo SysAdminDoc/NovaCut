@@ -3,16 +3,18 @@ package com.novacut.editor.ui.projects
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.OpenableColumns
-import android.webkit.MimeTypeMap
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.novacut.editor.R
 import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ProjectAutoSave
 import com.novacut.editor.engine.TemplateManager
 import com.novacut.editor.engine.UserTemplate
 import com.novacut.editor.engine.VideoEngine
+import com.novacut.editor.engine.importUriToManagedMedia
+import com.novacut.editor.engine.resolveMediaDisplayName
 import com.novacut.editor.engine.sanitizeFileName
 import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.AspectRatio
@@ -117,18 +119,21 @@ class ProjectListViewModel @Inject constructor(
         val initialTracks = buildTracks(trackTypes)
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                projectDao.insertProject(project)
-                autoSave.saveNow(
-                    project.id,
-                    AutoSaveState(
+            val created = withContext(Dispatchers.IO) {
+                createProjectWithInitialState(
+                    project = project,
+                    initialState = AutoSaveState(
                         projectId = project.id,
                         tracks = initialTracks,
                         textOverlays = emptyList()
                     )
                 )
             }
-            onCreated(project.id)
+            if (created) {
+                onCreated(project.id)
+            } else {
+                showToast(appContext.getString(R.string.project_create_failed))
+            }
         }
     }
 
@@ -226,24 +231,29 @@ class ProjectListViewModel @Inject constructor(
             templateId = template.id
         )
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                projectDao.insertProject(project)
-                val autoState = AutoSaveState(
-                    projectId = project.id,
-                    tracks = tracks.map { track ->
-                        track.copy(
-                            clips = if (track.type == TrackType.VIDEO || track.type == TrackType.AUDIO) {
-                                emptyList()
-                            } else {
-                                track.clips
-                            }
-                        )
-                    },
-                    textOverlays = textOverlays
+            val created = withContext(Dispatchers.IO) {
+                createProjectWithInitialState(
+                    project = project,
+                    initialState = AutoSaveState(
+                        projectId = project.id,
+                        tracks = tracks.map { track ->
+                            track.copy(
+                                clips = if (track.type == TrackType.VIDEO || track.type == TrackType.AUDIO) {
+                                    emptyList()
+                                } else {
+                                    track.clips
+                                }
+                            )
+                        },
+                        textOverlays = textOverlays
+                    )
                 )
-                autoSave.saveNow(project.id, autoState)
             }
-            onCreated(project.id)
+            if (created) {
+                onCreated(project.id)
+            } else {
+                showToast(appContext.getString(R.string.project_create_failed))
+            }
         }
     }
 
@@ -264,19 +274,23 @@ class ProjectListViewModel @Inject constructor(
             updatedAt = System.currentTimeMillis()
         )
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                projectDao.insertProject(newProject)
-                // If the auto-save file copy fails (disk full, source corrupt, etc.) we
-                // would otherwise leave an orphaned Room row that opens as an empty
-                // project — confusing the user, who expected a duplicate. Roll the row
-                // back so the failure is observable and re-tryable rather than silent.
+            val duplicated = withContext(Dispatchers.IO) {
                 try {
-                    autoSave.copyAutoSave(project.id, newId)
+                    projectDao.insertProject(newProject)
+                    if (autoSave.copyAutoSave(project.id, newId)) {
+                        true
+                    } else {
+                        projectDao.deleteById(newId)
+                        false
+                    }
                 } catch (e: Exception) {
-                    android.util.Log.w("ProjectListVM", "Failed to copy auto-save for duplicate; rolling back row", e)
+                    Log.w("ProjectListVM", "Failed to duplicate project ${project.id}", e)
                     runCatching { projectDao.deleteById(newId) }
-                    throw e
+                    false
                 }
+            }
+            if (!duplicated) {
+                showToast(appContext.getString(R.string.project_duplicate_failed))
             }
         }
     }
@@ -284,8 +298,13 @@ class ProjectListViewModel @Inject constructor(
     fun createProjectFromImport(videoUri: Uri, onCreated: (String) -> Unit) {
         viewModelScope.launch {
             val importedUri = withContext(Dispatchers.IO) {
-                copyToLocalMedia(videoUri, "video")
+                importUriToManagedMedia(appContext, videoUri, "video")
             }
+            if (importedUri == null) {
+                showToast(appContext.getString(R.string.project_import_copy_failed))
+                return@launch
+            }
+            val copiedForImport = importedUri.toString() != videoUri.toString()
             val importCheck = withContext(Dispatchers.IO) {
                 val readable = runCatching {
                     appContext.contentResolver.openAssetFileDescriptor(importedUri, "r")?.use { true } ?: false
@@ -293,13 +312,16 @@ class ProjectListViewModel @Inject constructor(
                 readable to videoEngine.hasVisualTrack(importedUri)
             }
             if (!importCheck.first || !importCheck.second) {
+                if (copiedForImport) {
+                    runCatching { importedUri.path?.let(::File)?.delete() }
+                }
                 showToast("Couldn't import that video")
                 return@launch
             }
             val durationMs = withContext(Dispatchers.IO) {
                 videoEngine.getVideoDuration(importedUri).takeIf { it > 0 } ?: 3_000L
             }
-            val fileName = resolveDisplayName(videoUri)
+            val fileName = resolveMediaDisplayName(appContext, videoUri)
                 ?.substringBeforeLast('.')
                 ?.let(::normalizeProjectName)
                 ?: "Imported"
@@ -325,19 +347,24 @@ class ProjectListViewModel @Inject constructor(
                 }
             }
 
-            withContext(Dispatchers.IO) {
-                projectDao.insertProject(project)
-                autoSave.saveNow(
-                    project.id,
-                    AutoSaveState(
+            val created = withContext(Dispatchers.IO) {
+                createProjectWithInitialState(
+                    project = project,
+                    initialState = AutoSaveState(
                         projectId = project.id,
                         tracks = importedTracks,
                         textOverlays = emptyList()
                     )
                 )
             }
-
-            onCreated(project.id)
+            if (created) {
+                onCreated(project.id)
+            } else {
+                if (copiedForImport) {
+                    runCatching { importedUri.path?.let(::File)?.delete() }
+                }
+                showToast(appContext.getString(R.string.project_create_failed))
+            }
         }
     }
 
@@ -358,80 +385,22 @@ class ProjectListViewModel @Inject constructor(
         return raw.trim().ifBlank { "Untitled" }
     }
 
-    private fun resolveDisplayName(uri: Uri): String? {
-        if (uri.scheme == "file") {
-            return uri.lastPathSegment
-        }
-
-        return runCatching {
-            appContext.contentResolver.query(
-                uri,
-                arrayOf(OpenableColumns.DISPLAY_NAME),
-                null,
-                null,
-                null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-                } else {
-                    null
-                }
-            }
-        }.getOrNull() ?: uri.lastPathSegment
-    }
-
-    private fun copyToLocalMedia(uri: Uri, mediaType: String): Uri {
+    private suspend fun createProjectWithInitialState(
+        project: Project,
+        initialState: AutoSaveState
+    ): Boolean {
         return try {
-            if (uri.scheme == "file") {
-                val path = uri.path.orEmpty()
-                if (path.startsWith(appContext.filesDir.absolutePath) || path.startsWith(appContext.cacheDir.absolutePath)) {
-                    return uri
-                }
-            }
-
-            val mediaDir = File(appContext.filesDir, "media").apply { mkdirs() }
-            val ext = resolveFileExtension(uri, mediaType)
-            var destFile = File(
-                mediaDir,
-                "${System.currentTimeMillis()}_${uri.lastPathSegment?.hashCode()?.toUInt() ?: 0}$ext"
-            )
-            while (destFile.exists()) {
-                destFile = File(mediaDir, "${System.currentTimeMillis()}_${(0..9999).random()}$ext")
-            }
-
-            val input = appContext.contentResolver.openInputStream(uri) ?: return uri
-            input.use { src ->
-                destFile.outputStream().use { dst -> src.copyTo(dst) }
-            }
-
-            if (destFile.length() == 0L) {
-                destFile.delete()
-                uri
+            projectDao.insertProject(project)
+            if (autoSave.saveNow(project.id, initialState)) {
+                true
             } else {
-                Uri.fromFile(destFile)
+                projectDao.deleteById(project.id)
+                false
             }
         } catch (e: Exception) {
-            uri
-        }
-    }
-
-    private fun resolveFileExtension(uri: Uri, mediaType: String): String {
-        val mimeType = appContext.contentResolver.getType(uri)
-        val mimeExt = mimeType?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-        if (!mimeExt.isNullOrBlank()) {
-            return ".${mimeExt.lowercase()}"
-        }
-
-        val displayName = resolveDisplayName(uri)
-        val nameExt = displayName?.substringAfterLast('.', "")
-        if (!nameExt.isNullOrBlank()) {
-            return ".${nameExt.lowercase()}"
-        }
-
-        return when (mediaType) {
-            "image" -> ".jpg"
-            "audio" -> ".m4a"
-            else -> ".mp4"
+            Log.w("ProjectListVM", "Failed to create project ${project.id}", e)
+            runCatching { projectDao.deleteById(project.id) }
+            false
         }
     }
 

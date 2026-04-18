@@ -2,6 +2,7 @@ package com.novacut.editor.engine
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class FileNamingTest {
@@ -32,5 +33,15 @@ class FileNamingTest {
 
         assertEquals("rough__cut_.fcpxml", sanitized)
         assertFalse(sanitized.endsWith("."))
+    }
+
+    @Test
+    fun `autoSaveFileStem is deterministic and strips path separators`() {
+        val stem = autoSaveFileStem("../CON?.json")
+
+        assertEquals(stem, autoSaveFileStem("../CON?.json"))
+        assertNotEquals(stem, autoSaveFileStem("../CON?.json/other"))
+        assertFalse(stem.contains("/"))
+        assertFalse(stem.contains("\\"))
     }
 }
