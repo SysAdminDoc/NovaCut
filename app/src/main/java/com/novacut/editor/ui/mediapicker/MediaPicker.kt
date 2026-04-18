@@ -4,8 +4,6 @@ import android.Manifest
 import android.net.Uri
 import android.os.Build
 import android.content.pm.PackageManager
-import android.provider.OpenableColumns
-import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.novacut.editor.R
+import com.novacut.editor.engine.finalizePendingCameraCapture
+import com.novacut.editor.engine.importUriToManagedMedia
+import com.novacut.editor.engine.pendingCameraCaptureDir
+import com.novacut.editor.engine.resolveManagedMediaExtension
 import com.novacut.editor.ui.editor.PremiumEditorPanel
 import com.novacut.editor.ui.editor.PremiumPanelCard
 import com.novacut.editor.ui.editor.PremiumPanelPill
@@ -90,8 +92,12 @@ fun MediaPickerSheet(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            val localUri = copyToLocalMedia(context, uri, "video")
-            onMediaSelected(localUri, "video")
+            val localUri = importUriToManagedMedia(context, uri, "video")
+            if (localUri != null) {
+                onMediaSelected(localUri, "video")
+            } else {
+                permissionMessage = context.getString(R.string.media_picker_local_copy_failed)
+            }
         }
     }
 
@@ -99,8 +105,12 @@ fun MediaPickerSheet(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            val localUri = copyToLocalMedia(context, uri, "image")
-            onMediaSelected(localUri, "image")
+            val localUri = importUriToManagedMedia(context, uri, "image")
+            if (localUri != null) {
+                onMediaSelected(localUri, "image")
+            } else {
+                permissionMessage = context.getString(R.string.media_picker_local_copy_failed)
+            }
         }
     }
 
@@ -109,8 +119,12 @@ fun MediaPickerSheet(
     ) { uris ->
         uris.forEach { uri ->
             val type = resolvePickedMediaType(context, uri, fallbackType = "video")
-            val localUri = copyToLocalMedia(context, uri, type)
-            onMediaSelected(localUri, type)
+            val localUri = importUriToManagedMedia(context, uri, type)
+            if (localUri != null) {
+                onMediaSelected(localUri, type)
+            } else {
+                permissionMessage = context.getString(R.string.media_picker_local_copy_failed)
+            }
         }
     }
 
@@ -118,7 +132,13 @@ fun MediaPickerSheet(
         contract = ActivityResultContracts.CaptureVideo()
     ) { success ->
         if (success) {
-            cameraVideoUri?.let { uri -> onMediaSelected(uri, "video") }
+            val finalizedUri = cameraVideoFile?.let { finalizePendingCameraCapture(context, it, "video") }
+            if (finalizedUri != null) {
+                onMediaSelected(finalizedUri, "video")
+            } else {
+                permissionMessage = context.getString(R.string.media_picker_local_copy_failed)
+                cameraVideoFile?.delete()
+            }
         } else {
             cameraVideoFile?.delete()
         }
@@ -127,7 +147,7 @@ fun MediaPickerSheet(
     }
 
     fun startCameraCapture() {
-        val cameraDir = File(context.filesDir, "media").apply { mkdirs() }
+        val cameraDir = pendingCameraCaptureDir(context).apply { mkdirs() }
         val videoFile = File(cameraDir, "novacut_${System.currentTimeMillis()}.mp4")
         val uri = FileProvider.getUriForFile(
             context,
@@ -150,12 +170,10 @@ fun MediaPickerSheet(
         }
     }
 
-    // Clean up stale camera temp files (older than 1 hour). The directory must match the
-    // location used by `startCameraCapture()` above (`filesDir/media`) — previously this
-    // pointed at `cacheDir/camera` which never existed, so orphaned recordings from app
-    // crashes would accumulate forever.
+    // Clean up stale, unfinalized camera captures without touching imported media that
+    // projects already depend on.
     LaunchedEffect(Unit) {
-        val cameraDir = File(context.filesDir, "media")
+        val cameraDir = pendingCameraCaptureDir(context)
         if (cameraDir.exists()) {
             val cutoff = System.currentTimeMillis() - 3_600_000L
             cameraDir.listFiles()?.filter { it.isFile && it.lastModified() < cutoff }
@@ -326,44 +344,6 @@ fun MediaPickerSheet(
     }
 }
 
-/**
- * Copy a picker URI to app-local storage so it survives across sessions.
- * Photo Picker URIs lose permission on app restart.
- */
-private fun copyToLocalMedia(context: android.content.Context, uri: Uri, mediaType: String): Uri {
-    return try {
-        if (uri.scheme == "file") {
-            val path = uri.path.orEmpty()
-            if (path.startsWith(context.filesDir.absolutePath) || path.startsWith(context.cacheDir.absolutePath)) {
-                return uri
-            }
-        }
-
-        val mediaDir = File(context.filesDir, "media").apply { mkdirs() }
-        val ext = resolveFileExtension(context, uri, mediaType)
-        var destFile = File(mediaDir, "${System.currentTimeMillis()}_${uri.lastPathSegment?.hashCode()?.toUInt() ?: 0}$ext")
-        while (destFile.exists()) {
-            destFile = File(mediaDir, "${System.currentTimeMillis()}_${(0..9999).random()}$ext")
-        }
-        val input = context.contentResolver.openInputStream(uri)
-        if (input == null) {
-            android.util.Log.w("MediaPicker", "Cannot open input stream for $uri")
-            return uri
-        }
-        input.use { src ->
-            destFile.outputStream().use { dst -> src.copyTo(dst) }
-        }
-        if (destFile.length() == 0L) {
-            destFile.delete()
-            return uri
-        }
-        Uri.fromFile(destFile)
-    } catch (e: Exception) {
-        android.util.Log.w("MediaPicker", "Failed to copy URI to local storage, using original", e)
-        uri
-    }
-}
-
 private fun resolvePickedMediaType(
     context: android.content.Context,
     uri: Uri,
@@ -375,59 +355,13 @@ private fun resolvePickedMediaType(
         mimeType.startsWith("audio/") -> "audio"
         mimeType.startsWith("video/") -> "video"
         else -> {
-            when (resolveFileExtension(context, uri, fallbackType).removePrefix(".").lowercase()) {
+            when (resolveManagedMediaExtension(context, uri, fallbackType).removePrefix(".").lowercase()) {
                 "jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "heif", "avif" -> "image"
                 "mp3", "wav", "m4a", "aac", "ogg", "flac", "opus" -> "audio"
                 else -> fallbackType
             }
         }
     }
-}
-
-private fun resolveFileExtension(
-    context: android.content.Context,
-    uri: Uri,
-    mediaType: String
-): String {
-    val mimeType = context.contentResolver.getType(uri)
-    val mimeExt = mimeType?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-    if (!mimeExt.isNullOrBlank()) {
-        return ".${mimeExt.lowercase()}"
-    }
-
-    val displayName = resolveDisplayName(context, uri)
-    val nameExt = displayName?.substringAfterLast('.', "")
-    if (!nameExt.isNullOrBlank()) {
-        return ".${nameExt.lowercase()}"
-    }
-
-    return when (mediaType) {
-        "image" -> ".jpg"
-        "audio" -> ".m4a"
-        else -> ".mp4"
-    }
-}
-
-private fun resolveDisplayName(context: android.content.Context, uri: Uri): String? {
-    if (uri.scheme == "file") {
-        return uri.lastPathSegment
-    }
-
-    return runCatching {
-        context.contentResolver.query(
-            uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME),
-            null,
-            null,
-            null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-            } else {
-                null
-            }
-        }
-    }.getOrNull() ?: uri.lastPathSegment
 }
 
 @Composable

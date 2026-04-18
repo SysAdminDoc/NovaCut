@@ -131,16 +131,19 @@ class ExportDelegate(
                 exportStartTime = System.currentTimeMillis(),
                 exportProgress = 0f,
                 exportState = ExportState.EXPORTING,
-                exportErrorMessage = null
+                exportErrorMessage = null,
+                lastExportedFilePath = null
             ) }
             gifExportJob = scope.launch {
+                var sheetFile: File? = null
                 try {
                     withContext(Dispatchers.IO) { outputDir.mkdirs() }
-                    val sheetFile = createOutputFile(
+                    sheetFile = createOutputFile(
                         outputDir = outputDir,
                         extension = "png",
                         preferredOutputName = (preferredOutputName ?: currentState.project.name) + "_contact"
                     )
+                    val targetSheetFile = sheetFile ?: return@launch
                     val allClips = tracks
                         .filter { it.type == com.novacut.editor.model.TrackType.VIDEO || it.type == com.novacut.editor.model.TrackType.OVERLAY }
                         .flatMap { it.clips }
@@ -152,7 +155,7 @@ class ExportDelegate(
                     val ok = ContactSheetExporter.export(
                         clips = allClips,
                         columns = configWithChapters.contactSheetColumns,
-                        outputFile = sheetFile,
+                        outputFile = targetSheetFile,
                         extractThumb = { uri, timeUs, w, h -> videoEngine.extractThumbnail(uri, timeUs, w, h) },
                         onProgress = { p -> stateFlow.update { it.copy(exportProgress = p) } }
                     )
@@ -160,9 +163,9 @@ class ExportDelegate(
                         stateFlow.update { it.copy(
                             exportState = ExportState.COMPLETE,
                             exportProgress = 1f,
-                            lastExportedFilePath = sheetFile.absolutePath
+                            lastExportedFilePath = targetSheetFile.absolutePath
                         ) }
-                        showToast("Contact sheet exported: ${sheetFile.name}")
+                        showToast("Contact sheet exported: ${targetSheetFile.name}")
                     } else {
                         stateFlow.update { it.copy(
                             exportState = ExportState.ERROR,
@@ -170,12 +173,16 @@ class ExportDelegate(
                         ) }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
-                    stateFlow.update { it.copy(exportState = ExportState.CANCELLED, exportProgress = 0f) }
+                    stateFlow.update {
+                        it.copy(exportState = ExportState.CANCELLED, exportProgress = 0f, lastExportedFilePath = null)
+                    }
                 } catch (e: Exception) {
                     android.util.Log.w("ExportDelegate", "Contact sheet export failed", e)
+                    sheetFile?.delete()
                     stateFlow.update { it.copy(
                         exportState = ExportState.ERROR,
-                        exportErrorMessage = e.message ?: "Contact sheet export failed"
+                        exportErrorMessage = e.message ?: "Contact sheet export failed",
+                        lastExportedFilePath = null
                     ) }
                 } finally {
                     gifExportJob = null
@@ -190,7 +197,8 @@ class ExportDelegate(
                 exportStartTime = System.currentTimeMillis(),
                 exportProgress = 0f,
                 exportState = ExportState.EXPORTING,
-                exportErrorMessage = null
+                exportErrorMessage = null,
+                lastExportedFilePath = null
             ) }
             gifExportJob = scope.launch {
                 val frames = mutableListOf<android.graphics.Bitmap>()
@@ -265,14 +273,16 @@ class ExportDelegate(
                     gifFile?.delete()
                     stateFlow.update { it.copy(
                         exportState = ExportState.CANCELLED,
-                        exportProgress = 0f
+                        exportProgress = 0f,
+                        lastExportedFilePath = null
                     ) }
                 } catch (e: Exception) {
                     android.util.Log.w("ExportDelegate", "GIF export failed", e)
                     gifFile?.delete()
                     stateFlow.update { it.copy(
                         exportState = ExportState.ERROR,
-                        exportErrorMessage = e.message ?: "GIF export failed"
+                        exportErrorMessage = e.message ?: "GIF export failed",
+                        lastExportedFilePath = null
                     ) }
                 } finally {
                     gifExportJob = null
@@ -291,7 +301,8 @@ class ExportDelegate(
             exportStartTime = System.currentTimeMillis(),
             exportProgress = 0f,
             exportState = ExportState.EXPORTING,
-            exportErrorMessage = null
+            exportErrorMessage = null,
+            lastExportedFilePath = null
         ) }
 
         scope.launch {
@@ -343,16 +354,20 @@ class ExportDelegate(
                         showToast("Export complete: ${outputFile.name}")
                     },
                     onError = { e ->
+                        outputFile.delete()
                         stateFlow.update { it.copy(
                             exportState = ExportState.ERROR,
-                            exportErrorMessage = e.message ?: "Unknown error"
+                            exportErrorMessage = e.message ?: "Unknown error",
+                            lastExportedFilePath = null
                         ) }
                     }
                 )
             } catch (e: Exception) {
+                outputFile.delete()
                 stateFlow.update { it.copy(
                     exportState = ExportState.ERROR,
-                    exportErrorMessage = e.message ?: "Unknown error"
+                    exportErrorMessage = e.message ?: "Unknown error",
+                    lastExportedFilePath = null
                 ) }
             }
         }

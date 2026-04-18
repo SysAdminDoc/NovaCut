@@ -416,6 +416,11 @@ class VideoEngine @Inject constructor(
         nextClipTransition: Transition? = null
     ): EditedMediaItem {
         val mediaItem = buildMediaItemForClip(clip, clip.sourceUri)
+        val linkedAudioTrackPresent = clip.linkedClipId?.let { linkedId ->
+            tracks.any { track ->
+                track.type == TrackType.AUDIO && track.clips.any { it.id == linkedId }
+            }
+        } == true
 
         val videoEffects = buildList<androidx.media3.common.Effect> {
             for (effect in clip.effects.filter { it.enabled }) {
@@ -504,7 +509,7 @@ class VideoEngine @Inject constructor(
         }
 
         val audioProcessors = buildList<AudioProcessor> {
-            if (videoMuted) {
+            if (videoMuted || linkedAudioTrackPresent) {
                 add(VolumeAudioProcessor(
                     volume = 0f, fadeInMs = 0L, fadeOutMs = 0L,
                     clipDurationMs = clip.durationMs, keyframes = emptyList()
