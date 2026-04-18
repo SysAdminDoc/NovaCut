@@ -1,0 +1,230 @@
+package com.novacut.editor.ui.theme
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun NovaCutScreenBackground(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .background(Mocha.Midnight)
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Mocha.Midnight,
+                            Mocha.Base.copy(alpha = 0.98f),
+                            Mocha.Midnight
+                        )
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Mocha.Mauve.copy(alpha = 0.12f),
+                            Color.Transparent
+                        ),
+                        center = Offset(180f, 120f),
+                        radius = 900f
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Mocha.Sapphire.copy(alpha = 0.1f),
+                            Color.Transparent
+                        ),
+                        center = Offset(1200f, 220f),
+                        radius = 960f
+                    )
+                )
+        )
+        content()
+    }
+}
+
+@Composable
+fun NovaCutHeroCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(Radius.xxl),
+    accent: Color = Mocha.Mauve,
+    contentPadding: PaddingValues = PaddingValues(horizontal = Spacing.xl, vertical = Spacing.xl),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Mocha.Panel,
+        shape = shape,
+        border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.88f))
+    ) {
+        Box(
+            modifier = Modifier.background(
+                Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to accent.copy(alpha = 0.08f),
+                        0.22f to Mocha.PanelHighest.copy(alpha = 0.94f),
+                        0.72f to Mocha.Panel.copy(alpha = 0.98f),
+                        1f to Mocha.Mantle
+                    )
+                )
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(contentPadding),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                content = content
+            )
+        }
+    }
+}
+
+@Composable
+fun NovaCutMetricPill(
+    text: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null
+) {
+    Surface(
+        modifier = modifier,
+        color = accent.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(Radius.pill),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Text(
+                text = text,
+                color = accent,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+@Composable
+fun NovaCutChromeIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = Mocha.Subtext1,
+    containerColor: Color = Mocha.PanelHighest,
+    borderColor: Color = Mocha.CardStroke,
+    shape: Shape = RoundedCornerShape(Radius.lg),
+    size: Dp = TouchTarget.minimum
+) {
+    Surface(
+        modifier = modifier,
+        color = containerColor,
+        shape = shape,
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.size(size)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun NovaCutSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Text(
+                text = title,
+                color = Mocha.Text,
+                style = MaterialTheme.typography.titleLarge
+            )
+            if (!description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.defaultMinSize(minHeight = 36.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            content = trailing
+        )
+    }
+}

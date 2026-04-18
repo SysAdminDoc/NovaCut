@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +36,7 @@ fun RenderPreviewSheet(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val hasSegments = segments.isNotEmpty()
     val reEncodeRatio = if (summary.totalDurationMs > 0L) {
         summary.reEncodeDurationMs.toFloat() / summary.totalDurationMs.toFloat()
     } else {
@@ -42,14 +44,40 @@ fun RenderPreviewSheet(
     }
     val isCompactActions = LocalConfiguration.current.screenWidthDp < 430
     val speedupLabel = when {
-        summary.reEncodeSegments == 0 -> "Instant"
+        !hasSegments || summary.reEncodeSegments == 0 -> stringResource(R.string.render_speedup_instant)
         summary.estimatedSpeedup >= 100f -> "100x+"
-        else -> "%.1fx".format(summary.estimatedSpeedup)
+        else -> stringResource(R.string.render_speedup_value, summary.estimatedSpeedup)
+    }
+    val outlook = when {
+        !hasSegments -> RenderOutlookState(
+            title = stringResource(R.string.render_preview_outlook_empty_title),
+            body = stringResource(R.string.render_preview_outlook_empty_body),
+            accent = Mocha.Blue,
+            icon = Icons.Default.Preview
+        )
+        summary.reEncodeSegments == 0 -> RenderOutlookState(
+            title = stringResource(R.string.render_preview_outlook_instant_title),
+            body = stringResource(R.string.render_preview_outlook_instant_body),
+            accent = Mocha.Green,
+            icon = Icons.Default.Preview
+        )
+        summary.passThroughSegments == 0 -> RenderOutlookState(
+            title = stringResource(R.string.render_preview_outlook_full_title),
+            body = stringResource(R.string.render_preview_outlook_full_body),
+            accent = Mocha.Yellow,
+            icon = Icons.Default.RocketLaunch
+        )
+        else -> RenderOutlookState(
+            title = stringResource(R.string.render_preview_outlook_mixed_title),
+            body = stringResource(R.string.render_preview_outlook_mixed_body),
+            accent = Mocha.Peach,
+            icon = Icons.Default.Preview
+        )
     }
 
     PremiumEditorPanel(
         title = stringResource(R.string.render_preview_title),
-        subtitle = "See which sections can stream through untouched and which shots still need a full render pass.",
+        subtitle = stringResource(R.string.render_preview_subtitle),
         icon = Icons.Default.Preview,
         accent = Mocha.Peach,
         onClose = onClose,
@@ -57,24 +85,43 @@ fun RenderPreviewSheet(
         modifier = modifier,
         scrollable = true
     ) {
-        PremiumPanelCard(accent = if (summary.reEncodeSegments > 0) Mocha.Peach else Mocha.Green) {
+        PremiumPanelCard(accent = outlook.accent) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Smart render outlook",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Mocha.Text
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "NovaCut can skip untouched sections and focus encode time only where the timeline changed.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Mocha.Subtext0
-                    )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Surface(
+                        color = outlook.accent.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, outlook.accent.copy(alpha = 0.18f))
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = outlook.icon,
+                            contentDescription = null,
+                            tint = outlook.accent,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = outlook.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Mocha.Text
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = outlook.body,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Mocha.Subtext0
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -89,7 +136,7 @@ fun RenderPreviewSheet(
                     )
                     PremiumPanelPill(
                         text = speedupLabel,
-                        accent = if (summary.reEncodeSegments > 0) Mocha.Peach else Mocha.Green
+                        accent = outlook.accent
                     )
                 }
             }
@@ -113,7 +160,7 @@ fun RenderPreviewSheet(
                 RenderMetric(
                     label = stringResource(R.string.panel_render_speedup),
                     value = speedupLabel,
-                    accent = Mocha.Peach,
+                    accent = outlook.accent,
                     modifier = Modifier.widthIn(min = 110.dp)
                 )
             }
@@ -164,25 +211,18 @@ fun RenderPreviewSheet(
                 color = Mocha.Text
             )
             Text(
-                text = "Each block shows whether NovaCut can copy that range directly or has to render it again.",
+                text = stringResource(R.string.render_preview_segments_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Mocha.Subtext0
             )
 
             if (segments.isEmpty()) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Mocha.PanelRaised,
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, Mocha.CardStroke)
-                ) {
-                    Text(
-                        text = "No clips are on the timeline yet, so there is nothing to analyze.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Mocha.Subtext0,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
+                RenderMessageCard(
+                    title = stringResource(R.string.render_preview_empty_title),
+                    body = stringResource(R.string.render_preview_empty_body),
+                    accent = Mocha.Blue,
+                    icon = Icons.Default.Preview
+                )
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -199,12 +239,12 @@ fun RenderPreviewSheet(
 
         PremiumPanelCard(accent = Mocha.Mauve) {
             Text(
-                text = "Render choices",
+                text = stringResource(R.string.render_preview_actions_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = Mocha.Text
             )
             Text(
-                text = "Generate a lightweight check render first, or jump straight into the full export flow with the current settings.",
+                text = stringResource(R.string.render_preview_actions_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Mocha.Subtext0
             )
@@ -216,6 +256,7 @@ fun RenderPreviewSheet(
                 ) {
                     OutlinedButton(
                         onClick = onRenderPreview,
+                        enabled = hasSegments,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
                         border = BorderStroke(1.dp, Mocha.Peach.copy(alpha = 0.4f)),
@@ -231,6 +272,7 @@ fun RenderPreviewSheet(
 
                     Button(
                         onClick = onRenderFull,
+                        enabled = hasSegments,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
@@ -250,6 +292,7 @@ fun RenderPreviewSheet(
                 ) {
                     OutlinedButton(
                         onClick = onRenderPreview,
+                        enabled = hasSegments,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(18.dp),
                         border = BorderStroke(1.dp, Mocha.Peach.copy(alpha = 0.4f)),
@@ -265,6 +308,7 @@ fun RenderPreviewSheet(
 
                     Button(
                         onClick = onRenderFull,
+                        enabled = hasSegments,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Mocha.Mauve)
@@ -278,9 +322,24 @@ fun RenderPreviewSheet(
                     }
                 }
             }
+
+            if (!hasSegments) {
+                Text(
+                    text = stringResource(R.string.render_actions_disabled_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Mocha.Subtext0
+                )
+            }
         }
     }
 }
+
+private data class RenderOutlookState(
+    val title: String,
+    val body: String,
+    val accent: Color,
+    val icon: ImageVector
+)
 
 @Composable
 private fun RenderMetric(
@@ -315,14 +374,74 @@ private fun RenderMetric(
 }
 
 @Composable
+private fun RenderMessageCard(
+    title: String,
+    body: String,
+    accent: Color,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = accent.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                color = accent.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Mocha.Subtext0
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun RenderSegmentRow(segment: SmartRenderEngine.RenderSegment) {
     val accent = if (segment.needsReEncode) Mocha.Yellow else Mocha.Green
-    val statusLabel = if (segment.needsReEncode) "Re-encode" else "Pass-through"
+    val statusLabel = stringResource(
+        if (segment.needsReEncode) R.string.panel_render_re_encode else R.string.panel_render_pass_through
+    )
     val detail = if (segment.needsReEncode) {
         segment.reason.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     } else {
-        "Stream copied directly with no image-processing work."
+        stringResource(R.string.render_segment_pass_through_detail)
     }
+    val durationLabel = stringResource(
+        R.string.render_segment_duration,
+        formatDuration(segment.endMs - segment.startMs)
+    )
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -340,27 +459,59 @@ private fun RenderSegmentRow(segment: SmartRenderEngine.RenderSegment) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${formatDuration(segment.startMs)} - ${formatDuration(segment.endMs)}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Mocha.Text,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Mocha.Subtext0
-                )
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Surface(
+                    color = accent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = if (segment.needsReEncode) Icons.Default.RocketLaunch else Icons.Default.Preview,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(
+                            R.string.render_segment_time_range,
+                            formatDuration(segment.startMs),
+                            formatDuration(segment.endMs)
+                        ),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Mocha.Text,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Mocha.Subtext0
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            PremiumPanelPill(
-                text = statusLabel,
-                accent = accent
-            )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PremiumPanelPill(
+                    text = statusLabel,
+                    accent = accent
+                )
+                PremiumPanelPill(
+                    text = durationLabel,
+                    accent = if (segment.needsReEncode) Mocha.Overlay1 else Mocha.Blue
+                )
+            }
         }
     }
 }

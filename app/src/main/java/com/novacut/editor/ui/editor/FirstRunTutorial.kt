@@ -144,6 +144,9 @@ fun FirstRunTutorial(
                         )
                         .padding(horizontal = Spacing.xxl, vertical = Spacing.xxl)
                 ) {
+                    val isFirstStep = step == 0
+                    val isLastStep = step == tutorialStepDefs.size - 1
+
                     // Direction arrow — kept but smaller and quieter so it's a hint, not a focal point.
                     Icon(
                         imageVector = tutorialStep.arrowIcon,
@@ -195,6 +198,25 @@ fun FirstRunTutorial(
                         textAlign = TextAlign.Center
                     )
 
+                    Spacer(modifier = Modifier.height(Spacing.md))
+
+                    Surface(
+                        color = Mocha.Surface0.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(Radius.pill),
+                        border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.75f))
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.tutorial_step_counter,
+                                step + 1,
+                                tutorialStepDefs.size
+                            ),
+                            color = Mocha.Subtext1,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(Spacing.xl))
 
                     // Step indicator — connected pill segments. The current step is wider and
@@ -224,36 +246,57 @@ fun FirstRunTutorial(
 
                     Spacer(modifier = Modifier.height(Spacing.xl))
 
-                    // Next / Get Started button
-                    val isLastStep = step == tutorialStepDefs.size - 1
-                    Button(
-                        onClick = {
-                            if (isLastStep) {
-                                onComplete()
-                            } else {
-                                currentStep++
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Mocha.Mauve,
-                            contentColor = Mocha.Crust
-                        ),
-                        shape = RoundedCornerShape(Radius.lg),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = stringResource(if (isLastStep) R.string.tutorial_get_started else R.string.tutorial_next),
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                        if (!isLastStep) {
-                            Spacer(modifier = Modifier.width(Spacing.sm))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = stringResource(R.string.cd_tutorial_next),
-                                modifier = Modifier.size(18.dp)
+                        if (!isFirstStep) {
+                            OutlinedButton(
+                                onClick = { currentStep-- },
+                                modifier = Modifier
+                                    .weight(0.42f)
+                                    .height(48.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Text),
+                                border = BorderStroke(1.dp, Mocha.CardStrokeStrong),
+                                shape = RoundedCornerShape(Radius.lg)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.tutorial_back),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (isLastStep) {
+                                    onComplete()
+                                } else {
+                                    currentStep++
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Mocha.Mauve,
+                                contentColor = Mocha.Crust
+                            ),
+                            shape = RoundedCornerShape(Radius.lg),
+                            modifier = Modifier
+                                .weight(if (isFirstStep) 1f else 0.58f)
+                                .height(48.dp)
+                        ) {
+                            Text(
+                                text = stringResource(if (isLastStep) R.string.tutorial_get_started else R.string.tutorial_next),
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                             )
+                            if (!isLastStep) {
+                                Spacer(modifier = Modifier.width(Spacing.sm))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = stringResource(R.string.cd_tutorial_next),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }

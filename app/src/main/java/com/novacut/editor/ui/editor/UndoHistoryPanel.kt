@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +48,11 @@ fun UndoHistoryPanel(
     val futureCount = remember(entries, selectedUndoIndex) {
         entries.count { it.index > selectedUndoIndex && selectedUndoIndex >= 0 }
     }
+    val actionCountLabel = pluralStringResource(
+        R.plurals.undo_history_action_count,
+        entries.size,
+        entries.size
+    )
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -54,7 +63,7 @@ fun UndoHistoryPanel(
 
     PremiumEditorPanel(
         title = stringResource(R.string.undo_history_title),
-        subtitle = "Review the recent edit stack and jump back to a known-good state without repeated undo taps.",
+        subtitle = stringResource(R.string.undo_history_subtitle),
         icon = Icons.Default.History,
         accent = Mocha.Mauve,
         onClose = onClose,
@@ -70,30 +79,30 @@ fun UndoHistoryPanel(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "History stack",
+                        text = stringResource(R.string.undo_history_stack_title),
                         style = MaterialTheme.typography.titleMedium,
                         color = Mocha.Text
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = if (entries.isEmpty()) {
-                            "No undoable actions have been recorded in this session yet."
+                            stringResource(R.string.undo_history_stack_empty_summary)
                         } else {
-                            "The highlighted row is the current state. Tap any earlier step to roll the timeline back in one move."
+                            stringResource(R.string.undo_history_stack_ready_summary)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = Mocha.Subtext0
                     )
                 }
 
-                Spacer(modifier = Modifier.height(0.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     PremiumPanelPill(
-                        text = "${entries.size} actions",
+                        text = actionCountLabel,
                         accent = Mocha.Mauve
                     )
                     if (futureCount > 0) {
@@ -118,10 +127,11 @@ fun UndoHistoryPanel(
 
         PremiumPanelCard(accent = Mocha.Blue) {
             if (entries.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.undo_history_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Mocha.Subtext0
+                UndoHistoryMessageCard(
+                    title = stringResource(R.string.undo_history_empty_title),
+                    body = stringResource(R.string.undo_history_empty_body),
+                    accent = Mocha.Blue,
+                    icon = Icons.Default.History
                 )
             } else {
                 Column(
@@ -161,6 +171,60 @@ fun UndoHistoryPanel(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UndoHistoryMessageCard(
+    title: String,
+    body: String,
+    accent: Color,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = accent.copy(alpha = 0.08f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                color = accent.copy(alpha = 0.12f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Mocha.Subtext0
+                )
             }
         }
     }

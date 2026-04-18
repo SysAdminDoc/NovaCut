@@ -59,6 +59,7 @@ fun SnapshotHistoryPanel(
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
     var snapshotName by remember { mutableStateOf("") }
+    var pendingDeleteSnapshot by remember { mutableStateOf<ProjectSnapshot?>(null) }
     val dateFormat = remember { SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()) }
     val snapshotNameFormat = remember { SimpleDateFormat("MMM d HH:mm", Locale.getDefault()) }
     val snapshotPrefix = stringResource(R.string.snapshot_default_prefix)
@@ -129,6 +130,51 @@ fun SnapshotHistoryPanel(
         )
     }
 
+    pendingDeleteSnapshot?.let { snapshot ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteSnapshot = null },
+            containerColor = Mocha.Base,
+            title = {
+                Text(
+                    text = stringResource(R.string.snapshot_delete_title),
+                    color = Mocha.Text,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(
+                        R.string.snapshot_delete_body,
+                        snapshot.label.ifEmpty { stringResource(R.string.panel_snapshot_untitled) }
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Mocha.Subtext0
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteSnapshot(snapshot.id)
+                        pendingDeleteSnapshot = null
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.snapshot_delete_confirm),
+                        color = Mocha.Red
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteSnapshot = null }) {
+                    Text(
+                        text = stringResource(R.string.panel_snapshot_cancel),
+                        color = Mocha.Subtext0
+                    )
+                }
+            }
+        )
+    }
+
     PremiumEditorPanel(
         title = stringResource(R.string.snapshot_title),
         subtitle = stringResource(R.string.panel_snapshot_subtitle),
@@ -171,6 +217,14 @@ fun SnapshotHistoryPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 PremiumPanelPill(
+                    text = if (latestSnapshot == null) {
+                        stringResource(R.string.snapshot_status_empty)
+                    } else {
+                        stringResource(R.string.snapshot_status_ready)
+                    },
+                    accent = if (latestSnapshot == null) Mocha.Overlay0 else Mocha.Green
+                )
+                PremiumPanelPill(
                     text = pluralStringResource(
                         R.plurals.panel_snapshot_saved_count,
                         sortedSnapshots.size,
@@ -195,26 +249,16 @@ fun SnapshotHistoryPanel(
 
         PremiumPanelCard(accent = Mocha.Blue) {
             if (sortedSnapshots.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = stringResource(R.string.cd_history),
-                        tint = Mocha.Overlay1,
-                        modifier = Modifier.size(30.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SnapshotMessageCard(
+                        title = stringResource(R.string.snapshot_empty_title),
+                        body = stringResource(R.string.snapshot_empty_body)
                     )
-                    Text(
-                        text = stringResource(R.string.snapshot_empty),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Mocha.Text
-                    )
-                    Text(
-                        text = stringResource(R.string.panel_snapshot_save_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Mocha.Subtext0
+                    SnapshotAction(
+                        icon = Icons.Default.Add,
+                        label = stringResource(R.string.snapshot_create_cta),
+                        accent = Mocha.Green,
+                        onClick = { showNameDialog = true }
                     )
                 }
             } else {
@@ -235,12 +279,63 @@ fun SnapshotHistoryPanel(
                         dateFormat = dateFormat,
                         isLatest = snapshot.id == latestSnapshot?.id,
                         onRestore = { onRestoreSnapshot(snapshot.id) },
-                        onDelete = { onDeleteSnapshot(snapshot.id) }
+                        onDelete = { pendingDeleteSnapshot = snapshot }
                     )
                     if (index < sortedSnapshots.lastIndex) {
                         Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnapshotMessageCard(
+    title: String,
+    body: String
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Mocha.PanelRaised,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Mocha.CardStroke)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                color = Mocha.Mauve.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Mocha.Mauve.copy(alpha = 0.18f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = null,
+                    tint = Mocha.Mauve,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Mocha.Text,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Mocha.Subtext0
+                )
             }
         }
     }

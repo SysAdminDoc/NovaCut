@@ -25,6 +25,9 @@ import com.novacut.editor.R
 import com.novacut.editor.engine.UserTemplate
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.NovaCutChromeIconButton
+import com.novacut.editor.ui.theme.NovaCutMetricPill
+import com.novacut.editor.ui.theme.NovaCutSectionHeader
 
 data class ProjectTemplateUI(
     val id: String,
@@ -150,9 +153,11 @@ fun ProjectTemplateSheet(
                     style = MaterialTheme.typography.headlineMedium
                 )
             }
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, stringResource(R.string.close), tint = Mocha.Subtext0)
-            }
+            NovaCutChromeIconButton(
+                icon = Icons.Default.Close,
+                contentDescription = stringResource(R.string.close),
+                onClick = onDismiss
+            )
         }
 
         Spacer(Modifier.height(6.dp))
@@ -168,31 +173,17 @@ fun ProjectTemplateSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                color = Mocha.Mauve.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(999.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Mauve.copy(alpha = 0.2f))
-            ) {
-                Text(
-                    text = stringResource(R.string.projects_templates_count, projectTemplates.size),
-                    color = Mocha.Mauve,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                )
-            }
+            NovaCutMetricPill(
+                text = stringResource(R.string.projects_templates_count, projectTemplates.size),
+                accent = Mocha.Mauve,
+                icon = Icons.Default.DashboardCustomize
+            )
             if (userTemplates.isNotEmpty()) {
-                Surface(
-                    color = Mocha.Sapphire.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(999.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Sapphire.copy(alpha = 0.2f))
-                ) {
-                    Text(
-                        text = stringResource(R.string.template_saved_count, userTemplates.size),
-                        color = Mocha.Sapphire,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
-                }
+                NovaCutMetricPill(
+                    text = stringResource(R.string.template_saved_count, userTemplates.size),
+                    accent = Mocha.Sapphire,
+                    icon = Icons.Default.BookmarkAdded
+                )
             }
         }
 
@@ -506,19 +497,10 @@ private fun TemplateSectionHeader(
     title: String,
     description: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = title,
-            color = Mocha.Text,
-            style = MaterialTheme.typography.titleMedium
-        )
-        Text(
-            text = description,
-            color = Mocha.Subtext0,
-            style = MaterialTheme.typography.bodySmall
-        )
-    }
-
+    NovaCutSectionHeader(
+        title = title,
+        description = description
+    )
     Spacer(Modifier.height(8.dp))
 }
 
