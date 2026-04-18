@@ -69,7 +69,7 @@ enum class PanelId {
     CLOUD_BACKUP, TUTORIAL, UNDO_HISTORY, CAPTION_STYLE_GALLERY,
     BEAT_SYNC, SMART_REFRAME, SPEED_PRESETS, FILLER_REMOVAL,
     AUTO_EDIT, TTS, EFFECT_LIBRARY, NOISE_REDUCTION, STICKER_PICKER,
-    DRAWING, MULTI_CAM, MARKER_LIST
+    DRAWING, MULTI_CAM, MARKER_LIST, SCRATCHPAD, RECOVERY_DIALOG
 }
 
 data class PanelVisibility(
@@ -402,6 +402,9 @@ class EditorViewModel @Inject constructor(
             // Restore auto-save AFTER Room load to avoid race condition
             val recovery = autoSave.loadRecoveryData(autoSaveId)
             if (recovery != null) {
+                val hadContent = recovery.tracks.any { it.clips.isNotEmpty() } ||
+                    recovery.textOverlays.isNotEmpty() ||
+                    recovery.imageOverlays.isNotEmpty()
                 _state.update {
                     it.copy(
                         tracks = recovery.tracks.ifEmpty { it.tracks },
@@ -414,7 +417,11 @@ class EditorViewModel @Inject constructor(
                         beatMarkers = recovery.beatMarkers,
                         totalDurationMs = recovery.tracks.maxOfOrNull { t ->
                             t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L
-                        } ?: 0L
+                        } ?: 0L,
+                        // Surface a dialog so the user knows auto-save recovered work — they can
+                        // either keep the recovered state (default, already applied) or ack and
+                        // discard the on-disk recovery file.
+                        panels = if (hadContent) it.panels.open(PanelId.RECOVERY_DIALOG) else it.panels
                     )
                 }
                 _playheadMs.value = recovery.playheadMs
@@ -3186,6 +3193,36 @@ class EditorViewModel @Inject constructor(
         val normalizedName = name.trim().ifBlank { "Untitled" }
         _state.update { it.copy(project = it.project.copy(name = normalizedName)) }
         saveProject()
+    }
+
+    fun showScratchpad() {
+        pauseIfPlaying()
+        _state.update { dismissedPanelState(it).copy(panels = it.panels.closeAll().open(PanelId.SCRATCHPAD)) }
+    }
+
+    fun hideScratchpad() {
+        _state.update { it.copy(panels = it.panels.close(PanelId.SCRATCHPAD)) }
+    }
+
+    fun updateProjectNotes(notes: String) {
+        _state.update { it.copy(project = it.project.copy(notes = notes)) }
+        saveProject()
+    }
+
+    fun dismissRecoveryDialog(recover: Boolean) {
+        _state.update { it.copy(panels = it.panels.close(PanelId.RECOVERY_DIALOG)) }
+        if (!recover) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val projectId = _state.value.project.id
+                if (projectId.isNotBlank()) {
+                    try {
+                        autoSave.clearRecoveryData(projectId)
+                    } catch (e: Exception) {
+                        Log.w("EditorViewModel", "Failed to discard recovery data", e)
+                    }
+                }
+            }
+        }
     }
 
     fun updateProjectAspect(aspect: AspectRatio) {

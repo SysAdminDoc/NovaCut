@@ -130,34 +130,65 @@ fun KeyframeCurveEditor(
                     expanded = showPresets,
                     onDismissRequest = { showPresets = false }
                 ) {
+                    // Grouped presets — Cinematic (subtle motion), Fades (opacity), Emphasis
+                    // (punch/attention). Groups are ordered from most-used to most-niche.
+                    val applyPreset: (String) -> Unit = { id ->
+                        val preset = when (id) {
+                            "kenburns" -> com.novacut.editor.engine.KeyframeEngine.createKenBurnsKeyframes(clipDurationMs)
+                            "fadein" -> com.novacut.editor.engine.KeyframeEngine.createFadeIn()
+                            "fadeout" -> com.novacut.editor.engine.KeyframeEngine.createFadeOut(clipDurationMs)
+                            "pulse" -> com.novacut.editor.engine.KeyframeEngine.createPulse(clipDurationMs)
+                            "shake" -> com.novacut.editor.engine.KeyframeEngine.createShake(clipDurationMs)
+                            "drift" -> com.novacut.editor.engine.KeyframeEngine.createDrift(clipDurationMs)
+                            "spin" -> com.novacut.editor.engine.KeyframeEngine.createSpin360(clipDurationMs)
+                            "zoominout" -> com.novacut.editor.engine.KeyframeEngine.createZoomInOut(clipDurationMs)
+                            else -> emptyList()
+                        }
+                        onKeyframesChanged(keyframes + preset)
+                        showPresets = false
+                    }
+
+                    Text(
+                        text = stringResource(R.string.keyframe_preset_group_cinematic),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
                     listOf(
                         stringResource(R.string.keyframe_preset_ken_burns) to "kenburns",
-                        stringResource(R.string.keyframe_preset_fade_in) to "fadein",
-                        stringResource(R.string.keyframe_preset_fade_out) to "fadeout",
-                        stringResource(R.string.keyframe_preset_pulse) to "pulse",
-                        stringResource(R.string.keyframe_preset_shake) to "shake",
                         stringResource(R.string.keyframe_preset_drift) to "drift",
-                        stringResource(R.string.keyframe_preset_spin) to "spin",
                         stringResource(R.string.keyframe_preset_zoom) to "zoominout"
                     ).forEach { (label, id) ->
-                        DropdownMenuItem(
-                            text = { Text(text = label) },
-                            onClick = {
-                                val preset = when (id) {
-                                    "kenburns" -> com.novacut.editor.engine.KeyframeEngine.createKenBurnsKeyframes(clipDurationMs)
-                                    "fadein" -> com.novacut.editor.engine.KeyframeEngine.createFadeIn()
-                                    "fadeout" -> com.novacut.editor.engine.KeyframeEngine.createFadeOut(clipDurationMs)
-                                    "pulse" -> com.novacut.editor.engine.KeyframeEngine.createPulse(clipDurationMs)
-                                    "shake" -> com.novacut.editor.engine.KeyframeEngine.createShake(clipDurationMs)
-                                    "drift" -> com.novacut.editor.engine.KeyframeEngine.createDrift(clipDurationMs)
-                                    "spin" -> com.novacut.editor.engine.KeyframeEngine.createSpin360(clipDurationMs)
-                                    "zoominout" -> com.novacut.editor.engine.KeyframeEngine.createZoomInOut(clipDurationMs)
-                                    else -> emptyList()
-                                }
-                                onKeyframesChanged(keyframes + preset)
-                                showPresets = false
-                            }
-                        )
+                        DropdownMenuItem(text = { Text(text = label) }, onClick = { applyPreset(id) })
+                    }
+
+                    androidx.compose.material3.HorizontalDivider(color = Mocha.CardStroke.copy(alpha = 0.4f))
+                    Text(
+                        text = stringResource(R.string.keyframe_preset_group_fades),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                    listOf(
+                        stringResource(R.string.keyframe_preset_fade_in) to "fadein",
+                        stringResource(R.string.keyframe_preset_fade_out) to "fadeout"
+                    ).forEach { (label, id) ->
+                        DropdownMenuItem(text = { Text(text = label) }, onClick = { applyPreset(id) })
+                    }
+
+                    androidx.compose.material3.HorizontalDivider(color = Mocha.CardStroke.copy(alpha = 0.4f))
+                    Text(
+                        text = stringResource(R.string.keyframe_preset_group_emphasis),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                    listOf(
+                        stringResource(R.string.keyframe_preset_pulse) to "pulse",
+                        stringResource(R.string.keyframe_preset_shake) to "shake",
+                        stringResource(R.string.keyframe_preset_spin) to "spin"
+                    ).forEach { (label, id) ->
+                        DropdownMenuItem(text = { Text(text = label) }, onClick = { applyPreset(id) })
                     }
                 }
             }

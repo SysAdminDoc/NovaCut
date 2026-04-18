@@ -7,6 +7,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.tween
+import com.novacut.editor.ui.theme.Motion
 
 @Composable
 fun BottomSheetSlot(
@@ -16,8 +18,18 @@ fun BottomSheetSlot(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter = slideInVertically(
+            animationSpec = tween(Motion.DurationMedium, easing = Motion.DecelerateEasing),
+            initialOffsetY = { it / 3 }
+        ) + fadeIn(
+            animationSpec = tween(Motion.DurationStandard, easing = Motion.DecelerateEasing)
+        ),
+        exit = slideOutVertically(
+            animationSpec = tween(Motion.DurationFast, easing = Motion.AccelerateEasing),
+            targetOffsetY = { it / 4 }
+        ) + fadeOut(
+            animationSpec = tween(Motion.DurationFast, easing = Motion.AccelerateEasing)
+        ),
         modifier = modifier
     ) {
         content()

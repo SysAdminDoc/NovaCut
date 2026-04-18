@@ -3,6 +3,7 @@ package com.novacut.editor.ui.export
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,6 +63,7 @@ import com.novacut.editor.model.FrameCaptureFormat
 import com.novacut.editor.model.PlatformPreset
 import com.novacut.editor.model.Resolution
 import com.novacut.editor.model.SubtitleFormat
+import com.novacut.editor.model.TargetSizePreset
 import com.novacut.editor.model.VideoCodec
 import com.novacut.editor.ui.theme.Mocha
 
@@ -87,18 +91,24 @@ fun ExportSheet(
 ) {
     val availableCodecs = remember { ExportConfig.getAvailableCodecs() }
     val (width, height) = config.resolution.forAspect(aspectRatio)
-    val estimatedSize = remember(config, totalDurationMs) { estimateExportSize(totalDurationMs, config) }
-    val videoModeEnabled = !config.exportAudioOnly && !config.exportStemsOnly && !config.exportAsGif && !config.captureFrameOnly
-    val audioCodecVisible = !config.captureFrameOnly && !config.exportAsGif
+    val effectiveConfig = remember(config, totalDurationMs) {
+        if (config.targetSizeBytes != null) config.resolveTargetSize(totalDurationMs) else config
+    }
+    val estimatedSize = remember(effectiveConfig, totalDurationMs) {
+        estimateExportSize(totalDurationMs, effectiveConfig)
+    }
+    val videoModeEnabled = !config.exportAudioOnly && !config.exportStemsOnly && !config.exportAsGif && !config.captureFrameOnly && !config.exportAsContactSheet
+    val audioCodecVisible = !config.captureFrameOnly && !config.exportAsGif && !config.exportAsContactSheet
 
     val bitrateDescription = when {
-        config.videoBitrate >= 40_000_000 -> stringResource(R.string.export_studio_quality)
-        config.videoBitrate >= 15_000_000 -> stringResource(R.string.export_great_for_youtube)
-        config.videoBitrate >= 6_000_000 -> stringResource(R.string.export_good_for_sharing)
+        effectiveConfig.videoBitrate >= 40_000_000 -> stringResource(R.string.export_studio_quality)
+        effectiveConfig.videoBitrate >= 15_000_000 -> stringResource(R.string.export_great_for_youtube)
+        effectiveConfig.videoBitrate >= 6_000_000 -> stringResource(R.string.export_good_for_sharing)
         else -> stringResource(R.string.export_compact_file_size)
     }
 
     val summaryHeadline = when {
+        config.exportAsContactSheet -> stringResource(R.string.export_contact_sheet_summary, config.contactSheetColumns)
         config.captureFrameOnly -> stringResource(R.string.export_capture_summary_format, width, height)
         config.exportAsGif -> stringResource(R.string.export_gif_summary_format, config.gifMaxWidth)
         config.exportStemsOnly -> stringResource(R.string.export_stems_summary)
@@ -112,7 +122,7 @@ fun ExportSheet(
         config.exportStemsOnly -> stringResource(R.string.export_stems_details_format, config.audioCodec.label, config.audioBitrate / 1000)
         config.exportAudioOnly -> stringResource(R.string.export_audio_details_format, config.audioCodec.label, config.audioBitrate / 1000)
         else -> buildString {
-            append(stringResource(R.string.export_bitrate_format, config.videoBitrate / 1_000_000, bitrateDescription))
+            append(stringResource(R.string.export_bitrate_format, effectiveConfig.videoBitrate / 1_000_000, bitrateDescription))
             estimatedSize?.let {
                 append("  •  ~")
                 append(it)
@@ -137,6 +147,7 @@ fun ExportSheet(
     }
 
     val primaryButtonLabel = when {
+        config.exportAsContactSheet -> stringResource(R.string.export_contact_sheet_button)
         config.exportAsGif -> stringResource(R.string.export_gif_button)
         config.captureFrameOnly -> stringResource(R.string.export_capture_button)
         config.exportStemsOnly -> stringResource(R.string.export_stems_button)
@@ -149,6 +160,7 @@ fun ExportSheet(
         config.exportStemsOnly -> Icons.Default.Layers
         config.exportAsGif -> Icons.Default.GifBox
         config.captureFrameOnly -> Icons.Default.Image
+        config.exportAsContactSheet -> Icons.Default.ViewModule
         else -> Icons.Default.FileUpload
     }
 
@@ -425,7 +437,8 @@ fun ExportSheet(
                             exportAudioOnly = it,
                             exportStemsOnly = false,
                             exportAsGif = false,
-                            captureFrameOnly = false
+                            captureFrameOnly = false,
+                            exportAsContactSheet = false
                         )
                     )
                 },
@@ -479,7 +492,8 @@ fun ExportSheet(
                             exportStemsOnly = it,
                             exportAudioOnly = false,
                             exportAsGif = false,
-                            captureFrameOnly = false
+                            captureFrameOnly = false,
+                            exportAsContactSheet = false
                         )
                     )
                 },
@@ -521,7 +535,8 @@ fun ExportSheet(
                             exportAsGif = it,
                             captureFrameOnly = false,
                             exportAudioOnly = false,
-                            exportStemsOnly = false
+                            exportStemsOnly = false,
+                            exportAsContactSheet = false
                         )
                     )
                 },
@@ -581,7 +596,8 @@ fun ExportSheet(
                             captureFrameOnly = it,
                             exportAsGif = false,
                             exportAudioOnly = false,
-                            exportStemsOnly = false
+                            exportStemsOnly = false,
+                            exportAsContactSheet = false
                         )
                     )
                 },
@@ -603,6 +619,48 @@ fun ExportSheet(
                                 label = { Text(format.displayName, style = MaterialTheme.typography.labelMedium) },
                                 selected = config.captureFormat == format,
                                 colors = exportChipColors(Mocha.Green)
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = Mocha.CardStroke.copy(alpha = 0.6f))
+
+            ExportToggleRow(
+                icon = Icons.Default.ViewModule,
+                title = stringResource(R.string.export_contact_sheet),
+                description = stringResource(R.string.export_contact_sheet_description),
+                checked = config.exportAsContactSheet,
+                onCheckedChange = {
+                    onConfigChanged(
+                        config.copy(
+                            exportAsContactSheet = it,
+                            exportAsGif = false,
+                            captureFrameOnly = false,
+                            exportAudioOnly = false,
+                            exportStemsOnly = false
+                        )
+                    )
+                },
+                accent = Mocha.Flamingo
+            )
+
+            if (config.exportAsContactSheet) {
+                ExportChoiceGroup(
+                    title = stringResource(R.string.export_contact_sheet_columns),
+                    accent = Mocha.Flamingo
+                ) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(2, 3, 4, 5, 6).forEach { cols ->
+                            FilterChip(
+                                onClick = { onConfigChanged(config.copy(contactSheetColumns = cols)) },
+                                label = { Text("$cols columns", style = MaterialTheme.typography.labelMedium) },
+                                selected = config.contactSheetColumns == cols,
+                                colors = exportChipColors(Mocha.Flamingo)
                             )
                         }
                     }
@@ -745,8 +803,91 @@ fun ExportSheet(
             )
             if (estimatedSize != null && videoModeEnabled) {
                 Text(
-                    text = "~$estimatedSize estimated",
+                    text = stringResource(R.string.export_estimated_size_format, estimatedSize),
                     color = Mocha.Peach,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (totalDurationMs > 0L && videoModeEnabled) {
+                val etaSec = estimateExportEtaSeconds(totalDurationMs, effectiveConfig)
+                Text(
+                    text = stringResource(R.string.export_estimated_time_format, formatEtaSeconds(etaSec)),
+                    color = Mocha.Blue,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        if (videoModeEnabled) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ExportSectionCard(
+                title = stringResource(R.string.export_target_size),
+                description = stringResource(R.string.export_target_size_description),
+                accent = Mocha.Pink
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        onClick = {
+                            onConfigChanged(config.copy(targetSizeBytes = null, bitrateOverride = null))
+                        },
+                        label = { Text("Off", style = MaterialTheme.typography.labelMedium) },
+                        selected = config.targetSizeBytes == null,
+                        colors = exportChipColors(Mocha.Pink)
+                    )
+                    TargetSizePreset.entries.forEach { preset ->
+                        FilterChip(
+                            onClick = {
+                                onConfigChanged(config.copy(targetSizeBytes = preset.sizeBytes))
+                            },
+                            label = { Text(preset.displayName, style = MaterialTheme.typography.labelMedium) },
+                            selected = config.targetSizeBytes == preset.sizeBytes,
+                            colors = exportChipColors(Mocha.Pink)
+                        )
+                    }
+                }
+                if (config.targetSizeBytes != null && totalDurationMs > 0L) {
+                    val mbps = effectiveConfig.videoBitrate / 1_000_000.0
+                    Text(
+                        text = "Target bitrate: %.1f Mbps".format(mbps),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ExportSectionCard(
+                title = stringResource(R.string.export_filename_template),
+                description = stringResource(R.string.export_filename_template_description),
+                accent = Mocha.Lavender
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        "{name}" to "Name",
+                        "{name}_{date}" to "Name + Date",
+                        "{name}_{date}_{time}" to "Name + Timestamp",
+                        "{name}_{res}_{fps}" to "Name + Specs",
+                        "{name}_{preset}" to "Name + Preset"
+                    ).forEach { (tmpl, label) ->
+                        FilterChip(
+                            onClick = { onConfigChanged(config.copy(filenameTemplate = tmpl)) },
+                            label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                            selected = config.filenameTemplate == tmpl,
+                            colors = exportChipColors(Mocha.Lavender)
+                        )
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.export_current_filename_template, config.filenameTemplate),
+                    color = Mocha.Subtext0,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -896,57 +1037,87 @@ private fun ExportToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     accent: Color
 ) {
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        color = if (checked) accent.copy(alpha = 0.08f) else Mocha.PanelRaised.copy(alpha = 0.7f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(
+            1.dp,
+            if (checked) accent.copy(alpha = 0.24f) else Mocha.CardStroke
+        )
     ) {
-        Surface(
-            color = accent.copy(alpha = 0.14f),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = checked,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange
+                )
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .padding(10.dp),
-                contentAlignment = Alignment.Center
+            Surface(
+                color = accent.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = accent,
-                    modifier = Modifier.size(20.dp)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .padding(10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = Mocha.Text,
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = description,
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
-        }
 
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = title,
-                color = Mocha.Text,
-                style = MaterialTheme.typography.titleSmall
-            )
-            Text(
-                text = description,
-                color = Mocha.Subtext0,
-                style = MaterialTheme.typography.bodySmall
+            Surface(
+                color = if (checked) accent.copy(alpha = 0.14f) else Mocha.Panel,
+                shape = RoundedCornerShape(999.dp),
+                border = BorderStroke(1.dp, if (checked) accent.copy(alpha = 0.26f) else Mocha.CardStroke)
+            ) {
+                Text(
+                    text = stringResource(if (checked) R.string.state_on else R.string.state_off),
+                    color = if (checked) accent else Mocha.Subtext0,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                )
+            }
+
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = accent,
+                    checkedThumbColor = Mocha.Crust,
+                    uncheckedTrackColor = Mocha.Surface1,
+                    uncheckedThumbColor = Mocha.Subtext0
+                )
             )
         }
-
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = accent,
-                checkedThumbColor = Mocha.Crust,
-                uncheckedTrackColor = Mocha.Surface1,
-                uncheckedThumbColor = Mocha.Subtext0
-            )
-        )
     }
 }
 
@@ -1176,4 +1347,33 @@ private fun estimateExportSize(
         estimatedBytes >= 1_048_576L -> "%.0f MB".format(estimatedBytes / 1_048_576.0)
         else -> "%.0f KB".format(estimatedBytes / 1024.0)
     }
+}
+
+/**
+ * Heuristic encode-time estimate before export starts. Calibrated against mid-range
+ * Android devices — 1080p30 runs at ~1.2x real-time with H.264, HEVC/AV1 are slower.
+ * Pixel count and bitrate scale the estimate roughly linearly.
+ */
+private fun estimateExportEtaSeconds(totalDurationMs: Long, config: ExportConfig): Long {
+    if (totalDurationMs <= 0L) return 0L
+    val durationSec = totalDurationMs / 1000.0
+    val pixels = config.resolution.width.toLong() * config.resolution.height.toLong()
+    val refPixels = 1920L * 1080L
+    val resolutionFactor = (pixels.toDouble() / refPixels).coerceAtLeast(0.25)
+    val codecFactor = when (config.codec) {
+        VideoCodec.H264 -> 1.0
+        VideoCodec.HEVC -> 1.6
+        VideoCodec.AV1 -> 2.4
+        VideoCodec.VP9 -> 1.9
+    }
+    val fpsFactor = config.frameRate / 30.0
+    // Base rate: 1080p30 H.264 ≈ 0.85x realtime on mid devices (so encode takes ~1.17x).
+    val encodeMultiplier = 1.17 * resolutionFactor * codecFactor * fpsFactor
+    return (durationSec * encodeMultiplier).toLong().coerceAtLeast(1L)
+}
+
+private fun formatEtaSeconds(seconds: Long): String = when {
+    seconds >= 3600 -> "%dh %dm".format(seconds / 3600, (seconds % 3600) / 60)
+    seconds >= 60 -> "%dm %02ds".format(seconds / 60, seconds % 60)
+    else -> "${seconds}s"
 }

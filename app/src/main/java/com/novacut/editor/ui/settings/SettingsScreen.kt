@@ -25,6 +25,10 @@ import com.novacut.editor.R
 import com.novacut.editor.engine.AppSettings
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.NovaCutChromeIconButton
+import com.novacut.editor.ui.theme.NovaCutHeroCard
+import com.novacut.editor.ui.theme.NovaCutMetricPill
+import com.novacut.editor.ui.theme.NovaCutSectionHeader
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -384,6 +388,7 @@ fun SettingsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SettingsHero(
     settings: AppSettings,
@@ -395,87 +400,59 @@ private fun SettingsHero(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Surface(
-            color = Mocha.Panel,
-            shape = RoundedCornerShape(28.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f))
+        NovaCutHeroCard(
+            accent = Mocha.Sapphire,
+            shape = RoundedCornerShape(28.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Mocha.PanelHighest.copy(alpha = 0.94f),
-                                Mocha.Panel.copy(alpha = 0.98f),
-                                Mocha.Mantle
-                            )
-                        )
-                    )
-                    .padding(20.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = Mocha.PanelHighest,
-                            shape = RoundedCornerShape(18.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke)
-                        ) {
-                            IconButton(
-                                onClick = onBack,
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    stringResource(R.string.back),
-                                    tint = Mocha.Text
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.settings_title),
-                                color = Mocha.Text,
-                                style = MaterialTheme.typography.headlineLarge
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                stringResource(R.string.settings_subtitle),
-                                color = Mocha.Subtext0,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        SettingsOverviewStat(
-                            label = stringResource(R.string.settings_editor),
-                            value = settings.editorMode,
-                            accent = Mocha.Mauve,
-                            modifier = Modifier.weight(1f)
-                        )
-                        SettingsOverviewStat(
-                            label = stringResource(R.string.settings_auto_save),
-                            value = if (settings.autoSaveEnabled) "${settings.autoSaveIntervalSec}s" else stringResource(R.string.settings_off),
-                            accent = Mocha.Sapphire,
-                            modifier = Modifier.weight(1f)
-                        )
-                        SettingsOverviewStat(
-                            label = stringResource(R.string.settings_ai_models),
-                            value = stringResource(R.string.manage),
-                            accent = Mocha.Rosewater,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable(onClick = onManageAiModels)
-                        )
-                    }
+                NovaCutChromeIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.back),
+                    onClick = onBack
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_title),
+                        color = Mocha.Text,
+                        style = MaterialTheme.typography.headlineLarge
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.settings_subtitle),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
+            }
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SettingsOverviewStat(
+                    label = stringResource(R.string.settings_editor),
+                    value = settings.editorMode,
+                    accent = Mocha.Mauve,
+                    modifier = Modifier.widthIn(min = 132.dp)
+                )
+                SettingsOverviewStat(
+                    label = stringResource(R.string.settings_auto_save),
+                    value = if (settings.autoSaveEnabled) "${settings.autoSaveIntervalSec}s" else stringResource(R.string.settings_off),
+                    accent = Mocha.Sapphire,
+                    modifier = Modifier.widthIn(min = 132.dp)
+                )
+                SettingsOverviewStat(
+                    label = stringResource(R.string.settings_ai_models),
+                    value = stringResource(R.string.manage),
+                    accent = Mocha.Rosewater,
+                    modifier = Modifier
+                        .widthIn(min = 132.dp)
+                        .clickable(onClick = onManageAiModels)
+                )
             }
         }
     }
@@ -520,21 +497,11 @@ private fun SettingsSection(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-            title,
-            color = Mocha.Rosewater,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 4.dp)
+        NovaCutSectionHeader(
+            title = title,
+            description = description,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
-        description?.let {
-            Text(
-                text = it,
-                color = Mocha.Subtext0,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
         Card(
             colors = CardDefaults.cardColors(containerColor = Mocha.Panel),
             shape = RoundedCornerShape(22.dp),
@@ -726,11 +693,9 @@ private fun SettingsActionRow(
         description = description,
         onClick = onClick
     ) {
-        Text(
+        NovaCutMetricPill(
             text = actionLabel,
-            color = accent,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold
+            accent = accent
         )
     }
 }
@@ -768,7 +733,8 @@ private fun SettingsSwitchTile(
         icon = icon,
         accent = accent,
         label = label,
-        description = description
+        description = description,
+        onClick = { onChanged(!checked) }
     ) {
         Switch(
             checked = checked,

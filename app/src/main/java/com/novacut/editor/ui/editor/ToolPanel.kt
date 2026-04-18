@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,6 +35,7 @@ import androidx.annotation.StringRes
 import com.novacut.editor.R
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.TouchTarget
 import java.util.Locale
 
 // --- Tab & sub-menu data ---
@@ -415,32 +418,69 @@ private fun BottomTabBarItem(
 ) {
     val isBack = tab.id == "back"
     val tabLabel = if (tab.labelRes != 0) stringResource(tab.labelRes) else ""
+    val shape = RoundedCornerShape(18.dp)
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            isActive && !isBack -> Mocha.Mauve.copy(alpha = 0.12f)
+            isBack -> Mocha.PanelRaised.copy(alpha = 0.68f)
+            else -> Color.Transparent
+        },
+        label = "toolTabContainer"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isActive && !isBack -> Mocha.Mauve.copy(alpha = 0.22f)
+            isBack -> Mocha.CardStroke.copy(alpha = 0.8f)
+            else -> Color.Transparent
+        },
+        label = "toolTabBorder"
+    )
+    val iconContainerColor by animateColorAsState(
+        targetValue = when {
+            isActive && !isBack -> Mocha.Mauve.copy(alpha = 0.16f)
+            isBack -> Mocha.PanelHighest
+            else -> Mocha.PanelHighest
+        },
+        label = "toolTabIconContainer"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = when {
+            isActive && !isBack -> Mocha.Rosewater
+            isBack -> Mocha.Text
+            else -> Mocha.Subtext0
+        },
+        label = "toolTabIconTint"
+    )
+    val labelColor by animateColorAsState(
+        targetValue = if (isActive && !isBack) Mocha.Rosewater else Mocha.Subtext0,
+        label = "toolTabLabelColor"
+    )
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .background(
-                if (isActive && !isBack) Mocha.Mauve.copy(alpha = 0.18f)
-                else Color.Transparent
+            .clip(shape)
+            .selectable(
+                selected = isActive,
+                onClick = onClick,
+                role = Role.Tab
             )
-            .padding(vertical = if (compact) 6.dp else 8.dp, horizontal = 2.dp),
+            .background(containerColor)
+            .border(BorderStroke(1.dp, borderColor), shape)
+            .heightIn(min = TouchTarget.comfortable)
+            .padding(vertical = if (compact) 6.dp else 8.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 32.dp else 34.dp)
+                .size(if (compact) 34.dp else 36.dp)
                 .clip(CircleShape)
-                .background(
-                    if (isActive && !isBack) Mocha.Mauve.copy(alpha = 0.14f)
-                    else Mocha.PanelHighest
-                ),
+                .background(iconContainerColor),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 tab.icon,
                 contentDescription = tabLabel.ifEmpty { tab.id },
-                tint = if (isActive && !isBack) Mocha.Rosewater else Mocha.Subtext0,
+                tint = iconTint,
                 modifier = Modifier.size(if (compact) 18.dp else 20.dp)
             )
         }
@@ -450,7 +490,7 @@ private fun BottomTabBarItem(
             Text(
                 text = tabLabel,
                 fontSize = if (compact) 9.sp else 10.sp,
-                color = if (isActive) Mocha.Rosewater else Mocha.Subtext0,
+                color = labelColor,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 lineHeight = if (compact) 11.sp else 12.sp,
@@ -497,28 +537,44 @@ private fun SubMenuGrid(
                 ) {
                     rowItems.forEach { item ->
                         val isDisabled = item.id in disabledIds
+                        val itemAccent = if (isDisabled) Mocha.Overlay0 else Mocha.Mauve
+                        val itemShape = RoundedCornerShape(18.dp)
                         Column(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(itemShape)
                                 .clickable(enabled = !isDisabled) { onItemSelected(item.id) }
-                                .background(Mocha.PanelHighest.copy(alpha = 0.86f))
-                                .padding(horizontal = 6.dp, vertical = 10.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            itemAccent.copy(alpha = if (isDisabled) 0.05f else 0.12f),
+                                            Mocha.PanelHighest
+                                        )
+                                    )
+                                )
+                                .border(
+                                    BorderStroke(
+                                        1.dp,
+                                        if (isDisabled) Mocha.CardStroke.copy(alpha = 0.6f) else itemAccent.copy(alpha = 0.18f)
+                                    ),
+                                    itemShape
+                                )
+                                .padding(horizontal = 8.dp, vertical = 10.dp)
                                 .width(60.dp)
-                                .alpha(if (isDisabled) 0.35f else 1f),
+                                .alpha(if (isDisabled) 0.45f else 1f),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             val itemLabel = stringResource(item.labelRes)
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(Mocha.Mauve.copy(alpha = 0.12f)),
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(itemAccent.copy(alpha = if (isDisabled) 0.10f else 0.16f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     item.icon,
                                     contentDescription = itemLabel,
-                                    tint = Mocha.Text,
+                                    tint = if (isDisabled) Mocha.Subtext0 else itemAccent,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1524,68 +1580,128 @@ private fun TextOverlayList(
     onEdit: (String) -> Unit,
     onDelete: (String) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Mocha.Mantle)
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Mocha.Panel,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.85f))
     ) {
-        Text(stringResource(R.string.tool_text_overlays), color = Mocha.Subtext1, fontSize = 11.sp)
-        Spacer(modifier = Modifier.height(4.dp))
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 150.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            overlays.forEach { overlay ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Mocha.Surface0)
-                        .clickable { onEdit(overlay.id) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Title,
-                        contentDescription = stringResource(R.string.tool_text_overlay_cd),
-                        tint = Color(overlay.color),
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = stringResource(R.string.tool_text_overlays),
+                        color = Mocha.Text,
+                        style = MaterialTheme.typography.titleSmall
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            overlay.text,
-                            color = Mocha.Text,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        val startSec = overlay.startTimeMs / 1000f
-                        val endSec = overlay.endTimeMs / 1000f
-                        Text(
-                            "%.1fs — %.1fs".format(startSec, endSec),
-                            color = Mocha.Subtext0,
-                            fontSize = 10.sp
-                        )
-                    }
-                    IconButton(
-                        onClick = { onEdit(overlay.id) },
-                        modifier = Modifier.size(28.dp)
+                    Text(
+                        text = stringResource(R.string.tool_text_overlays_description),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                PremiumPanelPill(
+                    text = stringResource(R.string.tool_text_overlays_count, overlays.size),
+                    accent = Mocha.Mauve
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 188.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                overlays.forEach { overlay ->
+                    val overlayAccent = Color(overlay.color)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Mocha.PanelHighest,
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, Mocha.CardStroke)
                     ) {
-                        Icon(Icons.Default.Edit, stringResource(R.string.tool_edit), tint = Mocha.Mauve, modifier = Modifier.size(14.dp))
-                    }
-                    IconButton(
-                        onClick = { onDelete(overlay.id) },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, stringResource(R.string.tool_delete), tint = Mocha.Red, modifier = Modifier.size(14.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onEdit(overlay.id) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(overlayAccent.copy(alpha = 0.14f))
+                                    .border(
+                                        BorderStroke(1.dp, overlayAccent.copy(alpha = 0.22f)),
+                                        RoundedCornerShape(14.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Title,
+                                    contentDescription = stringResource(R.string.tool_text_overlay_cd),
+                                    tint = overlayAccent,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = overlay.text.ifBlank { stringResource(R.string.tool_text_overlay_cd) },
+                                    color = Mocha.Text,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                PremiumPanelPill(
+                                    text = formatTextOverlayRange(overlay),
+                                    accent = Mocha.Lavender
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                PremiumPanelIconButton(
+                                    icon = Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.tool_edit),
+                                    onClick = { onEdit(overlay.id) },
+                                    tint = Mocha.Mauve
+                                )
+                                PremiumPanelIconButton(
+                                    icon = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.tool_delete),
+                                    onClick = { onDelete(overlay.id) },
+                                    tint = Mocha.Red
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+private fun formatTextOverlayRange(overlay: TextOverlay): String {
+    val startSec = overlay.startTimeMs / 1000f
+    val endSec = overlay.endTimeMs / 1000f
+    return String.format(Locale.US, "%.1fs — %.1fs", startSec, endSec)
 }

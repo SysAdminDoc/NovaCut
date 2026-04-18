@@ -165,6 +165,83 @@ val builtInTextTemplates = listOf(
         ),
         durationMs = 3000L
     ),
+    TextTemplate(
+        id = "social_impact_meme", name = "Impact Meme",
+        category = TextTemplateCategory.SOCIAL,
+        layers = listOf(
+            TextOverlay(text = "TOP TEXT", fontSize = 56f, color = 0xFFFFFFFF, bold = true,
+                fontFamily = "sans-serif-condensed",
+                strokeColor = 0xFF000000, strokeWidth = 8f, letterSpacing = 2f,
+                positionX = 0.5f, positionY = 0.1f,
+                animationIn = TextAnimation.SCALE, animationOut = TextAnimation.NONE),
+            TextOverlay(text = "BOTTOM TEXT", fontSize = 56f, color = 0xFFFFFFFF, bold = true,
+                fontFamily = "sans-serif-condensed",
+                strokeColor = 0xFF000000, strokeWidth = 8f, letterSpacing = 2f,
+                positionX = 0.5f, positionY = 0.9f,
+                animationIn = TextAnimation.SCALE, animationOut = TextAnimation.NONE)
+        ),
+        durationMs = 4000L
+    ),
+    TextTemplate(
+        id = "social_tiktok_caption", name = "TikTok Caption",
+        category = TextTemplateCategory.SOCIAL,
+        layers = listOf(
+            TextOverlay(text = "add caption here", fontSize = 36f, color = 0xFF000000, bold = true,
+                backgroundColor = 0xEEFFFFFF,
+                positionX = 0.5f, positionY = 0.75f, alignment = TextAlignment.CENTER,
+                animationIn = TextAnimation.SLIDE_UP, animationOut = TextAnimation.FADE)
+        ),
+        durationMs = 3000L
+    ),
+    TextTemplate(
+        id = "social_reels_hook", name = "Reels Hook",
+        category = TextTemplateCategory.SOCIAL,
+        layers = listOf(
+            TextOverlay(text = "WAIT FOR IT…", fontSize = 52f, color = 0xFFFFFFFF, bold = true,
+                strokeColor = 0xFF11111B, strokeWidth = 4f,
+                shadowColor = 0xCC000000, shadowOffsetX = 2f, shadowOffsetY = 2f, shadowBlur = 8f,
+                positionX = 0.5f, positionY = 0.18f, letterSpacing = 3f,
+                animationIn = TextAnimation.BOUNCE, animationOut = TextAnimation.FADE)
+        ),
+        durationMs = 2500L
+    ),
+    TextTemplate(
+        id = "social_pov", name = "POV Meme",
+        category = TextTemplateCategory.SOCIAL,
+        layers = listOf(
+            TextOverlay(text = "POV:", fontSize = 34f, color = 0xFFFFFFFF, bold = true,
+                backgroundColor = 0xBB000000,
+                positionX = 0.5f, positionY = 0.14f, alignment = TextAlignment.CENTER,
+                animationIn = TextAnimation.TYPEWRITER, animationOut = TextAnimation.FADE),
+            TextOverlay(text = "you forgot to hit record", fontSize = 28f, color = 0xFFFFFFFF,
+                backgroundColor = 0x99000000,
+                positionX = 0.5f, positionY = 0.22f, alignment = TextAlignment.CENTER,
+                animationIn = TextAnimation.TYPEWRITER, animationOut = TextAnimation.FADE)
+        ),
+        durationMs = 3500L
+    ),
+    TextTemplate(
+        id = "social_neon_glow", name = "Neon Glow",
+        category = TextTemplateCategory.SOCIAL,
+        layers = listOf(
+            TextOverlay(text = "VIBES", fontSize = 64f, color = 0xFFF5C2E7, bold = true,
+                glowColor = 0xFFF5C2E7, glowRadius = 20f, letterSpacing = 6f,
+                positionX = 0.5f, positionY = 0.5f,
+                animationIn = TextAnimation.BLUR_IN, animationOut = TextAnimation.FADE)
+        ),
+        durationMs = 3000L
+    ),
+    TextTemplate(
+        id = "social_caption_word", name = "Word Burst",
+        category = TextTemplateCategory.SOCIAL,
+        layers = listOf(
+            TextOverlay(text = "BIG", fontSize = 96f, color = 0xFFF9E2AF, bold = true,
+                strokeColor = 0xFF1E1E2E, strokeWidth = 5f,
+                positionX = 0.5f, positionY = 0.5f,
+                animationIn = TextAnimation.ELASTIC, animationOut = TextAnimation.SCALE)
+        ),
+        durationMs = 1200L
+    ),
 
     // Minimal
     TextTemplate(

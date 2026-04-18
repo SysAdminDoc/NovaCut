@@ -19,7 +19,8 @@ data class Project(
     val thumbnailUri: String? = null,
     val templateId: String? = null,
     val proxyEnabled: Boolean = false,
-    val version: Int = 1
+    val version: Int = 1,
+    val notes: String = ""
 )
 
 enum class AspectRatio(val widthRatio: Int, val heightRatio: Int, val label: String) {
