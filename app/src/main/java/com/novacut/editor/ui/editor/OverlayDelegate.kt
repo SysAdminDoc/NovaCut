@@ -55,10 +55,15 @@ class OverlayDelegate(
 
     fun addImageOverlay(uri: Uri, type: ImageOverlayType = ImageOverlayType.STICKER) {
         saveUndoState("Add sticker")
+        // Single snapshot read so start/end can't fall out of sync if the user
+        // scrubs the playhead between the two `stateFlow.value` accesses.
+        val snapshot = stateFlow.value
+        val startMs = snapshot.playheadMs
+        val endMs = minOf(startMs + 5000L, snapshot.totalDurationMs.coerceAtLeast(startMs + 1000L))
         val overlay = ImageOverlay(
             sourceUri = uri,
-            startTimeMs = stateFlow.value.playheadMs,
-            endTimeMs = minOf(stateFlow.value.playheadMs + 5000L, stateFlow.value.totalDurationMs.coerceAtLeast(stateFlow.value.playheadMs + 1000L)),
+            startTimeMs = startMs,
+            endTimeMs = endMs,
             type = type
         )
         stateFlow.update { it.copy(imageOverlays = it.imageOverlays + overlay) }
