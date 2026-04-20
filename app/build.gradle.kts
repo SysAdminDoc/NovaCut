@@ -22,8 +22,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 117
-        versionName = "3.56.0"
+        versionCode = 119
+        versionName = "3.58.0"
     }
 
     signingConfigs {
@@ -86,6 +86,16 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // Return default values (0/null/false) for un-mocked Android framework methods
+    // in plain JVM unit tests instead of throwing `Method X not mocked. See ...`.
+    // Matches the pragmatic testing approach used across the engine -- we test
+    // pure Kotlin logic on the JVM rather than standing up Robolectric for every
+    // small unit test. Instrumentation tests remain the path for anything that
+    // legitimately needs the Android runtime.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 }
 

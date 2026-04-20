@@ -3636,6 +3636,12 @@ class EditorViewModel @Inject constructor(
         voiceoverEngine.release()
         ttsEngine.stopPreview()
         videoEngine.removePlayerListener()
+        // Guarantee scrubbing-mode is reset regardless of whether a begin-X()
+        // had a matching end-X(). If the activity dies mid-trim / mid-scrub (OS
+        // kill, uncaught exception in the drag handler), a stale scrubbing flag
+        // would otherwise persist on the singleton VideoEngine and affect the
+        // next project opened in this process.
+        videoEngine.setScrubbingMode(false)
         // Only reset export state if no export is actively running — the ExportService
         // observes the same state flows and needs to see the terminal state to stop itself.
         if (videoEngine.exportState.value != ExportState.EXPORTING) {

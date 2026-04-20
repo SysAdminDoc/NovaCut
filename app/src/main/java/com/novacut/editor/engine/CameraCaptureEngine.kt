@@ -1,0 +1,90 @@
+package com.novacut.editor.engine
+
+import android.content.Context
+import android.net.Uri
+import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Stub engine -- requires androidx.camera + teleprompter UI. See ROADMAP.md Tier C.8.
+ *
+ * In-app video capture with optional scrolling teleprompter overlay. Captured
+ * clips drop directly onto the current timeline without a round trip through
+ * MediaStore.
+ *
+ * Dependencies to add when wiring the real UI:
+ *   implementation("androidx.camera:camera-core:1.4.+")
+ *   implementation("androidx.camera:camera-camera2:1.4.+")
+ *   implementation("androidx.camera:camera-lifecycle:1.4.+")
+ *   implementation("androidx.camera:camera-video:1.4.+")
+ *   implementation("androidx.camera:camera-view:1.4.+")
+ */
+@Singleton
+class CameraCaptureEngine @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+
+    data class CaptureConfig(
+        val resolution: Resolution = Resolution.UHD_4K,
+        val frameRate: Int = 30,
+        val useFrontCamera: Boolean = false,
+        val stabilizationEnabled: Boolean = true,
+        val hdrEnabled: Boolean = false,
+        val teleprompter: TeleprompterConfig? = null
+    ) {
+        enum class Resolution(val widthPx: Int, val heightPx: Int) {
+            HD_720P(1280, 720),
+            FHD_1080P(1920, 1080),
+            UHD_4K(3840, 2160)
+        }
+    }
+
+    data class TeleprompterConfig(
+        val text: String,
+        val scrollSpeedWordsPerMin: Int = 150,
+        val fontSizeSp: Int = 26,
+        val mirrorText: Boolean = false,
+        val backgroundAlpha: Float = 0.6f
+    )
+
+    data class CaptureResult(
+        val outputUri: Uri,
+        val durationMs: Long,
+        val widthPx: Int,
+        val heightPx: Int,
+        val frameRate: Int
+    )
+
+    private val _recordingState = MutableStateFlow(RecordingState.IDLE)
+    val recordingState: StateFlow<RecordingState> = _recordingState
+
+    enum class RecordingState { IDLE, PREPARING, RECORDING, PAUSED, STOPPING }
+
+    fun isCameraAvailable(): Boolean = false
+
+    suspend fun startRecording(
+        config: CaptureConfig = CaptureConfig(),
+        outputUri: Uri
+    ): Boolean = withContext(Dispatchers.Main) {
+        Log.d(TAG, "startRecording: stub -- CameraX not wired")
+        false
+    }
+
+    suspend fun stopRecording(): CaptureResult? = withContext(Dispatchers.Main) {
+        Log.d(TAG, "stopRecording: stub -- CameraX not wired")
+        null
+    }
+
+    fun pauseRecording() { Log.d(TAG, "pauseRecording: stub") }
+    fun resumeRecording() { Log.d(TAG, "resumeRecording: stub") }
+
+    companion object {
+        private const val TAG = "CameraCapture"
+    }
+}
