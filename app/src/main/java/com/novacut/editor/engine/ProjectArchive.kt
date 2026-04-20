@@ -96,11 +96,13 @@ object ProjectArchive {
         val targetDirAlreadyExisted = canonicalTargetDir.exists()
         val extractedPaths = mutableListOf<File>()
         try {
-            val inputStream = context.contentResolver.openInputStream(archiveUri) ?: return@withContext null
+            // Ensure target dir before opening the stream so a mkdirs() failure
+            // can't leak an already-open InputStream.
             if (!canonicalTargetDir.exists() && !canonicalTargetDir.mkdirs()) {
                 Log.e("ProjectArchive", "Failed to create import directory: ${canonicalTargetDir.path}")
                 return@withContext null
             }
+            val inputStream = context.contentResolver.openInputStream(archiveUri) ?: return@withContext null
 
             var projectJson: String? = null
             var mediaManifestJson: String? = null
