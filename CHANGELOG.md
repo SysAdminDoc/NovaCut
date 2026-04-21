@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.64.0 — Deep Audit Phase 26: Defensive Hardening
+
+Defensive improvements from final end-to-end engineering audit sweep. No behaviour change on valid inputs, no new dependencies.
+
+### Improvements
+
+- **`BeatDetectionEngine.fft` — undocumented power-of-2 contract now enforced** — The Radix-2 Cooley-Tukey FFT implementation requires its input arrays to have power-of-2 length; this was documented in a comment but not enforced in code. A non-power-of-2 input produces an incorrect bit-reversal permutation and a silently corrupted frequency spectrum, yielding wrong beat timings with no error signal. Added `require(n > 0 && (n and (n - 1)) == 0)` at the top of `fft()` so any future caller passing a wrong-sized array fails fast with a clear diagnostic instead of silently producing corrupt beat maps.
+
+- **`SettingsRepository.updateDefaultCodec` — silent rejection now logged** — When an unrecognised codec string is passed to `updateDefaultCodec`, the method silently returns without writing to DataStore. This is the correct defensive behaviour, but the absence of any log message makes it invisible during debugging or when tracing unexpected UI state (e.g. the codec dropdown appearing to reset). Added `Log.w("SettingsRepository", "Ignoring unknown codec value: $value")` before the early return so that corrupt or migrated settings strings surface in logcat without changing the validation logic.
+
 ## v3.63.0 — Deep Audit Phase 25: Segmentation and Stabilization Reliability
 
 Targeted correctness and defensive fixes from continued end-to-end engineering audit of AI processing and segmentation layers. No behaviour change on valid inputs, no new dependencies.
