@@ -72,10 +72,26 @@ class ColorGradingDelegate(
                 val lutDir = File(appContext.filesDir, "luts").also { it.mkdirs() }
                 val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "imported.cube"
                 val destFile = File(lutDir, fileName)
-                appContext.contentResolver.openInputStream(uri)?.use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
+                // Write to a sibling temp file first so a failed import never
+                // leaves a partial/corrupt .cube at the live path that subsequent
+                // imports would silently overwrite or use.
+                val tempFile = File(lutDir, "$fileName.tmp")
+                try {
+                    appContext.contentResolver.openInputStream(uri)?.use { input ->
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
                     }
+                    // renameTo is atomic on the same filesystem (internal storage).
+                    // Fall back to copy+delete if we cross a mount point (rare).
+                    if (!tempFile.renameTo(destFile)) {
+                        destFile.delete()
+                        tempFile.copyTo(destFile, overwrite = true)
+                        tempFile.delete()
+                    }
+                } catch (e: Exception) {
+                    tempFile.delete()
+                    throw e
                 }
                 withContext(Dispatchers.Main) {
                     setClipLut(destFile.absolutePath)

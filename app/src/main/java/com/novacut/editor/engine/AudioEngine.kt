@@ -76,7 +76,10 @@ class AudioEngine @Inject constructor(
             }
 
             if (audioTrackIndex < 0 || format == null) {
-                return@withContext FloatArray(sampleCount) { 0f }
+                // Use the same bounded size applied everywhere else in this function so
+                // callers that pass a large sampleCount (e.g. 48 000) don't receive an
+                // unexpectedly large array here when there is simply no audio track.
+                return@withContext FloatArray(boundedSampleCount) { 0f }
             }
 
             extractor.selectTrack(audioTrackIndex)
