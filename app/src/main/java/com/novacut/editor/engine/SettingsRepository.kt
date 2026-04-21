@@ -1,6 +1,7 @@
 package com.novacut.editor.engine
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
@@ -134,7 +135,12 @@ class SettingsRepository @Inject constructor(
 
     suspend fun updateDefaultCodec(value: String) {
         // Validate against known enum values to prevent storing garbage from corrupt settings
-        val validated = try { VideoCodec.valueOf(value).name } catch (_: IllegalArgumentException) { return }
+        val validated = try {
+            VideoCodec.valueOf(value).name
+        } catch (_: IllegalArgumentException) {
+            Log.w("SettingsRepository", "Ignoring unknown codec value: $value")
+            return
+        }
         context.dataStore.edit { it[Keys.DEFAULT_CODEC] = validated }
     }
 
