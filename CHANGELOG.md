@@ -1,6 +1,26 @@
 # Changelog
 
-## v3.58.0 — Extreme Hardening Audit (Phase 20)
+## v3.59.0 — Deep Audit Phase 21: Engine Reliability Fixes
+
+Targeted correctness and reliability fixes found during an end-to-end engineering audit of all engine and delegate files. No behaviour change on valid inputs, no new dependencies.
+
+### Bug fixes
+
+- **`AudioEngine` — `FloatArray(sampleCount)` OOM bypass** — When no audio track was found, the early-return path allocated `FloatArray(sampleCount)` instead of `FloatArray(boundedSampleCount)`. Callers that pass a large `sampleCount` (e.g. 48 000) would receive a much larger array than the 10 000-element cap applied everywhere else in the function, silently defeating the OOM guard. Fixed: use `boundedSampleCount` on the early-return path, consistent with the rest of the function.
+
+- **`ProxyEngine` — stale zero-byte proxy served as valid** — The cached-file existence check used `outFile.exists()`, which returned `true` for a zero-byte stub left by a prior failed Transformer run. The code would then cache and return this broken URI without re-rendering. Fixed: check `outFile.isFile && outFile.length() > 0L`, mirroring the identical guard already present in the `onCompleted` callback.
+
+- **`MultiCamEngine` — integer divide-by-zero on `targetSampleRate = 0`** — `max(1, sourceSampleRate / targetSampleRate)` computes the integer division before `max` runs; a caller passing `targetSampleRate = 0` would throw `ArithmeticException`. Fixed: coerce `targetSampleRate` to at least 1 before the division.
+
+- **`MultiCamEngine` — `Float.POSITIVE_INFINITY` poison from `channels = 0`** — `format.getInteger(KEY_CHANNEL_COUNT)` can return 0 from a malformed or synthetic `MediaFormat`. `mono /= channels` then produces `Float.POSITIVE_INFINITY`, which propagates through the entire decoded sample list and corrupts multi-cam sync analysis. Fixed: coerce `channels` to at least 1.
+
+- **`ColorGradingDelegate` — non-atomic LUT file import** — The `.cube` file was written directly to its destination path via `destFile.outputStream()`. A mid-write failure (disk full, cancelled job) left a partial file at the live path; a subsequent import of the same filename would overwrite it, but any access in between would use a corrupt LUT. Fixed: write to a sibling `.tmp` file first, then `renameTo` (atomic on the same filesystem). Falls back to `copyTo + delete` if rename crosses a mount point.
+
+### Notes
+- No DB schema changes. No new dependencies. No UI changes.
+- `.gitignore` already excludes `*.apk`, `CLAUDE.md`, and other local artefacts — no changes needed.
+
+
 
 End-to-end hardening sweep across the v3.57 engine scaffolding plus three parallel Explore-agent audits of adjacent subsystems. Landed every real defect found, rejected the false positives with rationale. Net +300 / −15 lines across 8 code files + 4 new test files (+470 lines of tests). Test count 44 → 73.
 

@@ -101,7 +101,11 @@ class ProxyEngine @Inject constructor(
         // kicking off a duplicate render.
         mutexFor(key).lock()
         try {
-            if (outFile.exists()) {
+            // A previous export attempt may have left a zero-byte file on disk
+            // (e.g. the transformer crashed before writing any data).  Treat
+            // zero-length files as absent so we re-render rather than returning
+            // a broken URI — mirrors the check inside the onCompleted callback.
+            if (outFile.isFile && outFile.length() > 0L) {
                 proxyMap[key] = Uri.fromFile(outFile)
                 return@withContext Uri.fromFile(outFile)
             }
