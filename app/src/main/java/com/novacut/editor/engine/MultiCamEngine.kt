@@ -162,7 +162,9 @@ class MultiCamEngine @Inject constructor(
                 val mime = format.getString(MediaFormat.KEY_MIME)
                     ?: return@withContext FloatArray(0)
                 val sourceSampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                // Malformed or synthetic MediaFormats can report 0 channels; coerce
+                // so the mono-mix divide below never produces Float.Inf / NaN.
+                val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
 
                 val decoder = MediaCodec.createDecoderByType(mime)
                 val samples = mutableListOf<Float>()
@@ -173,7 +175,10 @@ class MultiCamEngine @Inject constructor(
 
                     val bufferInfo = MediaCodec.BufferInfo()
                     var eos = false
-                    val decimation = max(1, sourceSampleRate / targetSampleRate)
+                    // Guard against a caller passing 0 as targetSampleRate (would produce
+                    // ArithmeticException on integer division before max() runs).
+                    val safeTargetRate = targetSampleRate.coerceAtLeast(1)
+                    val decimation = max(1, sourceSampleRate / safeTargetRate)
 
                     while (!eos) {
                         val inIdx = decoder.dequeueInputBuffer(10000)
