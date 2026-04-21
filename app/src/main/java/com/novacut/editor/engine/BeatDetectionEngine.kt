@@ -175,6 +175,7 @@ class BeatDetectionEngine @Inject constructor(
      */
     private fun fft(real: FloatArray, imag: FloatArray) {
         val n = real.size
+        require(n > 0 && (n and (n - 1)) == 0) { "FFT input must have power-of-2 length, got $n" }
         // Bit-reversal permutation
         var j = 0
         for (i in 1 until n) {
