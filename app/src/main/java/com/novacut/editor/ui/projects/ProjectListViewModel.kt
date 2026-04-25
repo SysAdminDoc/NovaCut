@@ -18,6 +18,7 @@ import com.novacut.editor.engine.deleteManagedMediaUri
 import com.novacut.editor.engine.importUriToManagedMedia
 import com.novacut.editor.engine.resolveMediaDisplayName
 import com.novacut.editor.engine.sanitizeFileName
+import com.novacut.editor.engine.sweepUnreferencedManagedMedia
 import com.novacut.editor.engine.db.ProjectDao
 import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Clip
@@ -182,32 +183,23 @@ class ProjectListViewModel @Inject constructor(
 
     fun deleteProject(project: Project) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                projectDao.deleteProject(project)
-                autoSave.clearRecoveryData(project.id)
-                // Sweep the managed-media dir against the union of sourceUris
-                // in every *remaining* project's auto-save JSON. Without this
-                // the imported source clips accumulate forever — deleting a
-                // project used to remove the row + recovery file but leak the
-                // imports in `filesDir/media/imports/`. 24h min-age buffer
-                // ensures an import from a freshly-created project (not yet
-                // auto-saved) doesn't get swept out from under it.
-                try {
-                    val referenced = autoSave.collectReferencedSourceUris()
-                        .map { android.net.Uri.parse(it) }
-                        .toSet()
-                    val result = com.novacut.editor.engine.sweepUnreferencedManagedMedia(
-                        appContext, referenced
-                    )
-                    if (result.filesDeleted > 0) {
-                        Log.d(
-                            "ProjectListVM",
-                            "Swept ${result.filesDeleted} orphan imports (${result.bytesFreed / 1024} KB)"
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.w("ProjectListVM", "Managed-media sweep failed", e)
+            val operation = beginOperation(
+                title = appContext.getString(R.string.projects_operation_delete_title),
+                description = appContext.getString(R.string.projects_operation_delete_body, project.name)
+            )
+            try {
+                val deleted = withContext(Dispatchers.IO) {
+                    deleteProjectAndCleanup(project)
                 }
+                showToast(
+                    if (deleted) {
+                        appContext.getString(R.string.project_delete_success, project.name)
+                    } else {
+                        appContext.getString(R.string.project_delete_failed)
+                    }
+                )
+            } finally {
+                endOperation(operation)
             }
         }
     }
@@ -321,25 +313,27 @@ class ProjectListViewModel @Inject constructor(
     }
 
     fun createFromTemplate(template: UserTemplate, onCreated: (String) -> Unit) {
-        val state = templateManager.loadTemplateState(template)
-        if (state == null) {
-            showToast(appContext.getString(R.string.project_template_open_failed))
-            return
-        }
-        val (tracks, textOverlays) = state
-        val project = Project(
-            name = normalizeProjectName(template.name),
-            aspectRatio = template.aspectRatio,
-            frameRate = template.frameRate,
-            resolution = template.resolution,
-            templateId = template.id
-        )
         viewModelScope.launch {
             val operation = beginOperation(
                 title = appContext.getString(R.string.projects_operation_template_create_title),
                 description = appContext.getString(R.string.projects_operation_template_create_body)
             )
             try {
+                val state = withContext(Dispatchers.IO) {
+                    templateManager.loadTemplateState(template)
+                }
+                if (state == null) {
+                    showToast(appContext.getString(R.string.project_template_open_failed))
+                    return@launch
+                }
+                val (tracks, textOverlays) = state
+                val project = Project(
+                    name = normalizeProjectName(template.name),
+                    aspectRatio = template.aspectRatio,
+                    frameRate = template.frameRate,
+                    resolution = template.resolution,
+                    templateId = template.id
+                )
                 val created = withContext(Dispatchers.IO) {
                     createProjectWithInitialState(
                         project = project,
@@ -363,6 +357,9 @@ class ProjectListViewModel @Inject constructor(
                 } else {
                     showToast(appContext.getString(R.string.project_create_failed))
                 }
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Failed to create project from template ${template.id}", e)
+                showToast(appContext.getString(R.string.project_create_failed))
             } finally {
                 endOperation(operation)
             }
@@ -564,6 +561,41 @@ class ProjectListViewModel @Inject constructor(
             Log.w("ProjectListVM", "Failed to create project ${project.id}", e)
             runCatching { projectDao.deleteById(project.id) }
             false
+        }
+    }
+
+    private suspend fun deleteProjectAndCleanup(project: Project): Boolean {
+        return try {
+            projectDao.deleteProject(project)
+            runCatching { autoSave.clearRecoveryData(project.id) }
+                .onFailure { error ->
+                    Log.w("ProjectListVM", "Deleted project ${project.id}, but recovery cleanup failed", error)
+                }
+            sweepManagedMediaAfterDeletion()
+            true
+        } catch (e: Exception) {
+            Log.w("ProjectListVM", "Failed to delete project ${project.id}", e)
+            false
+        }
+    }
+
+    private suspend fun sweepManagedMediaAfterDeletion() {
+        // Sweep the managed-media dir against the union of sourceUris in every
+        // remaining project's auto-save JSON. The 24h min-age buffer inside the
+        // sweeper avoids racing a fresh import that has not been auto-saved yet.
+        try {
+            val referenced = autoSave.collectReferencedSourceUris()
+                .map { Uri.parse(it) }
+                .toSet()
+            val result = sweepUnreferencedManagedMedia(appContext, referenced)
+            if (result.filesDeleted > 0) {
+                Log.d(
+                    "ProjectListVM",
+                    "Swept ${result.filesDeleted} orphan imports (${result.bytesFreed / 1024} KB)"
+                )
+            }
+        } catch (e: Exception) {
+            Log.w("ProjectListVM", "Managed-media sweep failed", e)
         }
     }
 

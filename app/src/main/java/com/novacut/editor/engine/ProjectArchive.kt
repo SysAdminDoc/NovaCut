@@ -42,16 +42,26 @@ object ProjectArchive {
         outputFile: File,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            outputFile.parentFile?.mkdirs()
+        val targetFile = outputFile.absoluteFile
+        val parentDir = targetFile.parentFile
+        val tempFile = try {
+            if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs() && !parentDir.exists()) {
+                throw IOException("Failed to create archive directory: ${parentDir.absolutePath}")
+            }
+            File.createTempFile("${targetFile.name}.", ".tmp", parentDir)
+        } catch (e: Exception) {
+            Log.e("ProjectArchive", "Archive export failed before writing", e)
+            return@withContext false
+        }
 
+        try {
             val projectJson = state.serialize()
             val archivedMedia = collectArchivedMedia(state)
             val mediaManifest = buildMediaManifest(archivedMedia)
             val totalFiles = archivedMedia.size + 2 // project.json + media manifest
             var processedFiles = 0
 
-            ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zip ->
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(tempFile))).use { zip ->
                 writeTextEntry(zip, PROJECT_JSON_ENTRY, projectJson)
                 processedFiles++
                 onProgress(processedFiles.toFloat() / totalFiles)
@@ -75,11 +85,12 @@ object ProjectArchive {
                     onProgress(processedFiles.toFloat() / totalFiles)
                 }
             }
+            moveFileReplacing(tempFile, targetFile)
 
             true
         } catch (e: Exception) {
             Log.e("ProjectArchive", "Archive export failed", e)
-            outputFile.delete()
+            tempFile.delete()
             false
         }
     }
