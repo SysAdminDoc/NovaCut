@@ -221,10 +221,31 @@ class ProjectListViewModel @Inject constructor(
 
     fun deleteUserTemplate(id: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                templateManager.deleteTemplate(id)
+            val operation = beginOperation(
+                title = appContext.getString(R.string.projects_operation_template_delete_title),
+                description = appContext.getString(R.string.projects_operation_template_delete_body)
+            )
+            try {
+                val deleteResult = withContext(Dispatchers.IO) {
+                    val template = templateManager.getTemplate(id)
+                    template?.name to templateManager.deleteTemplate(id)
+                }
+                loadUserTemplates()
+                showToast(
+                    if (deleteResult.second) {
+                        deleteResult.first?.let { templateName ->
+                            appContext.getString(R.string.project_template_delete_success, templateName)
+                        } ?: appContext.getString(R.string.project_template_delete_success_generic)
+                    } else {
+                        appContext.getString(R.string.project_template_delete_failed)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Template delete failed", e)
+                showToast(appContext.getString(R.string.project_template_delete_failed))
+            } finally {
+                endOperation(operation)
             }
-            loadUserTemplates()
         }
     }
 

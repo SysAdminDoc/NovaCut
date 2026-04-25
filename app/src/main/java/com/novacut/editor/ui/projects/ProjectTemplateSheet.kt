@@ -27,8 +27,10 @@ import com.novacut.editor.engine.UserTemplate
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.NovaCutChromeIconButton
+import com.novacut.editor.ui.theme.NovaCutDialogIcon
 import com.novacut.editor.ui.theme.NovaCutMetricPill
 import com.novacut.editor.ui.theme.NovaCutSectionHeader
+import com.novacut.editor.ui.theme.NovaCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
 import com.novacut.editor.ui.theme.TouchTarget
@@ -122,6 +124,8 @@ fun ProjectTemplateSheet(
     onImportTemplate: () -> Unit = {},
     userTemplates: List<UserTemplate> = emptyList()
 ) {
+    var pendingDeleteTemplate by remember { mutableStateOf<UserTemplate?>(null) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -294,7 +298,7 @@ fun ProjectTemplateSheet(
                     UserTemplateCard(
                         template = ut,
                         onClick = { onUserTemplateSelected(ut) },
-                        onDelete = { onDeleteUserTemplate(ut.id) },
+                        onDelete = { pendingDeleteTemplate = ut },
                         onShare = { onShareTemplate(ut.id) }
                     )
                 }
@@ -307,6 +311,17 @@ fun ProjectTemplateSheet(
             )
             EmptyTemplateStateCard()
         }
+    }
+
+    pendingDeleteTemplate?.let { template ->
+        DeleteUserTemplateDialog(
+            templateName = template.name,
+            onDismissRequest = { pendingDeleteTemplate = null },
+            onConfirm = {
+                pendingDeleteTemplate = null
+                onDeleteUserTemplate(template.id)
+            }
+        )
     }
 }
 
@@ -364,14 +379,14 @@ private fun UserTemplateCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     TemplateActionButton(
                         icon = Icons.Default.Share,
-                        contentDescription = stringResource(R.string.share),
+                        contentDescription = stringResource(R.string.template_share_cd_format, template.name),
                         tint = Mocha.Blue,
                         onClick = onShare
                     )
                     TemplateActionButton(
-                        icon = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.template_delete),
-                        tint = Mocha.Subtext0,
+                        icon = Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.template_delete_cd_format, template.name),
+                        tint = Mocha.Red,
                         onClick = onDelete
                     )
                 }
@@ -547,6 +562,55 @@ private fun EmptyTemplateStateCard() {
             )
         }
     }
+}
+
+@Composable
+private fun DeleteUserTemplateDialog(
+    templateName: String,
+    onDismissRequest: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        icon = {
+            NovaCutDialogIcon(
+                icon = Icons.Default.Delete,
+                accent = Mocha.Red
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.template_delete_confirm_title),
+                color = Mocha.Text,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.template_delete_confirm_body, templateName),
+                color = Mocha.Subtext0,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            NovaCutSecondaryButton(
+                text = stringResource(R.string.template_delete_confirm_action),
+                onClick = onConfirm,
+                icon = Icons.Default.Delete,
+                contentColor = Mocha.Red
+            )
+        },
+        dismissButton = {
+            NovaCutSecondaryButton(
+                text = stringResource(R.string.cancel),
+                onClick = onDismissRequest
+            )
+        },
+        containerColor = Mocha.PanelHighest,
+        titleContentColor = Mocha.Text,
+        textContentColor = Mocha.Subtext0,
+        shape = RoundedCornerShape(Radius.xxl)
+    )
 }
 
 @Composable
