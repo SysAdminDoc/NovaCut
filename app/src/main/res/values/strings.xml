@@ -129,8 +129,15 @@
     <string name="ai_tools_awaiting_clip">Awaiting clip</string>
     <string name="ai_tool_status_running">Running</string>
     <string name="ai_tool_status_ready">Ready</string>
+    <string name="ai_tool_status_whisper">Whisper</string>
+    <string name="ai_tool_status_fallback">Fallback</string>
+    <string name="ai_tool_status_model_gated">Model gated</string>
     <string name="ai_tool_status_clip_required">Clip required</string>
     <string name="ai_tool_ready_hint">Tap to stage or run this assist.</string>
+    <string name="ai_tool_hint_whisper_optional">Runs now; Whisper improves accuracy.</string>
+    <string name="ai_tool_hint_segmentation_fallback">Uses AI matte when installed, fallback otherwise.</string>
+    <string name="ai_tool_hint_stabilize_fallback">Uses OpenCV when available, fallback otherwise.</string>
+    <string name="ai_tool_hint_model_required">Shows model requirements before processing.</string>
     <string name="ai_tool_locked_hint">Select a clip to unlock this workflow.</string>
     <string name="ai_tool_auto_captions">Auto Captions</string>
     <string name="ai_tool_auto_captions_desc">Generate subtitles from speech</string>
@@ -157,6 +164,10 @@
     <string name="ai_tool_style_transfer">Style Transfer</string>
     <string name="ai_tool_style_transfer_desc">AnimeGAN / Neural Style Transfer</string>
     <string name="ai_coming_soon">Coming soon</string>
+    <string name="ai_requirement_model_label">Model</string>
+    <string name="ai_requirement_size_label">Size</string>
+    <string name="ai_requirement_review_models">Review AI models</string>
+    <string name="ai_requirement_not_now">Not now</string>
 
     <!-- NoiseReductionPanel -->
     <string name="noise_reduction_title">AI Noise Reduction</string>
