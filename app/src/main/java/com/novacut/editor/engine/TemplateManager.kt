@@ -88,8 +88,8 @@ class TemplateManager @Inject constructor(
         template
     }
 
-    fun deleteTemplate(id: String) {
-        templateFileForId(id)?.delete()
+    fun deleteTemplate(id: String): Boolean {
+        return templateFileForId(id)?.delete() == true
     }
 
     fun loadTemplateState(template: UserTemplate): Pair<List<Track>, List<TextOverlay>>? {
