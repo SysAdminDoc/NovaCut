@@ -137,6 +137,7 @@ data class EditorState(
     // one-shot action snackbar ("N clips deleted — Undo"). Null when no
     // banner is pending or after the user interacts with it.
     val bulkUndoPrompt: BulkUndoPrompt? = null,
+    val aiRequirementPrompt: AiRequirementPrompt? = null,
     val aiProcessingTool: String? = null,
     val lastExportedFilePath: String? = null,
     val copiedEffects: List<Effect> = emptyList(),
@@ -283,6 +284,15 @@ data class BulkUndoPrompt(
     val id: Long,
     val count: Int,
     val windowMs: Long
+)
+
+data class AiRequirementPrompt(
+    val id: Long = SystemClock.uptimeMillis(),
+    val title: String,
+    val body: String,
+    val modelName: String,
+    val estimatedSize: String,
+    val actionLabel: String
 )
 
 @HiltViewModel
@@ -3617,6 +3627,16 @@ class EditorViewModel @Inject constructor(
 
     fun runAiTool(toolId: String) = aiToolsDelegate.runAiTool(toolId)
     fun cancelAiTool() = aiToolsDelegate.cancelAiTool()
+    fun dismissAiRequirementPrompt() {
+        val current = _state.value.aiRequirementPrompt ?: return
+        _state.update {
+            if (it.aiRequirementPrompt?.id == current.id) {
+                it.copy(aiRequirementPrompt = null)
+            } else {
+                it
+            }
+        }
+    }
 
     fun insertFreezeFrame() {
         val clip = getSelectedClip() ?: return

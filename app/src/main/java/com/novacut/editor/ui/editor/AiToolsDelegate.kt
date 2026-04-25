@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -682,29 +683,66 @@ class AiToolsDelegate(
         saveProject()
     }
 
+    private fun showAiRequirementPrompt(
+        title: String,
+        body: String,
+        modelName: String,
+        estimatedSize: String,
+        actionLabel: String = appContext.getString(R.string.ai_requirement_review_models)
+    ) {
+        stateFlow.update {
+            it.copy(
+                aiRequirementPrompt = AiRequirementPrompt(
+                    title = title,
+                    body = body,
+                    modelName = modelName,
+                    estimatedSize = estimatedSize,
+                    actionLabel = actionLabel
+                )
+            )
+        }
+    }
+
     // --- Tier 3: ML Engine Wrapper Methods ---
 
     private suspend fun applyFrameInterpolation(clip: Clip) {
-        showToast(appContext.getString(R.string.ai_coming_soon))
-        return
+        showAiRequirementPrompt(
+            title = "Frame interpolation needs a model pack",
+            body = "Install the RIFE frame interpolation model before generating in-between frames. Until then, NovaCut avoids duplicating frames so motion remains predictable.",
+            modelName = "RIFE v4.6",
+            estimatedSize = "~10 MB"
+        )
     }
 
     private suspend fun applyObjectRemoval(clip: Clip) {
         if (!inpaintingEngine.isModelReady()) {
-            showToast("Object removal requires LaMa model download (~174MB)")
+            showAiRequirementPrompt(
+                title = "Object removal needs LaMa",
+                body = "Object removal requires the LaMa inpainting model so masked areas can be rebuilt instead of blurred or hidden. Download it before painting out objects.",
+                modelName = "LaMa inpainting",
+                estimatedSize = "~174 MB"
+            )
             return
         }
         showToast("Object removal: tap and paint over the object to remove (UI pending)")
     }
 
     private suspend fun applyVideoUpscale(clip: Clip) {
-        showToast(appContext.getString(R.string.ai_coming_soon))
-        return
+        showAiRequirementPrompt(
+            title = "AI upscale needs Real-ESRGAN",
+            body = "AI upscale needs the Real-ESRGAN model before rebuilding detail beyond the current project resolution. The standard upscale assist remains available for layout and sharpening.",
+            modelName = "Real-ESRGAN x4",
+            estimatedSize = "~17 MB"
+        )
     }
 
     private suspend fun applyAiBackground(clip: Clip) {
-        showToast(appContext.getString(R.string.ai_coming_soon))
-        return
+        showAiRequirementPrompt(
+            title = "AI background generation is model-gated",
+            body = "Background generation needs the compositing model workflow before NovaCut can synthesize a replacement safely. Use Remove BG or Replace BG when the segmentation model is ready.",
+            modelName = "Background composer",
+            estimatedSize = "Model pack pending"
+        )
     }
 
     private suspend fun applyStabilization(clip: Clip) {
@@ -780,8 +818,12 @@ class AiToolsDelegate(
     }
 
     private suspend fun applyStyleTransfer(clip: Clip) {
-        showToast(appContext.getString(R.string.ai_coming_soon))
-        return
+        showAiRequirementPrompt(
+            title = "AI style transfer needs a style model",
+            body = "Install a neural style model before applying full-frame artistic transfer. The lightweight style analyzer remains available through Style Transfer.",
+            modelName = "AnimeGAN / Fast NST",
+            estimatedSize = "~6-9 MB"
+        )
     }
 
 }
