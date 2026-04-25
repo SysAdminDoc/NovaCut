@@ -496,6 +496,8 @@
     <string name="projects_operation_template_share_body">Packaging the template for sharing.</string>
     <string name="projects_operation_template_create_title">Building from template</string>
     <string name="projects_operation_template_create_body">Creating a new edit from the saved structure.</string>
+    <string name="projects_operation_template_delete_title">Deleting template</string>
+    <string name="projects_operation_template_delete_body">Removing the saved setup while keeping your projects intact.</string>
     <string name="project_duplicate_success">Project duplicated</string>
     <string name="project_import_invalid_video">NovaCut couldn\'t import that video. Choose a readable video file and try again.</string>
     <string name="project_imported_default_name">Imported</string>
@@ -503,6 +505,9 @@
     <string name="project_template_import_failed">Template import failed</string>
     <string name="project_template_export_failed">Template export failed</string>
     <string name="project_template_open_failed">Template could not be opened</string>
+    <string name="project_template_delete_success">Deleted template: %1$s</string>
+    <string name="project_template_delete_success_generic">Deleted template</string>
+    <string name="project_template_delete_failed">Template could not be deleted</string>
 
     <!-- ProjectTemplateSheet -->
     <string name="template_new_project">New Project</string>
@@ -547,6 +552,11 @@
     <string name="template_tracks_format">%1$d tracks</string>
     <string name="template_tracks_texts_format">%1$d tracks, %2$d texts</string>
     <string name="template_delete">Delete</string>
+    <string name="template_delete_confirm_title">Delete saved template?</string>
+    <string name="template_delete_confirm_body">Delete \"%1$s\" from your saved templates? Projects already created from it stay unchanged, but this template cannot be restored.</string>
+    <string name="template_delete_confirm_action">Delete template</string>
+    <string name="template_delete_cd_format">Delete %1$s template</string>
+    <string name="template_share_cd_format">Share %1$s template</string>
 
     <!-- EditorScreen -->
     <string name="editor_no_clips_yet">No clips yet</string>
