@@ -17,6 +17,7 @@ import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.engine.exportMimeTypeFor
 import com.novacut.editor.engine.exportUsesImageCollection
 import com.novacut.editor.engine.sanitizeFileName
+import com.novacut.editor.engine.writeFileAtomically
 import com.novacut.editor.engine.writeUtf8TextAtomically
 import com.novacut.editor.model.BatchExportItem
 import com.novacut.editor.model.BatchExportStatus
@@ -378,8 +379,10 @@ class ExportDelegate(
                     }
 
                     withContext(Dispatchers.IO) {
-                        targetGifFile.outputStream().buffered().use { out ->
-                            encodeGif(frames, frameIntervalMs.toInt(), out)
+                        writeFileAtomically(targetGifFile, requireNonEmpty = true) { tempFile ->
+                            tempFile.outputStream().buffered().use { out ->
+                                encodeGif(frames, frameIntervalMs.toInt(), out)
+                            }
                         }
                     }
 
@@ -796,7 +799,11 @@ class ExportDelegate(
                 file.extension.ifBlank { if (usesImageCollection) "png" else "mp4" },
                 file.name
             )
-            file.copyTo(destinationFile, overwrite = true)
+            writeFileAtomically(destinationFile, requireNonEmpty = true) { tempFile ->
+                file.inputStream().use { input ->
+                    tempFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
             MediaScannerConnection.scanFile(
                 appContext,
                 arrayOf(destinationFile.absolutePath),

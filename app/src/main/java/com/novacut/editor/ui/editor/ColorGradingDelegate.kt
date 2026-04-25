@@ -2,6 +2,8 @@ package com.novacut.editor.ui.editor
 
 import android.content.Context
 import android.net.Uri
+import com.novacut.editor.engine.sanitizeFileNamePreservingExtension
+import com.novacut.editor.engine.writeFileAtomically
 import com.novacut.editor.model.ColorGrade
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 
 /**
  * Delegate handling color grading, LUT import, and scope operations.
@@ -70,28 +73,21 @@ class ColorGradingDelegate(
         scope.launch(Dispatchers.IO) {
             try {
                 val lutDir = File(appContext.filesDir, "luts").also { it.mkdirs() }
-                val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "imported.cube"
+                val rawFileName = uri.lastPathSegment?.substringAfterLast('/') ?: "imported.cube"
+                val fileName = sanitizeFileNamePreservingExtension(
+                    raw = rawFileName,
+                    fallbackStem = "imported",
+                    maxLength = 80
+                ).let { sanitized ->
+                    if (sanitized.contains('.')) sanitized else "$sanitized.cube"
+                }
                 val destFile = File(lutDir, fileName)
-                // Write to a sibling temp file first so a failed import never
-                // leaves a partial/corrupt .cube at the live path that subsequent
-                // imports would silently overwrite or use.
-                val tempFile = File(lutDir, "$fileName.tmp")
-                try {
-                    appContext.contentResolver.openInputStream(uri)?.use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
+                writeFileAtomically(destFile, requireNonEmpty = true) { tempFile ->
+                    val inputStream = appContext.contentResolver.openInputStream(uri)
+                        ?: throw IOException("Cannot open LUT file")
+                    inputStream.use { input ->
+                        tempFile.outputStream().use { output -> input.copyTo(output) }
                     }
-                    // renameTo is atomic on the same filesystem (internal storage).
-                    // Fall back to copy+delete if we cross a mount point (rare).
-                    if (!tempFile.renameTo(destFile)) {
-                        destFile.delete()
-                        tempFile.copyTo(destFile, overwrite = true)
-                        tempFile.delete()
-                    }
-                } catch (e: Exception) {
-                    tempFile.delete()
-                    throw e
                 }
                 withContext(Dispatchers.Main) {
                     setClipLut(destFile.absolutePath)

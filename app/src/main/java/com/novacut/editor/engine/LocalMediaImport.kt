@@ -201,11 +201,10 @@ internal fun finalizePendingCameraCapture(
         Uri.fromFile(destinationFile)
     } catch (_: Exception) {
         try {
-            pendingCanonical.inputStream().use { input ->
-                destinationFile.outputStream().use { output -> input.copyTo(output) }
-            }
-            if (destinationFile.length() <= 0L) {
-                throw IOException("Finalized camera capture is empty")
+            writeFileAtomically(destinationFile, requireNonEmpty = true) { tempFile ->
+                pendingCanonical.inputStream().use { input ->
+                    tempFile.outputStream().use { output -> input.copyTo(output) }
+                }
             }
             pendingCanonical.delete()
             Uri.fromFile(destinationFile)
