@@ -30,18 +30,36 @@ internal fun moveFileReplacing(sourceFile: File, targetFile: File) {
 }
 
 internal fun writeUtf8TextAtomically(targetFile: File, contents: String) {
+    writeFileAtomically(targetFile) { tempFile ->
+        tempFile.writeText(contents, Charsets.UTF_8)
+    }
+}
+
+internal fun writeFileAtomically(
+    targetFile: File,
+    requireNonEmpty: Boolean = false,
+    writeContents: (File) -> Unit
+) {
     val parentDir = targetFile.absoluteFile.parentFile
         ?: throw IOException("No parent directory for ${targetFile.absolutePath}")
     if (!parentDir.exists() && !parentDir.mkdirs() && !parentDir.exists()) {
         throw IOException("Failed to create directory ${parentDir.absolutePath}")
     }
 
-    val tempFile = File.createTempFile("${targetFile.name}.", ".tmp", parentDir)
+    val tempFile = File.createTempFile(atomicTempPrefixFor(targetFile), ".tmp", parentDir)
     try {
-        tempFile.writeText(contents, Charsets.UTF_8)
+        writeContents(tempFile)
+        if (requireNonEmpty && (!tempFile.isFile || tempFile.length() <= 0L)) {
+            throw IOException("Atomic write produced an empty file for ${targetFile.absolutePath}")
+        }
         moveFileReplacing(tempFile, targetFile)
     } catch (e: Exception) {
         tempFile.delete()
         throw e
     }
+}
+
+private fun atomicTempPrefixFor(targetFile: File): String {
+    val base = targetFile.name.ifBlank { "output" }.take(48)
+    return ".$base."
 }
