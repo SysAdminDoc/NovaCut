@@ -2019,20 +2019,56 @@ private fun EditorTopBar(
     if (showDeleteConfirmation) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text(stringResource(R.string.editor_delete), color = Mocha.Text) },
-            text = { Text(stringResource(R.string.editor_delete_clip_message), color = Mocha.Subtext1) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmation = false
-                    onDelete()
-                }) { Text(stringResource(R.string.editor_delete), color = Mocha.Red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text(stringResource(R.string.editor_cancel), color = Mocha.Subtext0)
+            icon = {
+                Surface(
+                    color = Mocha.Red.copy(alpha = 0.14f),
+                    shape = RoundedCornerShape(Radius.lg),
+                    border = BorderStroke(1.dp, Mocha.Red.copy(alpha = 0.24f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Mocha.Red,
+                        modifier = Modifier
+                            .padding(Spacing.md)
+                            .size(22.dp)
+                    )
                 }
             },
+            title = {
+                Text(
+                    text = stringResource(R.string.editor_delete),
+                    color = Mocha.Text,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.editor_delete_clip_message),
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                NovaCutSecondaryButton(
+                    text = stringResource(R.string.editor_delete),
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onDelete()
+                    },
+                    icon = Icons.Default.Delete,
+                    contentColor = Mocha.Red
+                )
+            },
+            dismissButton = {
+                NovaCutSecondaryButton(
+                    text = stringResource(R.string.editor_cancel),
+                    onClick = { showDeleteConfirmation = false }
+                )
+            },
             containerColor = Mocha.PanelHighest,
+            titleContentColor = Mocha.Text,
+            textContentColor = Mocha.Subtext0,
             shape = RoundedCornerShape(Radius.xxl)
         )
     }
