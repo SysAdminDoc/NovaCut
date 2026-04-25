@@ -68,6 +68,8 @@ import com.novacut.editor.model.VideoCodec
 import com.novacut.editor.model.Watermark
 import com.novacut.editor.model.WatermarkPosition
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.NovaCutPrimaryButton
+import com.novacut.editor.ui.theme.NovaCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
 
@@ -979,7 +981,8 @@ fun ExportSheet(
             description = stringResource(R.string.export_ready_to_export_description),
             accent = Mocha.Rosewater
         ) {
-            Button(
+            NovaCutPrimaryButton(
+                text = primaryButtonLabel,
                 onClick = {
                     if (config.captureFrameOnly) {
                         onCaptureFrame()
@@ -995,27 +998,11 @@ fun ExportSheet(
                         onStartExport()
                     }
                 },
+                icon = primaryButtonIcon,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Mocha.Rosewater,
-                    contentColor = Mocha.Midnight
-                ),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Icon(
-                    imageVector = primaryButtonIcon,
-                    contentDescription = stringResource(R.string.export_video_cd),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = primaryButtonLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+                    .height(54.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -1027,26 +1014,20 @@ fun ExportSheet(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
-                OutlinedButton(
+                NovaCutSecondaryButton(
+                    text = stringResource(R.string.export_otio),
                     onClick = onExportOtio,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Sapphire),
-                    border = BorderStroke(1.dp, Mocha.CardStrokeStrong),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(stringResource(R.string.export_otio), style = MaterialTheme.typography.labelLarge)
-                }
-                OutlinedButton(
+                    contentColor = Mocha.Sapphire
+                )
+                NovaCutSecondaryButton(
+                    text = stringResource(R.string.export_fcpxml),
                     onClick = onExportFcpxml,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Mocha.Sapphire),
-                    border = BorderStroke(1.dp, Mocha.CardStrokeStrong),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(stringResource(R.string.export_fcpxml), style = MaterialTheme.typography.labelLarge)
-                }
+                    contentColor = Mocha.Sapphire
+                )
             }
         }
     }

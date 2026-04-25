@@ -17,10 +17,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.novacut.editor.R
 import com.novacut.editor.engine.ExportState
+import com.novacut.editor.ui.theme.Elevation
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.Motion
 import com.novacut.editor.ui.theme.Radius
@@ -57,6 +64,23 @@ fun ExportProgressOverlay(
         0L
     }
     val percent = (progressValue * 100).toInt().coerceIn(0, 100)
+    val title = stringResource(R.string.panel_export_progress_exporting)
+    val remainingLabel = if (remaining > 0L) {
+        stringResource(R.string.export_eta_remaining, formatEta(remaining))
+    } else {
+        null
+    }
+    val elapsedLabel = if (elapsed > 0L) {
+        stringResource(R.string.export_elapsed, formatEta(elapsed))
+    } else {
+        null
+    }
+    val statusDescription = listOfNotNull(
+        title,
+        "$percent%",
+        remainingLabel,
+        elapsedLabel
+    ).joinToString(separator = ". ")
 
     AnimatedVisibility(
         visible = isExporting,
@@ -74,7 +98,12 @@ fun ExportProgressOverlay(
             color = Mocha.PanelHighest.copy(alpha = 0.98f),
             shape = RoundedCornerShape(Radius.xl),
             border = BorderStroke(1.dp, Mocha.CardStrokeStrong.copy(alpha = 0.92f)),
-            shadowElevation = 10.dp
+            shadowElevation = Elevation.toast,
+            modifier = Modifier.semantics(mergeDescendants = true) {
+                contentDescription = statusDescription
+                liveRegion = LiveRegionMode.Polite
+                progressBarRangeInfo = ProgressBarRangeInfo(progressValue, 0f..1f)
+            }
         ) {
             Row(
                 modifier = Modifier
@@ -117,7 +146,7 @@ fun ExportProgressOverlay(
                     modifier = Modifier.widthIn(min = 132.dp, max = 220.dp)
                 ) {
                     Text(
-                        text = stringResource(R.string.panel_export_progress_exporting),
+                        text = title,
                         color = Mocha.Text,
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
