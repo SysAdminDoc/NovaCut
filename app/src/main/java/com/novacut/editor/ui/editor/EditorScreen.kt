@@ -70,6 +70,39 @@ import com.novacut.editor.R
 import java.io.File
 
 @Composable
+private fun AiRequirementInfoChip(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = accent.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.24f)),
+        shape = RoundedCornerShape(Radius.lg)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Mocha.Subtext0
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                color = accent,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 fun EditorScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
@@ -1419,6 +1452,72 @@ fun EditorScreen(
                         onClick = { viewModel.dismissRecoveryDialog(recover = false) },
                         contentColor = Mocha.Red,
                         icon = Icons.Default.Delete
+                    )
+                },
+                containerColor = Mocha.PanelHighest,
+                titleContentColor = Mocha.Text,
+                textContentColor = Mocha.Subtext0,
+                shape = RoundedCornerShape(Radius.xxl)
+            )
+        }
+
+        state.aiRequirementPrompt?.let { prompt ->
+            AlertDialog(
+                onDismissRequest = viewModel::dismissAiRequirementPrompt,
+                icon = {
+                    NovaCutDialogIcon(
+                        icon = Icons.Default.Download,
+                        accent = Mocha.Mauve
+                    )
+                },
+                title = {
+                    Text(
+                        text = prompt.title,
+                        color = Mocha.Text,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = prompt.body,
+                            color = Mocha.Subtext0,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            AiRequirementInfoChip(
+                                label = stringResource(R.string.ai_requirement_model_label),
+                                value = prompt.modelName,
+                                accent = Mocha.Mauve,
+                                modifier = Modifier.weight(1f)
+                            )
+                            AiRequirementInfoChip(
+                                label = stringResource(R.string.ai_requirement_size_label),
+                                value = prompt.estimatedSize,
+                                accent = Mocha.Blue,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    NovaCutPrimaryButton(
+                        text = prompt.actionLabel,
+                        onClick = {
+                            viewModel.dismissAiRequirementPrompt()
+                            viewModel.showAiToolsPanel()
+                        },
+                        icon = Icons.Default.AutoAwesome
+                    )
+                },
+                dismissButton = {
+                    NovaCutSecondaryButton(
+                        text = stringResource(R.string.ai_requirement_not_now),
+                        onClick = viewModel::dismissAiRequirementPrompt,
+                        icon = Icons.Default.Close
                     )
                 },
                 containerColor = Mocha.PanelHighest,

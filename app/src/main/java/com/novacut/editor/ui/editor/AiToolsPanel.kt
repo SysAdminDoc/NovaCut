@@ -60,7 +60,10 @@ data class AiToolConfig(
     @StringRes val descriptionResId: Int,
     val icon: ImageVector,
     val color: Color,
-    val requiresClip: Boolean = true
+    val requiresClip: Boolean = true,
+    @StringRes val readinessResId: Int = R.string.ai_tool_status_ready,
+    @StringRes val readinessHintResId: Int = R.string.ai_tool_ready_hint,
+    val readinessAccent: Color = Mocha.Green
 )
 
 val aiTools = listOf(
@@ -69,14 +72,20 @@ val aiTools = listOf(
         R.string.ai_tool_auto_captions,
         R.string.ai_tool_auto_captions_desc,
         Icons.Default.ClosedCaption,
-        Mocha.Blue
+        Mocha.Blue,
+        readinessResId = R.string.ai_tool_status_whisper,
+        readinessHintResId = R.string.ai_tool_hint_whisper_optional,
+        readinessAccent = Mocha.Blue
     ),
     AiToolConfig(
         "remove_bg",
         R.string.ai_tool_remove_bg,
         R.string.ai_tool_remove_bg_desc,
         Icons.Default.Wallpaper,
-        Mocha.Green
+        Mocha.Green,
+        readinessResId = R.string.ai_tool_status_fallback,
+        readinessHintResId = R.string.ai_tool_hint_segmentation_fallback,
+        readinessAccent = Mocha.Teal
     ),
     AiToolConfig(
         "scene_detect",
@@ -125,28 +134,40 @@ val aiTools = listOf(
         R.string.ai_tool_ai_upscale,
         R.string.ai_tool_ai_upscale_desc,
         Icons.Default.ZoomIn,
-        Mocha.Rosewater
+        Mocha.Rosewater,
+        readinessResId = R.string.ai_tool_status_model_gated,
+        readinessHintResId = R.string.ai_tool_hint_model_required,
+        readinessAccent = Mocha.Peach
     ),
     AiToolConfig(
         "ai_background",
         R.string.ai_tool_ai_background,
         R.string.ai_tool_ai_background_desc,
         Icons.Default.PhotoFilter,
-        Mocha.Lavender
+        Mocha.Lavender,
+        readinessResId = R.string.ai_tool_status_model_gated,
+        readinessHintResId = R.string.ai_tool_hint_model_required,
+        readinessAccent = Mocha.Peach
     ),
     AiToolConfig(
         "ai_stabilize",
         R.string.ai_tool_ai_stabilize,
         R.string.ai_tool_ai_stabilize_desc,
         Icons.Default.Straighten,
-        Mocha.Sky
+        Mocha.Sky,
+        readinessResId = R.string.ai_tool_status_fallback,
+        readinessHintResId = R.string.ai_tool_hint_stabilize_fallback,
+        readinessAccent = Mocha.Teal
     ),
     AiToolConfig(
         "ai_style_transfer",
         R.string.ai_tool_style_transfer,
         R.string.ai_tool_style_transfer_desc,
         Icons.Default.Style,
-        Mocha.Maroon
+        Mocha.Maroon,
+        readinessResId = R.string.ai_tool_status_model_gated,
+        readinessHintResId = R.string.ai_tool_hint_model_required,
+        readinessAccent = Mocha.Peach
     )
 )
 
@@ -540,8 +561,8 @@ private fun AiToolCard(
 ) {
     Surface(
         modifier = Modifier
-            .width(168.dp)
-            .height(184.dp)
+            .width(176.dp)
+            .height(196.dp)
             .alpha(if (isEnabled) 1f else 0.92f)
             .clickable(enabled = !isProcessing, onClick = onClick),
         color = if (isEnabled) Mocha.PanelHighest else Mocha.PanelRaised.copy(alpha = 0.85f),
@@ -606,12 +627,12 @@ private fun AiToolCard(
                     PremiumPanelPill(
                         text = when {
                             isProcessing -> stringResource(R.string.ai_tool_status_running)
-                            isEnabled -> stringResource(R.string.ai_tool_status_ready)
+                            isEnabled -> stringResource(tool.readinessResId)
                             else -> stringResource(R.string.ai_tool_status_clip_required)
                         },
                         accent = when {
                             isProcessing -> tool.color
-                            isEnabled -> Mocha.Green
+                            isEnabled -> tool.readinessAccent
                             else -> Mocha.Peach
                         }
                     )
@@ -634,7 +655,7 @@ private fun AiToolCard(
 
                 Text(
                     text = if (isEnabled) {
-                        stringResource(R.string.ai_tool_ready_hint)
+                        stringResource(tool.readinessHintResId)
                     } else {
                         stringResource(R.string.ai_tool_locked_hint)
                     },
