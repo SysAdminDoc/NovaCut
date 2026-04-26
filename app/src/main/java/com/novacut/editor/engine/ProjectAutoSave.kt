@@ -760,6 +760,9 @@ data class AutoSaveState(
                 put("id", effect.id)
                 put("type", effect.type.name)
                 put("enabled", effect.enabled)
+                effect.targetTrackedObjectId
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { put("targetTrackedObjectId", it) }
                 put("params", JSONObject().apply {
                     effect.params.forEach { (k, v) -> putSafeFloat(k, v) }
                 })
@@ -1185,7 +1188,9 @@ data class AutoSaveState(
                 params = params,
                 keyframes = (0 until effectKfArr.length()).mapNotNull { i ->
                     try { deserializeEffectKeyframe(effectKfArr.getJSONObject(i)) } catch (e: Exception) { Log.w(TAG, "Failed to deserialize effect keyframe $i", e); null }
-                }.distinctBy { Pair(it.timeOffsetMs, it.paramName) }
+                }.distinctBy { Pair(it.timeOffsetMs, it.paramName) },
+                targetTrackedObjectId = json.optString("targetTrackedObjectId", "")
+                    .takeIf { it.isNotBlank() }
             )
         }
 
