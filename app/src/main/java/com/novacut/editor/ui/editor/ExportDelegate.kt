@@ -142,7 +142,7 @@ class ExportDelegate(
      * returns false when not eligible or when the muxer failed — in which
      * case the caller should fall through to the Transformer path.
      */
-    private suspend fun trySteamCopy(
+    private suspend fun tryStreamCopy(
         tracks: List<com.novacut.editor.model.Track>,
         config: ExportConfig,
         textOverlays: List<com.novacut.editor.model.TextOverlay>,
@@ -449,7 +449,7 @@ class ExportDelegate(
                 // unmodified clip with only head/tail cuts. Falls back to the
                 // Transformer path below on any failure so we never leave the
                 // user stuck if the MediaMuxer rejects the source.
-                if (trySteamCopy(
+                if (tryStreamCopy(
                         tracks, configWithChapters, textOverlays, currentState, outputFile
                     )
                 ) {
