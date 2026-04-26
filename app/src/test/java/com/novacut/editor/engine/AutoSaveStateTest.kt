@@ -197,4 +197,44 @@ class AutoSaveStateTest {
         assertEquals(1.2, overlay.getDouble("lineHeight"), 0.0001)
         assertEquals(4.0, drawingPath.getDouble("strokeWidth"), 0.0001)
     }
+
+    @Test
+    fun serialize_writesTrackedEffectTarget() {
+        val state = AutoSaveState(
+            projectId = "project",
+            tracks = listOf(
+                Track(
+                    type = TrackType.VIDEO,
+                    index = 0,
+                    clips = listOf(
+                        Clip(
+                            sourceUri = FakeUri,
+                            sourceDurationMs = 1_000L,
+                            timelineStartMs = 0L,
+                            trimStartMs = 0L,
+                            trimEndMs = 1_000L,
+                            effects = listOf(
+                                Effect(
+                                    type = EffectType.TRACKED_MOSAIC,
+                                    params = EffectType.defaultParams(EffectType.TRACKED_MOSAIC),
+                                    targetTrackedObjectId = "tracked-face"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        val effect = JSONObject(state.serialize())
+            .getJSONArray("tracks")
+            .getJSONObject(0)
+            .getJSONArray("clips")
+            .getJSONObject(0)
+            .getJSONArray("effects")
+            .getJSONObject(0)
+
+        assertEquals(EffectType.TRACKED_MOSAIC.name, effect.getString("type"))
+        assertEquals("tracked-face", effect.getString("targetTrackedObjectId"))
+    }
 }

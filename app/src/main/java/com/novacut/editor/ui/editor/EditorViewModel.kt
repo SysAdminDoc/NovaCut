@@ -867,7 +867,7 @@ class EditorViewModel @Inject constructor(
         } else {
             safeEditorFloat(track?.volume ?: 1f, 1f, 0f, 2f)
         }
-        videoEngine.applyPreviewEffects(clip)
+        videoEngine.applyPreviewEffects(clip, _state.value.trackedObjects)
         videoEngine.setPreviewSpeed(safeEditorFloat(clip?.speed ?: 1f, 1f, 0.01f, 100f))
         videoEngine.setPreviewVolume(safeEditorFloat((clip?.volume ?: 1f) * trackVolume, 1f, 0f, 1f))
     }
@@ -2669,7 +2669,54 @@ class EditorViewModel @Inject constructor(
                 if (obj.id == id) obj.copy(isEnabled = enabled) else obj
             })
         }
+        updatePreview()
         saveProject()
+    }
+
+    fun applyTrackedMosaicToObject(trackedObjectId: String) {
+        val state = _state.value
+        val trackedObject = state.trackedObjects.firstOrNull { it.id == trackedObjectId }
+        if (trackedObject == null || !trackedObject.isEnabled || trackedObject.keyframes.isEmpty()) {
+            showToast("No tracked object data available")
+            return
+        }
+
+        val sourceClip = state.tracks
+            .asSequence()
+            .flatMap { it.clips.asSequence() }
+            .firstOrNull { it.id == trackedObject.sourceClipId }
+        if (sourceClip == null) {
+            showToast("Tracked source clip is missing")
+            return
+        }
+
+        val alreadyApplied = sourceClip.effects.any {
+            it.type == EffectType.TRACKED_MOSAIC && it.targetTrackedObjectId == trackedObject.id
+        }
+        if (alreadyApplied) {
+            showToast("Tracked mosaic already applied")
+            return
+        }
+
+        val effect = Effect(
+            type = EffectType.TRACKED_MOSAIC,
+            params = EffectType.defaultParams(EffectType.TRACKED_MOSAIC),
+            targetTrackedObjectId = trackedObject.id
+        )
+
+        saveUndoState("Apply tracked mosaic")
+        updateClipById(sourceClip.id) { clip ->
+            clip.copy(effects = clip.effects + effect)
+        }
+        _state.update {
+            it.copy(
+                selectedClipId = sourceClip.id,
+                selectedEffectId = effect.id
+            )
+        }
+        updatePreview()
+        saveProject()
+        showToast("Tracked mosaic applied: ${trackedObject.label}")
     }
 
     // --- Multi-Cam Sync ---
