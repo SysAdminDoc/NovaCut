@@ -460,6 +460,7 @@ class ExportDelegate(
                     config = configWithChapters,
                     outputFile = outputFile,
                     textOverlays = textOverlays,
+                    trackedObjects = currentState.trackedObjects,
                     onProgress = { progress ->
                         stateFlow.update { it.copy(exportProgress = progress) }
                     },

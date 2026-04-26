@@ -34,7 +34,9 @@ internal object EffectBuilder {
      */
     fun buildVideoEffect(
         effect: Effect,
-        segmentationEngine: SegmentationEngine
+        segmentationEngine: SegmentationEngine,
+        trackedObjects: List<TrackedObject> = emptyList(),
+        sourceTimeOffsetMs: Long = 0L
     ): androidx.media3.common.Effect? {
         return when (effect.type) {
             EffectType.BRIGHTNESS -> {
@@ -297,6 +299,13 @@ internal object EffectBuilder {
             EffectType.MOSAIC -> {
                 val size = effect.params.safeParam("size", 15f, 2f, 50f)
                 EffectShaders.mosaic(size)
+            }
+            EffectType.TRACKED_MOSAIC -> {
+                val target = TrackedObjectEffectBinding.resolveTarget(effect, trackedObjects) ?: return null
+                val size = effect.params.safeParam("size", 18f, 2f, 50f)
+                val feather = effect.params.safeParam("feather", 0.02f, 0f, 0.15f)
+                val padding = effect.params.safeParam("padding", 0.04f, 0f, 0.2f)
+                EffectShaders.trackedMosaic(size, feather, padding, target, sourceTimeOffsetMs)
             }
             EffectType.FISHEYE -> {
                 val intensity = effect.params.safeParam("intensity", 0.5f, 0f, 1f)

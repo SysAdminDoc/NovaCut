@@ -8,6 +8,7 @@
 - Added a user-facing Cut Assistant workflow in the AI Hub and clip AI toolbar.
 - Added a review sheet for silence/filler-word proposals with selected-by-default candidates, per-row toggles, accept/reject all, reclaimed-duration summary, and an empty state.
 - Applying reviewed proposals still uses the existing `applyAcceptedCuts()` path, so the batch lands as one undoable timeline edit.
+- Added a Tracked Mosaic effect that binds persisted TrackedObject keyframes to a Media3 shader mask, with preview/export wiring, target-ID autosave, interpolation tests, and an Effects panel action for tracked masks on the selected clip.
 
 ## v3.71.0 — 2026-04-25 — Cut Assistant + TrackedObject scaffolding
 

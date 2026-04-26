@@ -68,6 +68,7 @@ class VideoEngine @Inject constructor(
     // Clips for per-clip effect switching during playback
     private var videoClips: List<Clip> = emptyList()
     private var previewSegments: List<PreviewSegment> = emptyList()
+    private var previewTrackedObjects: List<TrackedObject> = emptyList()
     @Volatile private var previewGapUri: Uri? = null
     // Memory-bounded bitmap cache — uses 1/8 of available heap
     // Don't recycle evicted bitmaps — they may still be referenced by Compose Image nodes
@@ -312,6 +313,7 @@ class VideoEngine @Inject constructor(
         outputFile: File,
         textOverlays: List<com.novacut.editor.model.TextOverlay> = emptyList(),
         lottieOverlays: List<LottieOverlaySpec> = emptyList(),
+        trackedObjects: List<TrackedObject> = emptyList(),
         onProgress: (Float) -> Unit = {},
         onComplete: () -> Unit = {},
         onError: (Exception) -> Unit = {}
@@ -371,7 +373,8 @@ class VideoEngine @Inject constructor(
                 targetW = targetW,
                 targetH = targetH,
                 textOverlays = textOverlays,
-                lottieOverlays = lottieOverlays
+                lottieOverlays = lottieOverlays,
+                trackedObjects = trackedObjects
             )
 
             val audioSequences = buildAudioSequences(tracks, soloTrackIds)
@@ -425,7 +428,8 @@ class VideoEngine @Inject constructor(
         targetW: Int,
         targetH: Int,
         textOverlays: List<com.novacut.editor.model.TextOverlay>,
-        lottieOverlays: List<LottieOverlaySpec>
+        lottieOverlays: List<LottieOverlaySpec>,
+        trackedObjects: List<TrackedObject>
     ): EditedMediaItemSequence {
         val sortedClips = clips.filter { it.durationMs > 0L }.sortedBy { it.timelineStartMs }
         val builder = EditedMediaItemSequence.Builder(emptyList<EditedMediaItem>())
@@ -453,6 +457,7 @@ class VideoEngine @Inject constructor(
                             targetH = targetH,
                             textOverlays = textOverlays,
                             lottieOverlays = lottieOverlays,
+                            trackedObjects = trackedObjects,
                             nextClipTransition = nextTransition
                         )
                     )
@@ -475,6 +480,7 @@ class VideoEngine @Inject constructor(
         targetH: Int,
         textOverlays: List<com.novacut.editor.model.TextOverlay>,
         lottieOverlays: List<LottieOverlaySpec>,
+        trackedObjects: List<TrackedObject>,
         nextClipTransition: Transition? = null
     ): EditedMediaItem {
         val mediaItem = buildMediaItemForClip(clip, clip.sourceUri)
@@ -485,8 +491,14 @@ class VideoEngine @Inject constructor(
         } == true
 
         val videoEffects = buildList<androidx.media3.common.Effect> {
+            val clipTrackedObjects = trackedObjects.filter { it.sourceClipId == clip.id && it.isEnabled }
             for (effect in clip.effects.filter { it.enabled }) {
-                EffectBuilder.buildVideoEffect(effect, segmentationEngine)?.let { add(it) }
+                EffectBuilder.buildVideoEffect(
+                    effect = effect,
+                    segmentationEngine = segmentationEngine,
+                    trackedObjects = clipTrackedObjects,
+                    sourceTimeOffsetMs = clip.trimStartMs
+                )?.let { add(it) }
             }
             addColorGradingEffects(clip)
 
@@ -1073,7 +1085,11 @@ class VideoEngine @Inject constructor(
      * Does NOT include speed (handled via PlaybackParameters), text overlays, Presentation, or FrameDropEffect.
      */
     @androidx.annotation.OptIn(UnstableApi::class)
-    fun applyPreviewEffects(clip: Clip?) {
+    fun applyPreviewEffects(
+        clip: Clip?,
+        trackedObjects: List<TrackedObject> = previewTrackedObjects
+    ) {
+        previewTrackedObjects = trackedObjects
         val p = player ?: return
         if (clip == null) {
             p.setVideoEffects(emptyList())
@@ -1081,7 +1097,7 @@ class VideoEngine @Inject constructor(
         }
         val nextClipTransition = nextPreviewTransitionForClip(clip)
 
-        val effects = buildPreviewEffectsForClip(clip, nextClipTransition)
+        val effects = buildPreviewEffectsForClip(clip, nextClipTransition, trackedObjects)
         try {
             p.setVideoEffects(effects)
         } catch (e: Exception) {
@@ -1120,7 +1136,7 @@ class VideoEngine @Inject constructor(
         }
         val nextClipTransition = nextPreviewTransitionForClip(clip)
 
-        val effects = buildPreviewEffectsForClip(clip, nextClipTransition)
+        val effects = buildPreviewEffectsForClip(clip, nextClipTransition, previewTrackedObjects)
         try {
             p.setVideoEffects(effects)
         } catch (e: Exception) {
@@ -1138,11 +1154,18 @@ class VideoEngine @Inject constructor(
     @UnstableApi
     private fun buildPreviewEffectsForClip(
         clip: Clip,
-        nextClipTransition: Transition?
+        nextClipTransition: Transition?,
+        trackedObjects: List<TrackedObject>
     ): List<androidx.media3.common.Effect> = buildList {
+        val clipTrackedObjects = trackedObjects.filter { it.sourceClipId == clip.id && it.isEnabled }
         // User effects (skip BG_REMOVAL in preview — per-frame segmentation is too slow for realtime)
         for (effect in clip.effects.filter { it.enabled && it.type != EffectType.BG_REMOVAL }) {
-            EffectBuilder.buildVideoEffect(effect, segmentationEngine)?.let { add(it) }
+            EffectBuilder.buildVideoEffect(
+                effect = effect,
+                segmentationEngine = segmentationEngine,
+                trackedObjects = clipTrackedObjects,
+                sourceTimeOffsetMs = clip.trimStartMs
+            )?.let { add(it) }
         }
         // Color grading (lift/gamma/gain + HSL + LUT)
         addColorGradingEffects(clip)

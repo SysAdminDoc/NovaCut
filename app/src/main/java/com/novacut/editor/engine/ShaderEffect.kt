@@ -7,6 +7,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BaseGlShaderProgram
 import androidx.media3.effect.GlEffect
 import androidx.media3.effect.GlShaderProgram
+import com.novacut.editor.model.TrackedObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -17,10 +18,11 @@ import java.nio.ByteOrder
 @UnstableApi
 class ShaderEffect(
     private val fragmentShader: String,
-    private val uniforms: Map<String, Float> = emptyMap()
+    private val uniforms: Map<String, Float> = emptyMap(),
+    private val dynamicUniforms: ((Long) -> Map<String, Float>)? = null
 ) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram {
-        return ShaderProgram(fragmentShader, uniforms, useHdr)
+        return ShaderProgram(fragmentShader, uniforms, dynamicUniforms, useHdr)
     }
 }
 
@@ -28,6 +30,7 @@ class ShaderEffect(
 private class ShaderProgram(
     private val fragmentShaderSource: String,
     private val uniforms: Map<String, Float>,
+    private val dynamicUniforms: ((Long) -> Map<String, Float>)?,
     useHdr: Boolean
 ) : BaseGlShaderProgram(useHdr, 1) {
 
@@ -55,6 +58,9 @@ private class ShaderProgram(
         uniform2f("uResolution", width.coerceAtLeast(1).toFloat(), height.coerceAtLeast(1).toFloat())
         uniform1f("uTime", presentationTimeUs / 1_000_000f)
         for ((name, value) in uniforms) uniform1f(name, value)
+        dynamicUniforms?.invoke(presentationTimeUs)?.forEach { (name, value) ->
+            uniform1f(name, value)
+        }
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
         GLES30.glBindVertexArray(0)
@@ -178,6 +184,28 @@ object EffectShaders {
     )
 
     fun mosaic(size: Float) = ShaderEffect(FRAG_MOSAIC, mapOf("uSize" to size))
+
+    fun trackedMosaic(
+        size: Float,
+        feather: Float,
+        padding: Float,
+        trackedObject: TrackedObject,
+        sourceTimeOffsetMs: Long
+    ) = ShaderEffect(
+        FRAG_TRACKED_MOSAIC,
+        mapOf(
+            "uSize" to size.coerceIn(2f, 50f),
+            "uFeather" to feather.coerceIn(0f, 0.15f),
+            "uPadding" to padding.coerceIn(0f, 0.2f)
+        ),
+        dynamicUniforms = { presentationTimeUs ->
+            TrackedObjectEffectBinding.uniformsForPresentationTime(
+                trackedObject,
+                presentationTimeUs,
+                sourceTimeOffsetMs
+            )
+        }
+    )
 
     fun fisheye(intensity: Float) = ShaderEffect(
         FRAG_FISHEYE, mapOf("uIntensity" to intensity)
@@ -467,6 +495,25 @@ object EffectShaders {
         "  vec2 bs = vec2(uSize) / uResolution;\n" +
         "  vec2 uv = floor(vTexCoord / bs) * bs + bs * 0.5;\n" +
         "  fragColor = texture(uTexSampler, uv);\n}"
+
+    private const val FRAG_TRACKED_MOSAIC = H +
+        "uniform vec2 uResolution;\nuniform float uSize;\n" +
+        "uniform float uCenterX;\nuniform float uCenterY;\n" +
+        "uniform float uObjectWidth;\nuniform float uObjectHeight;\n" +
+        "uniform float uObjectConfidence;\nuniform float uFeather;\nuniform float uPadding;\n" +
+        "void main() {\n" +
+        "  vec4 original = texture(uTexSampler, vTexCoord);\n" +
+        "  vec2 halfBox = max(vec2(uObjectWidth, uObjectHeight) * 0.5 + vec2(uPadding), vec2(0.0001));\n" +
+        "  vec2 delta = abs(vTexCoord - vec2(uCenterX, uCenterY)) - halfBox;\n" +
+        "  float signedDistance = max(delta.x, delta.y);\n" +
+        "  float feather = max(uFeather, 0.0001);\n" +
+        "  float confidence = smoothstep(0.2, 0.4, uObjectConfidence);\n" +
+        "  float active = step(0.001, uObjectWidth) * step(0.001, uObjectHeight) * confidence;\n" +
+        "  float mask = (1.0 - smoothstep(0.0, feather, signedDistance)) * active;\n" +
+        "  vec2 bs = max(vec2(uSize), vec2(1.0)) / max(uResolution, vec2(1.0));\n" +
+        "  vec2 uv = floor(vTexCoord / bs) * bs + bs * 0.5;\n" +
+        "  vec4 mosaic = texture(uTexSampler, clamp(uv, 0.0, 1.0));\n" +
+        "  fragColor = mix(original, mosaic, clamp(mask, 0.0, 1.0));\n}"
 
     private const val FRAG_FISHEYE = H +
         "uniform float uIntensity;\n" +

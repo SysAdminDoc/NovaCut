@@ -9,7 +9,8 @@ data class Effect(
     val type: EffectType,
     val params: Map<String, Float> = emptyMap(),
     val enabled: Boolean = true,
-    val keyframes: List<EffectKeyframe> = emptyList()
+    val keyframes: List<EffectKeyframe> = emptyList(),
+    val targetTrackedObjectId: String? = null
 )
 
 data class EffectKeyframe(
@@ -58,6 +59,7 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
     MOTION_BLUR("Motion Blur", EffectCategory.BLUR),
     TILT_SHIFT("Tilt Shift", EffectCategory.BLUR),
     MOSAIC("Mosaic", EffectCategory.BLUR),
+    TRACKED_MOSAIC("Tracked Mosaic", EffectCategory.BLUR),
 
     // Distortion
     FISHEYE("Fisheye", EffectCategory.DISTORTION),
@@ -101,6 +103,7 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
             COOL_TONE, WARM_TONE -> mapOf("intensity" to 0.5f)
             SPEED -> mapOf("value" to 1f)
             MOSAIC -> mapOf("size" to 15f)
+            TRACKED_MOSAIC -> mapOf("size" to 18f, "feather" to 0.02f, "padding" to 0.04f)
             RADIAL_BLUR, MOTION_BLUR, FISHEYE -> mapOf("intensity" to 0.5f)
             WAVE -> mapOf("amplitude" to 0.02f, "frequency" to 10f)
             POSTERIZE -> mapOf("levels" to 6f)
@@ -121,6 +124,8 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
             "smoothness" to ParamRange("Smoothness", 0f, 0.5f),
             "spill" to ParamRange("Spill", 0f, 1f),
             "threshold" to ParamRange("Threshold", 0.1f, 0.9f),
+            "feather" to ParamRange("Feather", 0f, 0.15f),
+            "padding" to ParamRange("Padding", 0f, 0.2f),
             "blur" to ParamRange("Blur", 0f, 0.05f),
             "focusY" to ParamRange("Focus Y", 0f, 1f),
             "width" to ParamRange("Width", 0.01f, 0.5f),

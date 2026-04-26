@@ -842,11 +842,16 @@ fun EditorScreen(
                 )
                 EffectsPanel(
                     selectedClip = selectedClip,
+                    trackedObjects = state.trackedObjects,
                     onAddEffect = { effectType ->
                         val clipId = state.selectedClipId ?: return@EffectsPanel
                         val effect = Effect(type = effectType, params = EffectType.defaultParams(effectType))
                         viewModel.addEffect(clipId, effect)
                         viewModel.selectEffect(effect.id)
+                        viewModel.hideEffectsPanel()
+                    },
+                    onAddTrackedMosaic = { trackedObject ->
+                        viewModel.applyTrackedMosaicToObject(trackedObject.id)
                         viewModel.hideEffectsPanel()
                     },
                     onClose = viewModel::hideEffectsPanel

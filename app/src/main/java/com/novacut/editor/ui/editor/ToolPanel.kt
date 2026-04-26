@@ -645,13 +645,26 @@ private fun SubMenuGrid(
 @Composable
 fun EffectsPanel(
     selectedClip: Clip?,
+    trackedObjects: List<TrackedObject> = emptyList(),
     onAddEffect: (EffectType) -> Unit,
+    onAddTrackedMosaic: (TrackedObject) -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedCategory by remember { mutableStateOf(EffectCategory.COLOR) }
     val accent = effectAccent(selectedCategory)
-    val effects = remember(selectedCategory) { EffectType.entries.filter { it.category == selectedCategory } }
+    val effects = remember(selectedCategory) {
+        EffectType.entries.filter {
+            it.category == selectedCategory && it != EffectType.TRACKED_MOSAIC
+        }
+    }
+    val clipTrackedObjects = remember(selectedClip?.id, trackedObjects) {
+        selectedClip?.let { clip ->
+            trackedObjects.filter {
+                it.sourceClipId == clip.id && it.isEnabled && it.keyframes.isNotEmpty()
+            }
+        } ?: emptyList()
+    }
 
     PremiumEditorPanel(
         title = stringResource(R.string.tool_effects),
@@ -712,6 +725,81 @@ fun EffectsPanel(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (clipTrackedObjects.isNotEmpty()) {
+            PremiumPanelCard(accent = Mocha.Sky) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GpsFixed,
+                            contentDescription = null,
+                            tint = Mocha.Sky,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Tracked masks",
+                            color = Mocha.Text,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                    }
+                    PremiumPanelPill(
+                        text = clipTrackedObjects.size.toString(),
+                        accent = Mocha.Sky
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    clipTrackedObjects.forEach { trackedObject ->
+                        val isApplied = selectedClip?.effects?.any {
+                            it.type == EffectType.TRACKED_MOSAIC &&
+                                it.targetTrackedObjectId == trackedObject.id
+                        } == true
+                        FilterChip(
+                            selected = isApplied,
+                            onClick = {
+                                if (!isApplied) onAddTrackedMosaic(trackedObject)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.GridOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = "${trackedObject.label} Mosaic",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Mocha.Panel,
+                                labelColor = Mocha.Subtext0,
+                                iconColor = Mocha.Subtext0,
+                                selectedContainerColor = Mocha.Sky.copy(alpha = 0.18f),
+                                selectedLabelColor = Mocha.Sky,
+                                selectedLeadingIconColor = Mocha.Sky
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
