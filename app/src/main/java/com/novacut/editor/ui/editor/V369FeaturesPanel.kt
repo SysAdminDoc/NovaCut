@@ -178,7 +178,7 @@ fun V369FeaturesPanel(
             }
             Text(label, color = color, fontSize = 12.sp)
             Text(
-                "Stream-copy mux lights up with the FFmpegX dependency (Tier A.9).",
+                "Available for untouched single-source trims; otherwise export safely re-encodes.",
                 color = Mocha.Overlay1, fontSize = 10.sp
             )
             TinyButton("Check eligibility") {

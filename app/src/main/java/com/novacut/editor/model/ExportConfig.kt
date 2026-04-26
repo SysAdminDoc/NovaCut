@@ -37,11 +37,10 @@ data class ExportConfig(
     // (HEVC/AV1 on devices advertising HDR10+ profile support), this flag will
     // gate `MediaFormat.KEY_HDR10_PLUS_INFO` attachment.
     val hdr10PlusMetadata: Boolean = false,
-    // v3.69 placeholder — gate for the LosslessCut-style stream-copy export
-    // path. Eligibility detection already ships (StreamCopyExportEngine); the
-    // actual mux uses FFmpeg's `-c copy` path and wakes up with the FFmpegX
-    // dependency (Tier A.9). Default true so the feature turns on automatically
-    // the moment the dependency is present.
+    // Gate for the LosslessCut-style stream-copy export path. The exporter
+    // attempts direct MediaExtractor/MediaMuxer copy for untouched single-source
+    // trims, then safely falls back to Transformer when the timeline is not
+    // eligible or the device muxer rejects the source.
     val allowStreamCopy: Boolean = true
 ) {
     init {

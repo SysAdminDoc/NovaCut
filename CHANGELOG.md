@@ -12,6 +12,8 @@
 - Added template compatibility metadata to saved/exported templates, including schema version, minimum app version, required feature list, and media/text slot counts.
 - Added compatibility validation to template imports so future-schema, newer-app, or unknown required-feature templates are rejected before they are saved locally, with clearer user-facing failure copy.
 - Saved template cards now surface slot counts so reusable setups feel more inspectable before opening.
+- Surfaced the existing stream-copy fast trim path in the export sheet with a user-visible "Fast Trim When Possible" control, and refreshed stale copy around the MediaMuxer fallback behavior.
+- Clarified the roadmap split between shipped whole-timeline stream-copy and the still-open mixed segment smart-render bypass.
 
 ## v3.71.0 — 2026-04-25 — Cut Assistant + TrackedObject scaffolding
 
