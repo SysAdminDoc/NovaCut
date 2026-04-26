@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -800,6 +801,17 @@ fun ExportSheet(
                         onConfigChanged(config.copy(hdr10PlusMetadata = enabled && codecCanCarryHdr))
                     },
                     accent = Mocha.Yellow
+                )
+
+                HorizontalDivider(color = Mocha.CardStroke.copy(alpha = 0.6f))
+
+                ExportToggleRow(
+                    icon = Icons.Default.Speed,
+                    title = stringResource(R.string.export_fast_trim),
+                    description = stringResource(R.string.export_fast_trim_description),
+                    checked = config.allowStreamCopy,
+                    onCheckedChange = { onConfigChanged(config.copy(allowStreamCopy = it)) },
+                    accent = Mocha.Green
                 )
 
                 ExportChoiceGroup(
