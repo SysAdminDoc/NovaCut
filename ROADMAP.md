@@ -300,3 +300,97 @@ Research date: 2026-04-25. Scope: complementary open-source projects, profession
 - [x] Add `TrackedObject` model and bind one operation first: tracked blur or tracked sticker. *(Post-v3.71 continuation — Tracked Mosaic now binds `TrackedObject` keyframes to a Media3 shader mask, persists target IDs through autosave/archive, and exposes a selected-clip action in the Effects panel.)*
 - [x] Add color/HDR export confidence chips and mismatch warnings. *(Post-v3.71 continuation — ExportSheet now surfaces a Preserve HDR Metadata toggle, Color / HDR confidence chips, codec/device mismatch warnings, HDR10+ dynamic metadata support status, and advertised HDR encode limit warnings. Pure `ExportColorConfidenceEngine` covers SDR, H.264 HDR mismatch, missing HDR support, HDR10+ support, and limit-overrun cases.)*
 - [x] Add template compatibility metadata and import validation before marketplace work. *(Post-v3.71 continuation — template exports now include schema/app-version/required-feature metadata plus slot counts; imports infer + merge legacy metadata, reject future schemas/versions/unknown required features before saving, and show clearer failure copy.)*
+
+---
+
+## Research Round 5 — 2026 Refresh
+
+Research date: 2026-05. Scope: refresh Tier A/B unblocks against current upstream releases, identify successor dependencies for archived ones, and surface coverage gaps the previous rounds left thin (accessibility, i18n, observability, distribution, plugin ecosystem, security). Treat as a delta on top of Rounds 2–4 — items already covered are not repeated.
+
+### R5.1 — Media3 1.10 unblocks Tier B.1/B.2/C.9
+Media3 1.10 (March 2026) ships the multi-sequence/multi-track Composition API, Dolby Vision Profile 10 export, and VVC ingest. This is a direct dependency bump that retires the longest-standing limitation in this roadmap.
+- [ ] **R5.1a — Bump `androidx.media3` from 1.9.2 → 1.10.x** in [app/build.gradle.kts](app/build.gradle.kts). Audit `EditedMediaItemSequence` builder usage — the deprecated list constructor is removed in 1.10. Sources: https://github.com/androidx/media/releases · https://developer.android.com/media/media3/transformer/composition
+- [ ] **R5.1b — Wire multi-sequence Composition into `VideoEngine`** to unblock B.1 (multi-track export) and B.2 (true dual-texture blends). Confirm transition-beyond-crossfade gap is still present (issue #1662 open at time of research) and keep the wipe/slide effect-chain workaround until upstream lands it. Touch: [engine/VideoEngine.kt](app/src/main/java/com/novacut/editor/engine/VideoEngine.kt), [engine/EffectBuilder.kt](app/src/main/java/com/novacut/editor/engine/EffectBuilder.kt).
+- [ ] **R5.1c — Enable Dolby Vision Profile 10 + HDR10+ export paths** in `EncoderCapabilityProbe` (closes C.9 on capable devices). Pixel 10 / Tensor G5 ships AV1 + VP9 hardware encode — surface as a "device tier: premium" hint in ExportSheet. Sources: https://developer.android.com/media/media3/transformer/hdr · https://www.androidauthority.com/google-tensor-g5/
+- [ ] **R5.1d — Android 15/16 Ultra HDR ingest** — flagship phones now capture Ultra HDR video by default; widen `MediaImportEngine` HDR detection beyond HDR10/HLG to include the gain-map/Ultra HDR path. Source: https://developer.android.com/about/versions/15/features#ultra-hdr-video
+
+### R5.2 — Dependency successor pivots
+- [ ] **R5.2a — Pin `salahawad/ffmpeg-kit-community` instead of FFmpegX-Android (A.9).** `arthenica/ffmpeg-kit` was officially archived April 2025; the community fork has the most active commit cadence, retains the original Maven coordinates path, and ships AAR artifacts. FFmpegX-Android (mzgs) remains a viable secondary candidate but has lower commit velocity. Re-evaluate primary choice at next release. Sources: https://github.com/arthenica/ffmpeg-kit · https://github.com/salahawad/ffmpeg-kit-community
+- [ ] **R5.2b — Upgrade Sherpa-ONNX target to v1.12.28+ for Moonshine v2 (A.1).** Moonshine v2 (Feb 2026 release line) is faster than Whisper Tiny on the same audio with comparable WER on EN; ship as the default English ASR, keep Whisper Tiny multilingual as fallback. Source: https://github.com/k2-fsa/sherpa-onnx/releases
+- [ ] **R5.2c — SAM 2.1 ONNX path now viable for tracked masks (R4.3 follow-up).** SAM 2.1 (Meta) ships ONNX exports with video-segment propagation. Pairs with the `TrackedObject` model already shipped in v3.71 to upgrade Tracked Mosaic's mask quality. Gate on premium-tier devices (model + state cache > 200 MB). Source: https://github.com/facebookresearch/sam2
+- [ ] **R5.2d — Generative video stays cloud-optional, not on-device.** Wan 2.2, HunyuanVideo, VideoCrafter2 all remain server-side at this scale; NovaCut should expose them as opt-in cloud effects (clearly labelled), not bundled engines. Use the same trust pattern already documented in §Architecture guardrails. Sources: https://github.com/Wan-Video/Wan2.2 · https://github.com/Tencent-Hunyuan/HunyuanVideo
+
+### R5.3 — Accessibility coverage gap
+- [ ] **R5.3a — TalkBack semantics for the timeline custom view.** The timeline is rendered with custom drawing; TalkBack currently announces nothing meaningful. Apply Compose `Modifier.semantics { contentDescription, customActions }` for clip nodes, with custom actions for split / delete / nudge. Source: https://developer.android.com/jetpack/compose/accessibility
+- [ ] **R5.3b — Switch Access + keyboard-only editing flow.** Hardware keyboard + Switch Access users cannot reach jog/shuttle, trim handles, or the keyframe graph today. Add a focus traversal pass and arrow-key nudge equivalents.
+- [ ] **R5.3c — Caption style accessibility presets.** Add WCAG-AA contrast presets for caption fill/stroke, large-text preset (≥ 24sp at 1080p), and reduce-motion preset that disables shimmer/parallax in templates. Composes with the v3.69 flash-safety / color-blind work already shipped.
+- [ ] **R5.3d — Closed audio description track export.** Already in §Backlog. Promote to Round 5 because `SDH / audio-description` text export shipped in v3.69 — the audio track itself is the missing piece. Use TTS engine (A.8) to render the audio-description text into a sidecar or muxed AD track on export.
+
+### R5.4 — Internationalization / localization
+- [ ] **R5.4a — Caption translation pipeline (C.5) gains in-editor preview.** Beyond the model dependency, the edit UX needs side-by-side source/target caption rows and a per-caption "regenerate" action. Touch: caption panel.
+- [ ] **R5.4b — RTL timeline + overlay bidi text.** Already in §Backlog as "RTL / bidirectional text in overlays". Promote: timeline ruler direction, transition arrows, and the trim-handle hit zones must mirror under RTL locales. Source: https://developer.android.com/training/basics/supporting-devices/languages#BidirectionalText
+- [ ] **R5.4c — Strings extraction audit.** Run a one-time pass to make sure no engine-side toasts ship with hardcoded English. Many engine stubs (`UpscaleEngine`, `StyleTransferEngine`, etc.) emit user-facing copy via `Log.d` / `Toast.makeText` with literal strings.
+- [ ] **R5.4d — Locale-aware caption font fallback.** Bundle Noto CJK + Noto Arabic + Noto Devanagari subsets and route caption layout through them when the source language ≠ Latin.
+
+### R5.5 — Observability / privacy-preserving telemetry
+- [ ] **R5.5a — Opt-in crash reporting via Sentry-Android.** Strict opt-in dialog at first run, settings toggle, redaction of all media URIs and project paths from breadcrumbs. Initialize the SDK only when the user opts in. Source: https://docs.sentry.io/platforms/android/
+- [ ] **R5.5b — Aggregate-only usage metrics via Mozilla Glean or a Divvi-Up-style aggregator.** Goal: know which engines actually get used so future stub-activation work targets the most-used features. No raw events, no identifiers. Sources: https://mozilla.github.io/glean/book/language-bindings/android/index.html · https://divviup.org/blog/horizontal-tella/
+- [ ] **R5.5c — Privacy dashboard.** A settings screen that lists every category the app collects, lets the user export and delete it, and is the single source of truth for opt-in state. Required for any future Play Store data-safety form changes.
+- [ ] **R5.5d — Local-only diagnostic export.** A "Save diagnostic ZIP" action in settings (logcat tail, project header, model registry, Media3 capabilities snapshot) so users can attach to a GitHub issue without us shipping any telemetry pipe.
+
+### R5.6 — Distribution and packaging
+- [ ] **R5.6a — Play Asset Delivery for ML model bundles.** Whisper, Moonshine, RVM, RIFE, Real-ESRGAN, MobileSAM, Demucs all together blow past the 200 MB base-AAB. PAD on-demand asset packs, keyed off the existing `ModelDownloadManager`, are the correct vector — keeps F-Droid track buildable while Play install stays small. Source: https://developer.android.com/guide/playcore/asset-delivery
+- [ ] **R5.6b — F-Droid track with NonFreeNet anti-feature audit.** Any model fetched from a non-free CDN (Hugging Face is OK; vendor-locked endpoints are not) triggers `NonFreeNet`. Document each model URL + license + checksum in [docs/models.md](docs/models.md) so reproducible-build maintainers can verify. Source: https://f-droid.org/docs/Anti-Features/
+- [ ] **R5.6c — Reproducible release builds.** F-Droid inclusion requires byte-identical AAB rebuilds. Pin Gradle, AGP, Kotlin, and JDK in `gradle.properties`; commit the lockfile.
+- [ ] **R5.6d — APK split by ABI for OpenCV / NCNN / ONNX.** OpenCV (A.3) is arm64-only at ~40 MB. NCNN (A.4 RIFE) and ONNX Runtime add more. ABI splits + universal-fallback policy on GitHub Releases (arm64 primary, armv7 trimmed, x86_64 emulator-only).
+
+### R5.7 — Plugin ecosystem
+- [ ] **R5.7a — Promote `.novacut-template` to first-class plugin format.** Already exists for templates; widen to include LUTs (`.cube`), GLSL transition packs (`.ncfx`), and caption-style packs (`.ncstyle`) under one share intent. Touch: `TemplateManager.kt`, new `PluginRegistry.kt`.
+- [ ] **R5.7b — OpenFX-style effect descriptor (read-only).** Stop short of a full OpenFX runtime — instead, define a JSON descriptor that maps NovaCut's effect parameters to OpenFX-named parameters, so future Resolve/Premiere round-trip preserves effect intent. Pairs with C.14 (NLE round-trip import).
+- [ ] **R5.7c — Glaxnimate / Rive / Lottie compatibility matrix.** Document which template features survive an export to each format, which require shimming, which are NovaCut-only. Sits in [docs/templates.md](docs/templates.md).
+
+### R5.8 — Testing strategy (when explicitly requested)
+*Not auto-executed — listed here so it is on the page when next requested.*
+- Roborazzi screenshot tests for every panel (caption, trim, keyframe graph, ExportSheet) — golden images per device tier.
+- Espresso flow: import → cut → caption → export. One per major engine activation in Tier A.
+- Test fixtures called out in §Architecture guardrails (line 282) — malformed FCPXML, missing media, schema-too-new, mixed frame rate — already in scope; add per-fixture asserts when the request lands.
+
+### R5.9 — Security and supply chain
+- [ ] **R5.9a — Track Media3 + ONNX Runtime CVE feeds.** No known unpatched CVEs at research time. Add Dependabot config or Renovate so upstream advisories arrive as PRs. Source: https://nvd.nist.gov/
+- [ ] **R5.9b — Model checksum enforcement at runtime.** `ModelDownloadManager` (v3.70.0) records SHA256; make checksum verification non-bypassable on first run, not just at download. Catches partial-download corruption and supply-chain swaps.
+- [ ] **R5.9c — Cloud effect call-out sheet.** Any cloud-touching path (C.7 stock, C.4 Wav2Lip cloud variant, R5.2d generative video) shows a one-time "this will leave your device" sheet with the destination, payload size, and an opt-out toggle stored per project.
+- [ ] **R5.9d — Sign release artifacts.** Already done for AAB/APK via Play. Add `cosign` signatures to GitHub Release artifacts so users sideloading the APK can verify provenance. Source: https://docs.sigstore.dev/
+
+### R5.10 — Resolved / superseded by upstream
+Items in earlier rounds that 2026 upstream releases now resolve or trivialise — reconciled here so they don't get re-researched:
+- **A.1 Sherpa-ONNX dep target** — bump to `1.12.28+` for Moonshine v2 (was pinned to 1.10.x).
+- **A.9 FFmpegEngine dep target** — switch from FFmpegX-Android to `salahawad/ffmpeg-kit-community` as primary (FFmpegX kept as fallback note).
+- **B.1 / B.2 / C.9** — unblocked by Media3 1.10 multi-sequence Composition + Dolby Vision Profile 10 + VVC; remaining work is the bump itself plus wiring (R5.1).
+- **Open Video Editor (devhyper)** — confirmed still the only direct OSS Compose+Media3 competitor at ~650 stars; no new direct competitor surfaced this round.
+
+### Round 5 appendix
+- https://github.com/androidx/media/releases — Media3 release notes (1.10 multi-sequence + Dolby Vision Profile 10 + VVC).
+- https://github.com/androidx/media/issues/1662 — multi-item transitions beyond crossfade still open.
+- https://github.com/arthenica/ffmpeg-kit — archived April 2025.
+- https://github.com/salahawad/ffmpeg-kit-community — primary maintained successor fork.
+- https://github.com/k2-fsa/sherpa-onnx/releases — Moonshine v2 + Whisper Turbo bindings (v1.12.28+).
+- https://github.com/facebookresearch/sam2 — SAM 2.1 ONNX export support.
+- https://github.com/Wan-Video/Wan2.2 — generative video, server-side.
+- https://github.com/Tencent-Hunyuan/HunyuanVideo — generative video, server-side.
+- https://github.com/devhyper/open-video-editor — direct OSS competitor.
+- https://github.com/furudo-erika/awesome-capcut-alternatives — awesome-list crosswalk.
+- https://github.com/WyattBlue/auto-editor — silence + filler-word algorithm reference for C.2.
+- https://developer.android.com/about/versions/15/features#ultra-hdr-video — Ultra HDR video ingest path.
+- https://developer.android.com/media/media3/transformer/composition — multi-sequence Composition API.
+- https://developer.android.com/media/media3/transformer/hdr — HDR encode profiles.
+- https://developer.android.com/jetpack/compose/accessibility — Compose semantics + custom actions.
+- https://developer.android.com/training/basics/supporting-devices/languages#BidirectionalText — RTL guidance.
+- https://developer.android.com/guide/playcore/asset-delivery — Play Asset Delivery for large ML payloads.
+- https://f-droid.org/docs/Anti-Features/ — NonFreeNet criteria for ML-model downloads.
+- https://docs.sentry.io/platforms/android/ — Sentry-Android opt-in setup.
+- https://mozilla.github.io/glean/book/language-bindings/android/index.html — Glean privacy model.
+- https://divviup.org/blog/horizontal-tella/ — privacy-preserving aggregate telemetry.
+- https://opentelemetry.io/docs/platforms/client-apps/android/ — OpenTelemetry Android SDK.
+- https://docs.sigstore.dev/ — cosign signing.
+- https://www.androidauthority.com/google-tensor-g5/ — Pixel 10 / Tensor G5 AV1 + VP9 hardware encode.
+
