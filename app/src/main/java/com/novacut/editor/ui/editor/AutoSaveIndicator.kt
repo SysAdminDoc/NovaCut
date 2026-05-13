@@ -72,7 +72,7 @@ fun AutoSaveIndicator(
     ) {
         Surface(
             color = Mocha.PanelHighest.copy(alpha = 0.96f),
-            shape = RoundedCornerShape(Radius.pill),
+            shape = RoundedCornerShape(Radius.sm),
             border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f)),
             shadowElevation = Elevation.toast,
             modifier = Modifier.semantics {

@@ -444,7 +444,7 @@ private fun BatchExportItemRow(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
-                            .background(Mocha.Surface1, RoundedCornerShape(999.dp)),
+                            .background(Mocha.Surface1, RoundedCornerShape(10.dp)),
                         color = Mocha.Mauve,
                         trackColor = Mocha.Surface1
                     )

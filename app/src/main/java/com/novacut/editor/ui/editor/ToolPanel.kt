@@ -557,7 +557,7 @@ private fun SubMenuGrid(
                     .align(Alignment.CenterHorizontally)
                     .width(40.dp)
                     .height(4.dp)
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Mocha.Surface2.copy(alpha = 0.8f))
             )
             Spacer(modifier = Modifier.height(14.dp))

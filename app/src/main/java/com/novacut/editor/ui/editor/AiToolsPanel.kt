@@ -628,7 +628,7 @@ private fun ModelStatusCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(Radius.pill)),
+                    .clip(RoundedCornerShape(Radius.sm)),
                 color = accent,
                 trackColor = Mocha.Surface1
             )

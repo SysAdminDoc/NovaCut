@@ -169,13 +169,13 @@ fun RenderPreviewSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(10.dp)
-                    .background(Mocha.Green.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                    .background(Mocha.Green.copy(alpha = 0.22f), RoundedCornerShape(10.dp))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(reEncodeRatio.coerceIn(0f, 1f))
                         .height(10.dp)
-                        .background(Mocha.Yellow.copy(alpha = 0.72f), RoundedCornerShape(999.dp))
+                        .background(Mocha.Yellow.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
                 )
             }
 
