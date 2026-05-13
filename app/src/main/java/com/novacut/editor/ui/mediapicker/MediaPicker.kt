@@ -478,7 +478,7 @@ private fun MediaImportStatusCard(operation: MediaPickerOperationState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(5.dp)
-                .clip(RoundedCornerShape(Radius.pill)),
+                .clip(RoundedCornerShape(Radius.sm)),
             color = Mocha.Mauve,
             trackColor = Mocha.Surface1
         )

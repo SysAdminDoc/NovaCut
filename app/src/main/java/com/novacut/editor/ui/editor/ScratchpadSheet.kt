@@ -129,7 +129,7 @@ private fun ScratchpadStatusPill(
     val accent = if (saved) Mocha.Green else Mocha.Sapphire
     Surface(
         color = accent.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(Radius.sm),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         androidx.compose.foundation.layout.Row(

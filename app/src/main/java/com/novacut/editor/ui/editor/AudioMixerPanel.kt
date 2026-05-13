@@ -722,7 +722,7 @@ private fun AudioEffectChip(
                     .size(8.dp)
                     .background(
                         if (effect.enabled) Mocha.Green else Mocha.Red,
-                        RoundedCornerShape(999.dp)
+                        RoundedCornerShape(10.dp)
                     )
             )
             Text(

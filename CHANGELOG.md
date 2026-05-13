@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.73.0 — 2026-05-13 — Premium polish pass (trust surfaces, model storage, visual system)
+
+- **AI model settings now feel like a managed product surface instead of a static list.** Added a Wi-Fi-only model download preference, live install/download/error state badges, local storage disclosure, and per-model download/remove controls for Whisper and segmentation models.
+- **Settings overview actions now keep users in context.** The AI Models summary card jumps to the model-management section instead of exiting Settings, and model rows now read with cleaner download-size microcopy.
+- **Large model downloads now respect user trust boundaries.** Whisper and segmentation downloads read the Wi-Fi-only setting, block metered-network starts, and recover to the correct installed/not-installed state after a blocked or failed request.
+- **Backup imports now show persistent recovery notes.** Successful imports with missing media, warnings, or regenerated project IDs open a structured report dialog with counts, affected files, and suggested next actions; failed imports now state that the current project was left unchanged.
+- **Timeline handoff exports now surface professional validation reports.** OTIO/FCPXML validation errors open a blocking report with severity, path, and suggested fix details; lossy successful exports show post-export notes instead of relying on a transient toast.
+- **Visual language tightened across user-facing surfaces.** Replaced oversized pill/oval backdrops with consistent small-radius status, metric, and chip shapes while preserving true circular controls, indicators, and color swatches.
+- **Test coverage / verification** — `assembleDebug`, `testDebugUnitTest`, and `git diff --check` pass on the Android Studio JBR/SDK environment.
+
 ## v3.72.0 — 2026-05-13 — Hardening pass (Cut Assistant correctness, resource leaks, persistence guards)
 
 - **Cut Assistant slice-deletion bug fixed.** `applyAcceptedCuts()` was looking up `op.clipId` AFTER the first `splitClipAt()`, which keeps the LEFT half on the original id. The "middle" lookup therefore matched the wrong slice and the engine deleted content BEFORE the silence range instead of the silence itself. The new applier diffs the per-track clip-id set across both splits, identifies the freshly-minted right half, deletes the correct slice, and ripple-shifts every subsequent clip back by the deleted span so the timeline has no orphan gaps after a batch of cuts.

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.72.0</string>
+    <string name="app_version">v3.73.0</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -11,6 +11,7 @@
     <string name="share">Share</string>
     <string name="get">Get</string>
     <string name="remove">Remove</string>
+    <string name="download">Download</string>
     <string name="manage">Manage</string>
     <string name="back">Back</string>
     <string name="complete">Complete</string>
@@ -233,13 +234,24 @@
     <string name="settings_enable_proxy_description">Use lighter preview media when timelines start to feel heavy.</string>
     <string name="settings_ai_models">AI Models</string>
     <string name="settings_ai_models_description">Manage downloaded AI models for on-device processing.</string>
+    <string name="settings_ai_wifi_only">Wi-Fi-only model downloads</string>
+    <string name="settings_ai_wifi_only_description">Block large AI model downloads on metered or unavailable networks.</string>
+    <string name="settings_ai_storage_title">Local AI storage</string>
+    <string name="settings_ai_storage_description">Whisper: %1$s · Segmentation: %2$s</string>
     <string name="settings_whisper_model">Whisper (Speech-to-Text)</string>
     <string name="settings_whisper_size">~100 MB</string>
     <string name="settings_segmentation_model">Segmentation (Background)</string>
     <string name="settings_segmentation_size">~7 MB</string>
     <string name="settings_piper_model">Piper TTS Voices</string>
     <string name="settings_piper_size">15–65 MB each</string>
+    <string name="settings_piper_system_voice_description">Uses Android system voices today; downloadable local voice packs will appear here when bundled.</string>
+    <string name="settings_piper_system_voice_status">System voices</string>
     <string name="settings_download_size_format">Download size: %1$s</string>
+    <string name="settings_model_description_with_size">%1$s. %2$s</string>
+    <string name="settings_model_installed">Installed</string>
+    <string name="settings_model_not_installed">Not installed</string>
+    <string name="settings_model_downloading">Downloading</string>
+    <string name="settings_model_error">Needs attention</string>
     <string name="settings_tutorial">Tutorial</string>
     <string name="settings_tutorial_description">Replay the first-run walkthrough whenever you need a refresher.</string>
     <string name="settings_reset_tutorial">Reset First-Run Tutorial</string>

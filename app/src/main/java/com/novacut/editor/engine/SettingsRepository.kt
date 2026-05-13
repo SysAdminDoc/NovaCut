@@ -35,6 +35,7 @@ data class AppSettings(
     val thumbnailCacheSizeMb: Int = 128,
     val confirmBeforeDelete: Boolean = true,
     val defaultExportQuality: String = "HIGH",
+    val aiModelWifiOnly: Boolean = true,
     // v3.69: UI-mode flags. `desktopMode` is auto-detected from the device
     // config (Samsung DeX, Chromebook, or generic large-screen + mouse). It
     // can still be user-overridden via [updateDesktopModeOverride]. `oneHandedMode`
@@ -73,6 +74,7 @@ class SettingsRepository @Inject constructor(
         val THUMBNAIL_CACHE_SIZE_MB = intPreferencesKey("thumbnail_cache_size_mb")
         val CONFIRM_BEFORE_DELETE = booleanPreferencesKey("confirm_before_delete")
         val DEFAULT_EXPORT_QUALITY = stringPreferencesKey("default_export_quality")
+        val AI_MODEL_WIFI_ONLY = booleanPreferencesKey("ai_model_wifi_only")
         val ONE_HANDED_MODE = booleanPreferencesKey("one_handed_mode")
         val DESKTOP_OVERRIDE = stringPreferencesKey("desktop_override")
         val ACOUSTID_KEY = stringPreferencesKey("acoustid_api_key")
@@ -119,6 +121,7 @@ class SettingsRepository @Inject constructor(
                 defaultExportQuality = prefs[Keys.DEFAULT_EXPORT_QUALITY]
                     ?.takeIf { quality -> runCatching { ExportQuality.valueOf(quality) }.isSuccess }
                     ?: ExportQuality.HIGH.name,
+                aiModelWifiOnly = prefs[Keys.AI_MODEL_WIFI_ONLY] ?: true,
                 oneHandedMode = prefs[Keys.ONE_HANDED_MODE] ?: false,
                 desktopModeOverride = prefs[Keys.DESKTOP_OVERRIDE]?.let {
                     runCatching { DesktopOverride.valueOf(it) }.getOrNull()
@@ -247,6 +250,10 @@ class SettingsRepository @Inject constructor(
     suspend fun updateDefaultExportQuality(value: String) {
         val validated = try { ExportQuality.valueOf(value).name } catch (_: IllegalArgumentException) { return }
         context.dataStore.edit { it[Keys.DEFAULT_EXPORT_QUALITY] = validated }
+    }
+
+    suspend fun updateAiModelWifiOnly(value: Boolean) {
+        context.dataStore.edit { it[Keys.AI_MODEL_WIFI_ONLY] = value }
     }
 
     suspend fun updateOneHandedMode(value: Boolean) {

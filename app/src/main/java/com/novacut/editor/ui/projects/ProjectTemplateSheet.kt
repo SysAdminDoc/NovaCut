@@ -140,7 +140,7 @@ fun ProjectTemplateSheet(
                 .align(Alignment.CenterHorizontally)
                 .width(36.dp)
                 .height(3.dp)
-                .clip(RoundedCornerShape(Radius.pill))
+                .clip(RoundedCornerShape(Radius.sm))
                 .background(Mocha.Surface2.copy(alpha = 0.55f))
         )
 
@@ -407,7 +407,7 @@ private fun UserTemplateCard(
                     color = Mocha.Mauve,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier
-                        .background(Mocha.Mauve.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                        .background(Mocha.Mauve.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
                 if (template.compatibility.slotCount > 0) {
@@ -416,7 +416,7 @@ private fun UserTemplateCard(
                         color = Mocha.Sapphire,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier
-                            .background(Mocha.Sapphire.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .background(Mocha.Sapphire.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
@@ -476,7 +476,7 @@ private fun ProjectTemplateCard(
                     color = template.accentColor,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.16f), RoundedCornerShape(999.dp))
+                        .background(Color.Black.copy(alpha = 0.16f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 5.dp)
                 )
             }
@@ -512,7 +512,7 @@ private fun ProjectTemplateCard(
                     color = template.accentColor,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier
-                        .background(template.accentColor.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
+                        .background(template.accentColor.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
                 Text(
@@ -520,7 +520,7 @@ private fun ProjectTemplateCard(
                     color = Mocha.Subtext0,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier
-                        .background(Mocha.Panel.copy(alpha = 0.7f), RoundedCornerShape(999.dp))
+                        .background(Mocha.Panel.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
                 Text(
@@ -528,7 +528,7 @@ private fun ProjectTemplateCard(
                     color = Mocha.Subtext0,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier
-                        .background(Mocha.Panel.copy(alpha = 0.7f), RoundedCornerShape(999.dp))
+                        .background(Mocha.Panel.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }

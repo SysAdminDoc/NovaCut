@@ -75,7 +75,7 @@ fun PremiumEditorPanel(
                 .align(Alignment.CenterHorizontally)
                 .width(36.dp)
                 .height(3.dp)
-                .background(Mocha.Surface2.copy(alpha = 0.55f), RoundedCornerShape(Radius.pill))
+                .background(Mocha.Surface2.copy(alpha = 0.55f), RoundedCornerShape(Radius.sm))
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -203,7 +203,7 @@ fun PremiumPanelPill(
     Surface(
         modifier = modifier,
         color = accent.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         Text(
