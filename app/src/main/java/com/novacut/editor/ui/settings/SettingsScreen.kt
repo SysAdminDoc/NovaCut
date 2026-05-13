@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -25,6 +27,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.novacut.editor.NovaCutApp
 import com.novacut.editor.R
 import com.novacut.editor.engine.AppSettings
+import com.novacut.editor.engine.segmentation.SegmentationModelState
+import com.novacut.editor.engine.whisper.WhisperModelState
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.NovaCutChromeIconButton
@@ -37,28 +41,51 @@ import com.novacut.editor.ui.theme.NovaCutSectionHeader
 import com.novacut.editor.ui.theme.NovaCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    onNavigateToAiModels: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    var aiModelsScrollY by remember { mutableIntStateOf(0) }
+    val bringAiModelsIntoView: () -> Unit = {
+        coroutineScope.launch {
+            scrollState.animateScrollTo((aiModelsScrollY - 24).coerceAtLeast(0))
+        }
+    }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val aiModelStorage by viewModel.aiModelStorage.collectAsStateWithLifecycle()
+    val whisperModelState by viewModel.whisperModelState.collectAsStateWithLifecycle()
+    val segmentationModelState by viewModel.segmentationModelState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshAiModelStorage()
+    }
 
     NovaCutScreenBackground(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
         SettingsHero(
             settings = settings,
             onBack = onBack,
-            onManageAiModels = onNavigateToAiModels
+            onManageAiModels = bringAiModelsIntoView
         )
+
+        aiModelStorage.feedbackMessage?.let { message ->
+            SettingsFeedbackBanner(
+                message = message,
+                onDismiss = viewModel::dismissAiModelStorageFeedback
+            )
+        }
 
         Spacer(Modifier.height(10.dp))
 
@@ -209,24 +236,89 @@ fun SettingsScreen(
         }
 
         // AI Models
-        SettingsSection(
-            title = stringResource(R.string.settings_ai_models),
-            description = stringResource(R.string.settings_ai_models_description)
+        Box(
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                aiModelsScrollY = (coordinates.positionInRoot().y + scrollState.value).roundToInt()
+            }
         ) {
-            val models = listOf(
-                Triple(Icons.Default.AutoAwesome, stringResource(R.string.settings_whisper_model), stringResource(R.string.settings_whisper_size)),
-                Triple(Icons.Default.Movie, stringResource(R.string.settings_segmentation_model), stringResource(R.string.settings_segmentation_size)),
-                Triple(Icons.Default.Mic, stringResource(R.string.settings_piper_model), stringResource(R.string.settings_piper_size))
-            )
-            models.forEach { (icon, name, size) ->
-                SettingsActionRow(
-                    icon = icon,
-                    accent = Mocha.Mauve,
-                    label = name,
-                    description = stringResource(R.string.settings_download_size_format, size),
-                    actionLabel = stringResource(R.string.manage),
-                    onClick = onNavigateToAiModels
+            SettingsSection(
+                title = stringResource(R.string.settings_ai_models),
+                description = stringResource(R.string.settings_ai_models_description)
+            ) {
+                SettingsSwitch(
+                    icon = Icons.Default.Wifi,
+                    accent = Mocha.Sapphire,
+                    label = stringResource(R.string.settings_ai_wifi_only),
+                    description = stringResource(R.string.settings_ai_wifi_only_description),
+                    checked = settings.aiModelWifiOnly,
+                    onChanged = viewModel::setAiModelWifiOnly
                 )
+                SettingsStorageOverview(
+                    totalBytes = aiModelStorage.totalBytes,
+                    whisperBytes = aiModelStorage.whisperBytes,
+                    segmentationBytes = aiModelStorage.segmentationBytes
+                )
+                SettingsAiModelRow(
+                    icon = Icons.Default.RecordVoiceOver,
+                    accent = Mocha.Mauve,
+                    label = stringResource(R.string.settings_whisper_model),
+                    description = stringResource(R.string.ai_whisper_description),
+                    stateLabel = whisperModelState.displayLabel(),
+                    storageLabel = modelStorageLabel(aiModelStorage.whisperBytes, stringResource(R.string.settings_whisper_size)),
+                    canRemove = whisperModelState == WhisperModelState.READY && aiModelStorage.whisperBytes > 0L,
+                    isBusy = aiModelStorage.isRemovingWhisper || whisperModelState == WhisperModelState.DOWNLOADING,
+                    actionLabel = if (whisperModelState == WhisperModelState.READY && aiModelStorage.whisperBytes > 0L) {
+                        stringResource(R.string.remove)
+                    } else {
+                        stringResource(R.string.download)
+                    },
+                    actionIcon = if (whisperModelState == WhisperModelState.READY && aiModelStorage.whisperBytes > 0L) {
+                        Icons.Default.Delete
+                    } else {
+                        Icons.Default.Download
+                    },
+                    onAction = if (whisperModelState == WhisperModelState.READY && aiModelStorage.whisperBytes > 0L) {
+                        viewModel::removeWhisperModel
+                    } else {
+                        viewModel::downloadWhisperModel
+                    }
+                )
+                SettingsAiModelRow(
+                    icon = Icons.Default.PersonOff,
+                    accent = Mocha.Green,
+                    label = stringResource(R.string.settings_segmentation_model),
+                    description = stringResource(R.string.ai_segmentation_description),
+                    stateLabel = segmentationModelState.displayLabel(),
+                    storageLabel = modelStorageLabel(aiModelStorage.segmentationBytes, stringResource(R.string.settings_segmentation_size)),
+                    canRemove = segmentationModelState == SegmentationModelState.READY && aiModelStorage.segmentationBytes > 0L,
+                    isBusy = aiModelStorage.isRemovingSegmentation || segmentationModelState == SegmentationModelState.DOWNLOADING,
+                    actionLabel = if (segmentationModelState == SegmentationModelState.READY && aiModelStorage.segmentationBytes > 0L) {
+                        stringResource(R.string.remove)
+                    } else {
+                        stringResource(R.string.download)
+                    },
+                    actionIcon = if (segmentationModelState == SegmentationModelState.READY && aiModelStorage.segmentationBytes > 0L) {
+                        Icons.Default.Delete
+                    } else {
+                        Icons.Default.Download
+                    },
+                    onAction = if (segmentationModelState == SegmentationModelState.READY && aiModelStorage.segmentationBytes > 0L) {
+                        viewModel::removeSegmentationModel
+                    } else {
+                        viewModel::downloadSegmentationModel
+                    }
+                )
+                SettingsTile(
+                    icon = Icons.Default.Mic,
+                    accent = Mocha.Peach,
+                    label = stringResource(R.string.settings_piper_model),
+                    description = stringResource(R.string.settings_piper_system_voice_description)
+                ) {
+                    SettingsStatusBadge(
+                        text = stringResource(R.string.settings_piper_system_voice_status),
+                        accent = Mocha.Peach
+                    )
+                }
             }
         }
 
@@ -530,6 +622,155 @@ private fun SettingsOverviewStat(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsFeedbackBanner(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+        color = Mocha.Green.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(Radius.lg),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Green.copy(alpha = 0.22f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SettingsTileIcon(icon = Icons.Default.CheckCircle, accent = Mocha.Green)
+            Text(
+                text = message,
+                color = Mocha.Text,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.close),
+                    tint = Mocha.Subtext0
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsStorageOverview(
+    totalBytes: Long,
+    whisperBytes: Long,
+    segmentationBytes: Long
+) {
+    SettingsTile(
+        icon = Icons.Default.Storage,
+        accent = Mocha.Rosewater,
+        label = stringResource(R.string.settings_ai_storage_title),
+        description = stringResource(
+            R.string.settings_ai_storage_description,
+            formatStorageBytes(whisperBytes),
+            formatStorageBytes(segmentationBytes)
+        )
+    ) {
+        SettingsStatusBadge(
+            text = formatStorageBytes(totalBytes),
+            accent = if (totalBytes > 0L) Mocha.Rosewater else Mocha.Overlay0
+        )
+    }
+}
+
+@Composable
+private fun SettingsAiModelRow(
+    icon: ImageVector,
+    accent: androidx.compose.ui.graphics.Color,
+    label: String,
+    description: String,
+    stateLabel: String,
+    storageLabel: String,
+    canRemove: Boolean,
+    isBusy: Boolean,
+    actionLabel: String,
+    actionIcon: ImageVector,
+    onAction: () -> Unit
+) {
+    SettingsTile(
+        icon = icon,
+        accent = accent,
+        label = label,
+        description = stringResource(R.string.settings_model_description_with_size, description, storageLabel)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            SettingsStatusBadge(
+                text = stateLabel,
+                accent = when {
+                    canRemove -> Mocha.Green
+                    isBusy -> Mocha.Sapphire
+                    else -> Mocha.Overlay1
+                }
+            )
+            NovaCutSecondaryButton(
+                text = actionLabel,
+                onClick = onAction,
+                enabled = !isBusy,
+                contentColor = if (canRemove) Mocha.Red else accent,
+                icon = actionIcon
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsStatusBadge(
+    text: String,
+    accent: androidx.compose.ui.graphics.Color
+) {
+    Surface(
+        color = accent.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(Radius.sm),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.22f))
+    ) {
+        Text(
+            text = text,
+            color = accent,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun WhisperModelState.displayLabel(): String = when (this) {
+    WhisperModelState.READY -> stringResource(R.string.settings_model_installed)
+    WhisperModelState.DOWNLOADING -> stringResource(R.string.settings_model_downloading)
+    WhisperModelState.ERROR -> stringResource(R.string.settings_model_error)
+    WhisperModelState.NOT_DOWNLOADED -> stringResource(R.string.settings_model_not_installed)
+}
+
+@Composable
+private fun SegmentationModelState.displayLabel(): String = when (this) {
+    SegmentationModelState.READY -> stringResource(R.string.settings_model_installed)
+    SegmentationModelState.DOWNLOADING -> stringResource(R.string.settings_model_downloading)
+    SegmentationModelState.ERROR -> stringResource(R.string.settings_model_error)
+    SegmentationModelState.NOT_DOWNLOADED -> stringResource(R.string.settings_model_not_installed)
+}
+
+private fun modelStorageLabel(bytes: Long, downloadSize: String): String {
+    return if (bytes > 0L) {
+        "Installed size: ${formatStorageBytes(bytes)}."
+    } else {
+        "Download size: $downloadSize."
     }
 }
 

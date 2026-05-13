@@ -467,7 +467,7 @@ private fun ProjectOperationCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(5.dp)
-                    .clip(RoundedCornerShape(Radius.pill)),
+                    .clip(RoundedCornerShape(Radius.sm)),
                 color = Mocha.Mauve,
                 trackColor = Mocha.Surface1
             )
@@ -1036,7 +1036,7 @@ private fun ProjectMetadataChip(
 ) {
     Surface(
         color = accent.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(Radius.sm),
         border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         Text(

@@ -96,6 +96,7 @@ class WhisperEngine @Inject constructor(
      * Download Whisper tiny.en ONNX model files from HuggingFace.
      */
     suspend fun downloadModel(
+        wifiOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -131,7 +132,8 @@ class WhisperEngine @Inject constructor(
                 files = files,
                 totalEstimateBytes = estimateModelSizeMB() * 1024L * 1024L,
                 connectTimeoutMs = 30_000,
-                readTimeoutMs = 60_000
+                readTimeoutMs = 60_000,
+                wifiOnly = wifiOnly
             ) { progress ->
                 _downloadProgress.value = progress.coerceIn(0f, 0.99f)
                 onProgress(_downloadProgress.value)
@@ -141,6 +143,14 @@ class WhisperEngine @Inject constructor(
             onProgress(1f)
             _modelState.value = WhisperModelState.READY
             true
+        } catch (e: ModelDownloadManager.MeteredNetworkException) {
+            _modelState.value = if (hasDownloadedModelFiles()) {
+                WhisperModelState.READY
+            } else {
+                WhisperModelState.NOT_DOWNLOADED
+            }
+            _downloadProgress.value = 0f
+            throw e
         } catch (e: Exception) {
             _modelState.value = if (hasDownloadedModelFiles()) {
                 WhisperModelState.READY
@@ -567,8 +577,12 @@ class WhisperEngine @Inject constructor(
     }
 
     fun getModelSizeMB(): Long {
+        return getModelSizeBytes().div(1024 * 1024)
+    }
+
+    fun getModelSizeBytes(): Long {
         return if (modelDir.exists()) {
-            modelDir.listFiles()?.sumOf { it.length() }?.div(1024 * 1024) ?: 0
-        } else 0
+            modelDir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+        } else 0L
     }
 }

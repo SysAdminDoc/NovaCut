@@ -1721,7 +1721,7 @@ private fun TimelineInfoChip(
 ) {
     Surface(
         color = accent.copy(alpha = 0.13f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         Text(
@@ -1744,7 +1744,7 @@ private fun TimelineTextActionChip(
 ) {
     Surface(
         color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, Mocha.CardStroke)
     ) {
         Text(
@@ -1800,7 +1800,7 @@ private fun TimelineClipBadge(
 ) {
     Surface(
         color = accent.copy(alpha = 0.18f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.24f))
     ) {
         Text(

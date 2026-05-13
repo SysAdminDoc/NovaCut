@@ -42,10 +42,10 @@ object Spacing {
 }
 
 object Radius {
-    /** 6dp — tags, micro-pills, single-letter badges. */
+    /** 6dp — tags, status labels, single-letter badges. */
     val xs = 6.dp
 
-    /** 10dp — tight buttons, slim chips. */
+    /** 10dp — tight buttons and slim rectangular chips. */
     val sm = 10.dp
 
     /** 12dp — text fields, default control surfaces. */
@@ -60,8 +60,9 @@ object Radius {
     /** 24dp — top-level panel/sheet corners. */
     val xxl = 24.dp
 
-    /** 999dp — fully rounded (capsule, dot). */
-    val pill = 999.dp
+    /** 10dp — legacy alias retained for older call sites; do not use for capsule shapes. */
+    @Deprecated("Use Radius.sm for compact rectangular badges.")
+    val pill = sm
 }
 
 object Elevation {

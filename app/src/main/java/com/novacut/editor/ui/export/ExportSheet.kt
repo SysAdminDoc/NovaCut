@@ -210,7 +210,7 @@ fun ExportSheet(
                 .align(Alignment.CenterHorizontally)
                 .width(36.dp)
                 .height(3.dp)
-                .background(Mocha.Surface2.copy(alpha = 0.55f), RoundedCornerShape(Radius.pill))
+                .background(Mocha.Surface2.copy(alpha = 0.55f), RoundedCornerShape(Radius.sm))
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -1282,7 +1282,7 @@ private fun SmartRenderExportOutlook(summary: SmartRenderEngine.SmartRenderSumma
                 )
                 Surface(
                     color = Mocha.Blue.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(Radius.pill)
+                    shape = RoundedCornerShape(Radius.sm)
                 ) {
                     Text(
                         text = speedupText,
@@ -1553,7 +1553,7 @@ private fun ExportToggleRow(
 
             Surface(
                 color = if (checked && enabled) accent.copy(alpha = 0.14f) else Mocha.Panel,
-                shape = RoundedCornerShape(999.dp),
+                shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, if (checked && enabled) accent.copy(alpha = 0.26f) else Mocha.CardStroke)
             ) {
                 Text(
@@ -1676,7 +1676,7 @@ private fun ExportStateCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(10.dp)
-                            .clip(RoundedCornerShape(com.novacut.editor.ui.theme.Radius.pill)),
+                            .clip(RoundedCornerShape(com.novacut.editor.ui.theme.Radius.sm)),
                         color = tint,
                         trackColor = Mocha.PanelHighest.copy(alpha = 0.8f)
                     )
@@ -1772,7 +1772,7 @@ private fun ExportPill(
 ) {
     Surface(
         color = accent.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         Text(

@@ -389,7 +389,7 @@ private fun MarkerFilterChip(
 ) {
     Surface(
         color = if (selected) accent.copy(alpha = 0.16f) else Mocha.PanelRaised,
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, if (selected) accent.copy(alpha = 0.24f) else Mocha.CardStroke)
     ) {
         Text(

@@ -243,7 +243,7 @@ fun PreviewPanel(
                         if (!showGapState) {
                             Surface(
                                 color = Mocha.Midnight.copy(alpha = 0.72f),
-                                shape = RoundedCornerShape(999.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
                                     .padding(10.dp)

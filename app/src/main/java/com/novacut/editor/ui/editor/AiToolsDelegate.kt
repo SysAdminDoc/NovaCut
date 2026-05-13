@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,7 +43,8 @@ class AiToolsDelegate(
     private val rebuildPlayerTimeline: () -> Unit,
     private val saveProject: () -> Unit,
     private val videoEngine: VideoEngine,
-    private val recalculateDuration: (EditorState) -> EditorState
+    private val recalculateDuration: (EditorState) -> EditorState,
+    private val settingsRepo: SettingsRepository
 ) {
     private var aiJob: Job? = null
 
@@ -87,8 +89,14 @@ class AiToolsDelegate(
     fun downloadWhisperModel() {
         scope.launch {
             showToast("Downloading Whisper speech model...")
-            val success = aiFeatures.whisperEngine.downloadModel()
-            showToast(if (success) "Whisper model ready" else "Model download failed")
+            try {
+                val success = aiFeatures.whisperEngine.downloadModel(
+                    wifiOnly = settingsRepo.settings.first().aiModelWifiOnly
+                )
+                showToast(if (success) "Whisper model ready" else "Model download failed")
+            } catch (_: ModelDownloadManager.MeteredNetworkException) {
+                showToast("Wi-Fi-only model downloads are on. Connect to Wi-Fi or change the setting.")
+            }
         }
     }
 
@@ -114,8 +122,14 @@ class AiToolsDelegate(
     fun downloadSegmentationModel() {
         scope.launch {
             showToast("Downloading segmentation model...")
-            val success = aiFeatures.segmentationEngine.downloadModel()
-            showToast(if (success) "Segmentation model ready" else "Model download failed")
+            try {
+                val success = aiFeatures.segmentationEngine.downloadModel(
+                    wifiOnly = settingsRepo.settings.first().aiModelWifiOnly
+                )
+                showToast(if (success) "Segmentation model ready" else "Model download failed")
+            } catch (_: ModelDownloadManager.MeteredNetworkException) {
+                showToast("Wi-Fi-only model downloads are on. Connect to Wi-Fi or change the setting.")
+            }
         }
     }
 
