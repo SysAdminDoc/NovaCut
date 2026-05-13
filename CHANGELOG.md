@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Hardening pass (Cut Assistant correctness, resource leaks, persistence guards)
+## v3.72.0 — 2026-05-13 — Hardening pass (Cut Assistant correctness, resource leaks, persistence guards)
 
 - **Cut Assistant slice-deletion bug fixed.** `applyAcceptedCuts()` was looking up `op.clipId` AFTER the first `splitClipAt()`, which keeps the LEFT half on the original id. The "middle" lookup therefore matched the wrong slice and the engine deleted content BEFORE the silence range instead of the silence itself. The new applier diffs the per-track clip-id set across both splits, identifies the freshly-minted right half, deletes the correct slice, and ripple-shifts every subsequent clip back by the deleted span so the timeline has no orphan gaps after a batch of cuts.
 - **Cut Assistant proposeCutsForReview no longer trusts pre-IO state.** Tracks are re-read from `_state.value` after `withContext(Dispatchers.IO)` returns; clips that were deleted, moved, or replaced during the waveform scan are filtered out before the engine runs, and `CancellationException` is propagated so cancelling the operation actually tears down the scope.
