@@ -212,7 +212,7 @@ fun NovaCutMetricPill(
     Surface(
         modifier = modifier,
         color = accent.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(Radius.sm),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         Row(

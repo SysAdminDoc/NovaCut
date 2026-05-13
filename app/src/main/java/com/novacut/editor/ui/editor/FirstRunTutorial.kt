@@ -104,7 +104,7 @@ fun FirstRunTutorial(
         // competing with the primary "Next" CTA.
         Surface(
             color = Mocha.Surface0.copy(alpha = 0.6f),
-            shape = RoundedCornerShape(Radius.pill),
+            shape = RoundedCornerShape(Radius.sm),
             border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.6f)),
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -219,7 +219,7 @@ fun FirstRunTutorial(
 
                     Surface(
                         color = Mocha.Surface0.copy(alpha = 0.72f),
-                        shape = RoundedCornerShape(Radius.pill),
+                        shape = RoundedCornerShape(Radius.sm),
                         border = BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.75f))
                     ) {
                         Text(
@@ -256,7 +256,7 @@ fun FirstRunTutorial(
                                 modifier = Modifier
                                     .width(width)
                                     .height(8.dp)
-                                    .clip(RoundedCornerShape(Radius.pill))
+                                    .clip(RoundedCornerShape(Radius.sm))
                                     .background(
                                         if (index == step) Mocha.Mauve
                                         else Mocha.Surface1.copy(alpha = 0.7f)

@@ -737,7 +737,7 @@ private fun TemplateCategoryChip(
     Surface(
         onClick = onClick,
         color = if (selected) accent.copy(alpha = 0.14f) else Mocha.PanelHighest,
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(
             1.dp,
             if (selected) accent.copy(alpha = 0.28f) else Mocha.CardStroke

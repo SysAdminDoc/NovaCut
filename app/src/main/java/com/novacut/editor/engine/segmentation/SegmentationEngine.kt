@@ -73,6 +73,7 @@ class SegmentationEngine @Inject constructor(
      * Download the selfie segmenter model (~256KB) from Google's model storage.
      */
     suspend fun downloadModel(
+        wifiOnly: Boolean = false,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -98,7 +99,8 @@ class SegmentationEngine @Inject constructor(
                     )
                 ),
                 connectTimeoutMs = 15_000,
-                readTimeoutMs = 30_000
+                readTimeoutMs = 30_000,
+                wifiOnly = wifiOnly
             ) { progress ->
                 _downloadProgress.value = progress.coerceIn(0f, 0.99f)
                 onProgress(_downloadProgress.value)
@@ -108,6 +110,14 @@ class SegmentationEngine @Inject constructor(
             onProgress(1f)
             _modelState.value = SegmentationModelState.READY
             true
+        } catch (e: ModelDownloadManager.MeteredNetworkException) {
+            _modelState.value = if (hasDownloadedModelFile()) {
+                SegmentationModelState.READY
+            } else {
+                SegmentationModelState.NOT_DOWNLOADED
+            }
+            _downloadProgress.value = 0f
+            throw e
         } catch (e: Exception) {
             _modelState.value = if (hasDownloadedModelFile()) {
                 SegmentationModelState.READY
@@ -248,6 +258,12 @@ class SegmentationEngine @Inject constructor(
         modelDir.deleteRecursively()
         _modelState.value = SegmentationModelState.NOT_DOWNLOADED
         _downloadProgress.value = 0f
+    }
+
+    fun getModelSizeBytes(): Long {
+        return if (modelDir.exists()) {
+            modelDir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+        } else 0L
     }
 
     fun release() {

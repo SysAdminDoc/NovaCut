@@ -15,6 +15,7 @@ import com.novacut.editor.engine.AudioEngine
 import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.ProjectAutoSave
+import com.novacut.editor.engine.ProjectArchive
 import com.novacut.editor.engine.ProxyEngine
 import com.novacut.editor.engine.SettingsRepository
 import com.novacut.editor.engine.SmartRenderEngine
@@ -45,6 +46,7 @@ import com.novacut.editor.engine.StabilizationEngine
 import com.novacut.editor.engine.StyleTransferEngine
 import com.novacut.editor.engine.SmartReframeEngine
 import com.novacut.editor.engine.TimelineExchangeEngine
+import com.novacut.editor.engine.TimelineExchangeValidator
 import com.novacut.editor.engine.ProxyWorkflowEngine
 import com.novacut.editor.engine.MultiCamEngine
 import com.novacut.editor.engine.VideoEngine
@@ -217,7 +219,11 @@ data class EditorState(
     // v3.71 Cut Assistant review state. Null until the user opens the panel;
     // mutating per-proposal acceptance does not split clips — the apply step is
     // explicit so undo records a single "Apply Cut Assistant" entry.
-    val cutAssistantReview: com.novacut.editor.engine.CutAssistantEngine.ReviewSet? = null
+    val cutAssistantReview: com.novacut.editor.engine.CutAssistantEngine.ReviewSet? = null,
+    // Trust/report surfaces for operations that can lose data or need follow-up.
+    // These are UI-only and intentionally excluded from project persistence.
+    val backupImportFeedback: BackupImportFeedback? = null,
+    val timelineExchangeFeedback: TimelineExchangeFeedback? = null
 )
 
 /**
@@ -306,6 +312,22 @@ data class AiRequirementPrompt(
     val modelName: String,
     val estimatedSize: String,
     val actionLabel: String
+)
+
+data class BackupImportFeedback(
+    val succeeded: Boolean,
+    val title: String,
+    val body: String,
+    val report: ProjectArchive.ImportReport,
+    val errorMessage: String? = null
+)
+
+data class TimelineExchangeFeedback(
+    val succeeded: Boolean,
+    val title: String,
+    val body: String,
+    val outputFileName: String?,
+    val report: TimelineExchangeValidator.Report
 )
 
 @HiltViewModel
@@ -403,7 +425,8 @@ class EditorViewModel @Inject constructor(
         },
         rebuildPlayerTimeline = ::rebuildPlayerTimeline, saveProject = ::saveProject,
         videoEngine = videoEngine,
-        recalculateDuration = ::recalculateDuration
+        recalculateDuration = ::recalculateDuration,
+        settingsRepo = settingsRepo
     )
 
     val clipEditingDelegate = ClipEditingDelegate(
@@ -1707,7 +1730,7 @@ class EditorViewModel @Inject constructor(
                 val existingProjectIds = runCatching {
                     projectDao.getAllProjectsSnapshot().map { it.id }.toSet()
                 }.getOrDefault(emptySet())
-                val result = com.novacut.editor.engine.ProjectArchive.importArchiveWithReport(
+                val result = ProjectArchive.importArchiveWithReport(
                     appContext,
                     uri,
                     targetDir,
@@ -1748,9 +1771,32 @@ class EditorViewModel @Inject constructor(
                             "Backup imported (${report.summary})"
                         else -> "Backup imported successfully"
                     }
+                    if (report.mediaMissing > 0 || report.warnings.isNotEmpty() || report.projectIdCollided) {
+                        _state.update {
+                            it.copy(
+                                backupImportFeedback = BackupImportFeedback(
+                                    succeeded = true,
+                                    title = "Backup imported with notes",
+                                    body = "NovaCut restored the timeline, but this archive needs review before you export or hand it off.",
+                                    report = report
+                                )
+                            )
+                        }
+                    }
                     showToast(message)
                 } else {
                     val reason = result.errorMessage ?: result.report.summary
+                    _state.update {
+                        it.copy(
+                            backupImportFeedback = BackupImportFeedback(
+                                succeeded = false,
+                                title = "Backup import failed",
+                                body = "NovaCut left the current project unchanged.",
+                                report = result.report,
+                                errorMessage = reason
+                            )
+                        )
+                    }
                     showToast("Failed to import backup: $reason")
                 }
             } catch (e: Exception) {
@@ -3124,7 +3170,7 @@ class EditorViewModel @Inject constructor(
             try {
                 val s = _state.value
                 val report = timelineExchangeValidator.validateExport(
-                    com.novacut.editor.engine.TimelineExchangeEngine.TimelineExchangeFormat.OTIO,
+                    TimelineExchangeEngine.TimelineExchangeFormat.OTIO,
                     s.tracks,
                     s.textOverlays,
                     s.exportConfig.frameRate
@@ -3132,6 +3178,17 @@ class EditorViewModel @Inject constructor(
                 if (!report.canProceed) {
                     val first = report.errors.first()
                     withContext(Dispatchers.Main) {
+                        _state.update {
+                            it.copy(
+                                timelineExchangeFeedback = TimelineExchangeFeedback(
+                                    succeeded = false,
+                                    title = "OTIO export blocked",
+                                    body = "NovaCut found a timeline issue that would make the handoff unreliable.",
+                                    outputFileName = null,
+                                    report = report
+                                )
+                            )
+                        }
                         showToast("OTIO export blocked: ${first.path} — ${first.message}")
                     }
                     return@launch
@@ -3143,6 +3200,19 @@ class EditorViewModel @Inject constructor(
                 writeUtf8TextAtomically(file, otioJson)
                 withContext(Dispatchers.Main) {
                     val tail = if (report.warnings.isNotEmpty()) " (${report.summary})" else ""
+                    if (report.issues.isNotEmpty()) {
+                        _state.update {
+                            it.copy(
+                                timelineExchangeFeedback = TimelineExchangeFeedback(
+                                    succeeded = true,
+                                    title = "OTIO exported with notes",
+                                    body = "The file was written, but the receiving editor may need manual cleanup.",
+                                    outputFileName = file.name,
+                                    report = report
+                                )
+                            )
+                        }
+                    }
                     showToast("OTIO exported: ${file.name}$tail")
                 }
             } catch (e: Exception) {
@@ -3156,7 +3226,7 @@ class EditorViewModel @Inject constructor(
             try {
                 val s = _state.value
                 val report = timelineExchangeValidator.validateExport(
-                    com.novacut.editor.engine.TimelineExchangeEngine.TimelineExchangeFormat.FCPXML,
+                    TimelineExchangeEngine.TimelineExchangeFormat.FCPXML,
                     s.tracks,
                     s.textOverlays,
                     s.exportConfig.frameRate
@@ -3164,6 +3234,17 @@ class EditorViewModel @Inject constructor(
                 if (!report.canProceed) {
                     val first = report.errors.first()
                     withContext(Dispatchers.Main) {
+                        _state.update {
+                            it.copy(
+                                timelineExchangeFeedback = TimelineExchangeFeedback(
+                                    succeeded = false,
+                                    title = "FCPXML export blocked",
+                                    body = "NovaCut found a timeline issue that would make the handoff unreliable.",
+                                    outputFileName = null,
+                                    report = report
+                                )
+                            )
+                        }
                         showToast("FCPXML export blocked: ${first.path} — ${first.message}")
                     }
                     return@launch
@@ -3175,6 +3256,19 @@ class EditorViewModel @Inject constructor(
                 writeUtf8TextAtomically(file, xml)
                 withContext(Dispatchers.Main) {
                     val tail = if (report.warnings.isNotEmpty()) " (${report.summary})" else ""
+                    if (report.issues.isNotEmpty()) {
+                        _state.update {
+                            it.copy(
+                                timelineExchangeFeedback = TimelineExchangeFeedback(
+                                    succeeded = true,
+                                    title = "FCPXML exported with notes",
+                                    body = "The file was written, but the receiving editor may need manual cleanup.",
+                                    outputFileName = file.name,
+                                    report = report
+                                )
+                            )
+                        }
+                    }
                     showToast("FCPXML exported: ${file.name}$tail")
                 }
             } catch (e: Exception) {
@@ -4032,6 +4126,14 @@ class EditorViewModel @Inject constructor(
                 it
             }
         }
+    }
+
+    fun dismissBackupImportFeedback() {
+        _state.update { it.copy(backupImportFeedback = null) }
+    }
+
+    fun dismissTimelineExchangeFeedback() {
+        _state.update { it.copy(timelineExchangeFeedback = null) }
     }
 
     fun insertFreezeFrame() {

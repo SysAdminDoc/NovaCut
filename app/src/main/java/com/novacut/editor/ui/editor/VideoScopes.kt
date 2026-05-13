@@ -101,7 +101,7 @@ fun VideoScopesOverlay(
                     .align(Alignment.CenterHorizontally)
                     .width(40.dp)
                     .height(4.dp)
-                    .background(Mocha.Surface2.copy(alpha = 0.8f), RoundedCornerShape(999.dp))
+                    .background(Mocha.Surface2.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
             )
 
             Row(
