@@ -2,6 +2,96 @@
 
 ## Unreleased
 
+### Roadmap Round 6 — 2026-05 refresh (Next / Later tier engine + docs pass)
+
+Second autonomous pass continuing the Round 6 work. All commits land at the
+engine + test + ROADMAP layer; the corresponding Compose UI commits follow
+once a host with Android Studio is available. No new Maven dependencies
+added; ~90 new JVM unit tests across the batch.
+
+- **A.10 — Oboe resampler scaffold.** Reflection probe, pinned Maven coords,
+  pure-math `estimatedOutputFrames(input, fromHz, toHz)` helper safe to call
+  before the dep is wired. 8 new tests.
+- **R5.7a/b/c — Plugin format family + OpenFX descriptor + compatibility
+  matrix.** `PluginRegistry` (.novacut-template / .ncfx / .ncstyle / .cube /
+  .3dl / .ncfxd) classification with longest-extension-first detection;
+  `OpenFxDescriptor` JSON parser with permissive parameter validation and
+  `toOpenFx` / `fromOpenFx` round-trip math; [docs/templates.md](docs/templates.md)
+  Lottie / dotLottie / Rive / Glaxnimate compatibility matrix. 20 new tests.
+- **R5.9a/b — Supply chain + non-bypassable checksum.** `.github/dependabot.yml`
+  watches Gradle and GitHub Actions with grouped PRs. `ModelDownloadManager`
+  gains `requireChecksum: Boolean` and `verifyChecksumOrDelete()` for fail-
+  closed first-run verification. 4 new tests.
+- **R6.4a/b — SAM 3 / SAM 3.1 watch item.** `TapSegmentEngine.SAM3_HIERA_TINY_ONNX_PLACEHOLDER`
+  enum entry behind `SAM3_PLACEHOLDER_ENABLED` flag (off by default). New
+  `segmentByTextPrompt(bitmap, prompt)` stub returns null today; SAM 2.1 stays
+  the default tracked-mask target until an ONNX-export Tiny variant ships.
+- **R6.11 — APV codec ingest probe.** `EncoderCapabilityProbe.probeApvIngest()`
+  returns `ApvSupport` with `hasDecoder` / `isHardwareDecoder` / `decoderNames`.
+  No encoder path by design (R6.11c — APV is ingest-only). 5 new tests.
+- **R6.14a — Multicam SmartSwitch planner.** Pure-Kotlin `SpeakerSwitchPlanner`
+  with first-appearance round-robin angle assignment, explicit-assignment
+  override, redundant-cut coalescing, and a `minDwellMs` flicker guard.
+  11 new tests.
+- **R6.15a/b — AI Animated Subtitles per-word emphasis.** `WordEmphasisAnimator`
+  with POP / BOUNCE / GLOW / SLIDE_IN animations, `wordProgress(playhead,
+  start, end, window)` bridge from Whisper word timestamps, and
+  `DEFAULT_MAX_CONCURRENT_ANIMATING_WORDS = 3` performance budget. 17 new tests.
+- **R6.17a — Live streaming output scaffold.** `OutputStreamingEngine` with
+  6-protocol enum, multi-library reflection probe (Stream-Pack / Larix /
+  LibSRT-Android), pure `validateDestination(protocol, url)` and
+  `recommendedBitrateBps(w, h, fps)` pre-flight helpers. 11 new tests.
+- **R5.4a + R6.7 — Caption translation data model.** New `BERGAMOT_PER_PAIR`
+  model variant, MADLAD count 400 → 419, `EditorRowState` (TRANSLATED /
+  USER_EDITED / REGENERATE_PENDING), `LanguagePairQuality` lookup with
+  locale-suffix + case-insensitive matching. 12 new tests.
+- **R5.4d — Locale-aware Noto caption font fallback policy.** `CaptionFontFallbackPolicy`
+  routes BCP-47 / ISO-639-1 tags to the right Noto subset (CJK SC / TC / JP /
+  KR, Arabic, Hebrew, Devanagari, Bengali, Tamil, Thai) with per-family
+  bundle-byte disclosure. zh-Hant / zh-Hans script split, case-insensitive.
+  17 new tests.
+- **R5.5c — Privacy dashboard data model.** `PrivacyDashboard` is the single
+  source of truth for every data category NovaCut collects: location,
+  controls (export/delete/opt-out), collecting engines, retention policy,
+  default-collection state. Cloud + telemetry categories are forced off by
+  default (matches R5.9c contract). 10 invariant tests.
+- **C.2 — Silence + filler-word auto-cut follow-ups.** `SilenceDetectionEngine`
+  gains `detectMultiWordFillers(words, config, phrases)` with longest-match-
+  first sliding window and `mergeProposals(cuts, mergeGapMs)` to deduplicate
+  silence + filler proposals into a single Cut Assistant review list.
+  12 new tests.
+- **C.11 — Adjustment layer export-pipeline helper.** `AdjustmentLayerEngine.planForClip()`
+  returns an ordered list of `AdjustmentLayerSegment(timelineRange, effects)`
+  ready for EffectBuilder to consume per export segment. 5 new tests bring
+  the file to 15 covering the full plan / partition / effects-for-clip surface.
+- **C.12 — Keyframe bezier graph data model.** `KeyframeBezierGraph` ships the
+  per-segment cubic bezier evaluator (`evaluate`, `evaluatePoint`), canonical
+  unit-segment presets for all 12 NovaCut easings, and `rescale(seg, start,
+  end)` for runtime denormalization. 14 new tests.
+- **C.13 — Compound clip nested-sequence navigation stack.** `CompoundNavStack`
+  with push / pop / reset / breadcrumb / depth, cycle detection, MAX_DEPTH
+  cap, and autosave-friendly `toSerializedIds()` / `restore(clips)` round-
+  trip. 11 new tests.
+- **Tier A activation-docs sweep.** `FrameInterpolationEngine` (A.4 — RIFE +
+  NCNN + Vulkan zero-copy pipeline + Snapdragon 8 Gen 3 numbers),
+  `UpscaleEngine` (A.5 — Real-ESRGAN x4plus + tile-and-blend constants),
+  `VideoMattingEngine` (A.6 — RVM MobileNet + recurrent state pattern),
+  `StabilizationEngine` (A.3 — OpenCV + R6.9 Gyroflow-sidecar-first
+  directive), `StyleTransferEngine` (A.11 — AnimeGAN + Fast NST opt-in
+  download model), `RiveTemplateEngine` (A.13 — R6.16 Under-Consideration
+  rationale + reflection probe), `LottieTemplateEngine` (R6.16 — dotLottie
+  + state-machine upgrade plan).
+- **Tier C Later-tier helpers.** `StockAssetEngine` gains `validateQuery()` +
+  `attributionLine()` + API doc constants (C.7). `CameraCaptureEngine`
+  gains reflection probe + `teleprompterVisibleWordCount()` helper (C.8).
+  `TimelineImportEngine` gains `roundTripFidelity(format)` for the import
+  UX warning copy (C.14).
+- **Verification** — `git diff --check` passed. Gradle tests could not be
+  run in this environment (no JDK). The Round 6 second-pass added ~90 new
+  JVM unit tests; total new tests since the Round 6 refresh started:
+  ~125. All need a `gradlew testDebugUnitTest` run on a host with a JDK
+  to verify.
+
 ### Roadmap Round 6 — 2026-05 refresh (engine + docs pass)
 
 This batch processes the Now-tier items from the ROADMAP Round 6 Forward
