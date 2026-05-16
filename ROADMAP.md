@@ -619,8 +619,8 @@ DaVinci Resolve 20's Multicam SmartSwitch auto-cuts between camera angles based 
 
 DaVinci 20's AI Animated Subtitles animates each word as it's spoken. NovaCut shipped karaoke captions in v3.69 (`KaraokeCaptionEngine`); this is an extension of the same pipeline with motion presets per word.
 
-- [ ] **R6.15a — Extend the caption style gallery** with "Word Pop", "Word Bounce", "Word Glow", "Word Slide-In" presets that operate on word boundaries (already exposed by Whisper word timestamps).
-- [ ] **R6.15b — Performance budget:** per-word animation should run on the existing Canvas overlay path; do not add a GPU pass per word. Cap concurrent animating words at 3 to bound the per-frame cost. Sources: https://www.miracamp.com/learn/davinci-resolve/whats-new-all-new-features-explained
+- [x] **R6.15a — Extend the caption style gallery** with "Word Pop", "Word Bounce", "Word Glow", "Word Slide-In" presets that operate on word boundaries (already exposed by Whisper word timestamps). *(Done — [WordEmphasisAnimator](app/src/main/java/com/novacut/editor/engine/WordEmphasisAnimator.kt) ships the 4 per-word animations as a pure-math object that emits a `WordRenderState` (scale, offsetX, offsetY, alpha, emphasisMix, emphasisColor) the caption renderer applies on top of the base typography. `wordProgress(playhead, start, end, windowMs)` bridges Whisper word timestamps into the 0..1 animation domain and falls back to the word's spoken duration when shorter than the window. 17 new tests.)*
+- [x] **R6.15b — Performance budget:** per-word animation should run on the existing Canvas overlay path; do not add a GPU pass per word. *(Codified — `WordEmphasisAnimator.DEFAULT_MAX_CONCURRENT_ANIMATING_WORDS = 3` and the design note in the animator class docstring. A test pins the constant so a future bump prompts the author to re-evaluate the per-frame render cost.)* Sources: https://www.miracamp.com/learn/davinci-resolve/whats-new-all-new-features-explained
 
 ### R6.16 — Lottie state machines / dotLottie interactive templates
 
