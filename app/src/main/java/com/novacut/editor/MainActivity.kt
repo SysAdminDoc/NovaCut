@@ -9,9 +9,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
@@ -19,10 +21,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.novacut.editor.ui.editor.EditorScreen
+import com.novacut.editor.ui.editor.LocalTabletopPosture
 import com.novacut.editor.ui.projects.ProjectListScreen
 import com.novacut.editor.ui.settings.SettingsScreen
 import com.novacut.editor.ui.theme.NovaCutTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.window.layout.FoldingFeature
+import androidx.window.layout.WindowInfoTracker
+import kotlinx.coroutines.flow.collect
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -49,6 +55,20 @@ class MainActivity : ComponentActivity() {
                 val rootModifier = Modifier
                     .fillMaxSize()
                     .safeDrawingPadding()
+                var isTabletopPosture by remember { mutableStateOf(false) }
+
+                LaunchedEffect(Unit) {
+                    WindowInfoTracker.getOrCreate(this@MainActivity)
+                        .windowLayoutInfo(this@MainActivity)
+                        .collect { layoutInfo ->
+                            isTabletopPosture = layoutInfo.displayFeatures
+                                .filterIsInstance<FoldingFeature>()
+                                .any { feature ->
+                                    feature.state == FoldingFeature.State.HALF_OPENED &&
+                                        feature.orientation == FoldingFeature.Orientation.HORIZONTAL
+                                }
+                        }
+                }
 
                 LaunchedEffect(pendingVideoUri, currentRoute) {
                     if (pendingVideoUri != null && currentRoute != null && currentRoute != "projects") {
@@ -59,30 +79,32 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                NavHost(
-                    navController = navController,
-                    startDestination = "projects",
-                    modifier = rootModifier
-                ) {
-                    composable("projects") {
-                        ProjectListScreen(
-                            onProjectSelected = { projectId ->
-                                navController.navigate("editor/$projectId")
-                            },
-                            onSettings = { navController.navigate("settings") },
-                            pendingImportUri = pendingVideoUri,
-                            onPendingImportHandled = { pendingVideoUri = null }
-                        )
-                    }
-                    composable("settings") {
-                        SettingsScreen(
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
-                    composable("editor/{projectId}") {
-                        EditorScreen(
-                            onBack = { navController.popBackStack() }
-                        )
+                CompositionLocalProvider(LocalTabletopPosture provides isTabletopPosture) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = "projects",
+                        modifier = rootModifier
+                    ) {
+                        composable("projects") {
+                            ProjectListScreen(
+                                onProjectSelected = { projectId ->
+                                    navController.navigate("editor/$projectId")
+                                },
+                                onSettings = { navController.navigate("settings") },
+                                pendingImportUri = pendingVideoUri,
+                                onPendingImportHandled = { pendingVideoUri = null }
+                            )
+                        }
+                        composable("settings") {
+                            SettingsScreen(
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable("editor/{projectId}") {
+                            EditorScreen(
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                     }
                 }
             }
