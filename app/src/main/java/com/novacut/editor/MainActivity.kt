@@ -2,12 +2,13 @@ package com.novacut.editor
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +32,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // R8.3 — remove the translucent scrim Android draws under the
+        // three-button navigation bar when the app is edge-to-edge. We
+        // already render full-bleed under that bar, so the scrim adds
+        // visual noise without preventing legibility.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         handleIncomingIntent(intent)
 
         setContent {
@@ -40,7 +48,7 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = currentBackStackEntry?.destination?.route
                 val rootModifier = Modifier
                     .fillMaxSize()
-                    .systemBarsPadding()
+                    .safeDrawingPadding()
 
                 LaunchedEffect(pendingVideoUri, currentRoute) {
                     if (pendingVideoUri != null && currentRoute != null && currentRoute != "projects") {
