@@ -181,6 +181,9 @@ dependencies {
     // Tier 2: Lottie animated titles
     implementation(libs.lottie.compose)
 
+    // Tier A.9 / R6.5: FFmpeg Kit fork rebuilt for Android 16 KB pages
+    implementation(libs.ffmpeg.kit.sixteenkb)
+
     // Tier 4: OkHttp (cloud inpainting API)
     implementation(libs.okhttp)
 
