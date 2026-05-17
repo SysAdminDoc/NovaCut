@@ -4,6 +4,20 @@
 
 ### Autonomous roadmap continuation — 2026-05-17
 
+- **R7.4 / R6.5 — FFmpeg 16 KB integration.** The default app now pins
+  `com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1` through the version
+  catalog and app dependency graph. `FFmpegEngine` is no longer a pure
+  stub: raw commands and structured argument-list helpers run through
+  FFmpegKit async sessions with cancellation, completion progress, SAF
+  content-URI input support, and implementations for stream-copy trim,
+  concat demuxer, WAV extraction, subtitle burn-in, loudnorm, and
+  speed-change helpers. Plain JVM tests still report FFmpeg unavailable
+  to avoid loading Android native libraries outside ART. The resolved
+  debug APK verifies 30 required 16 KB-aligned native libs and 0
+  misaligned libs. [LICENSE](LICENSE) and [docs/models.md](docs/models.md)
+  now treat the dependency as GPLv3-obligation material because the AAR
+  packages GPLv3 license/source-offer resources even though the Maven POM
+  declares LGPL-3.0.
 - **R5.5d / R7.1 — Settings diagnostic ZIP workflow.** Settings now exposes
   a local-only Diagnostic ZIP row that creates the existing
   `DiagnosticExportEngine` bundle, shows busy / success / error state, stores

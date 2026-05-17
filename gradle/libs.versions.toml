@@ -21,6 +21,7 @@ onnxruntime = "1.26.0"
 mediapipe = "0.10.35"
 okhttp = "5.3.2"
 lottieCompose = "6.7.1"
+ffmpegKit = "6.1.1"
 junit4 = "4.13.2"
 json = "20240303"
 
@@ -63,6 +64,7 @@ onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime
 mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "mediapipe" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottieCompose" }
+ffmpeg-kit-sixteenkb = { group = "com.moizhassan.ffmpeg", name = "ffmpeg-kit-16kb", version.ref = "ffmpegKit" }
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 org-json = { group = "org.json", name = "json", version.ref = "json" }
 
