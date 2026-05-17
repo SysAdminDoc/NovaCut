@@ -76,6 +76,15 @@
   for overnight" Settings entry once an estimated render crosses 30
   minutes. Ready for `ExportService` to consume; engine layer fully
   unit-tested on the JVM.
+- **R8.15 — LNP scope classifier for OutputStreamingEngine.**
+  `OutputStreamingEngine.classifyNetworkScope(url)` +
+  `requiresLocalNetworkPermission(url)` route any RTMP / SRT / RIST /
+  WebRTC / RTSP destination into `PUBLIC_INTERNET` / `LOCAL_LAN` /
+  `MULTICAST` / `LOOPBACK` before the streaming library is wired. Lets
+  the future R6.17 UI gate the Android 16 Local Network Protection
+  consent sheet on real LAN destinations only, not on Twitch / YouTube
+  / etc. Nine engine tests cover RFC1918 ranges, multicast, link-local,
+  IPv6 heuristics, mDNS, user-info stripping, and malformed URLs.
 - **Verification recovery.** Restored the JVM unit-test baseline by making
   `AutoSaveState.deserialize()` accept an injectable URI parser with Android's
   parser as the production default, so JVM tests can use the repo's `FakeUri`

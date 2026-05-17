@@ -143,6 +143,111 @@ class OutputStreamingEngine @Inject constructor(
     }
 
     /**
+     * R8.15 — Android 16 Local Network Protection (LNP) scope classification.
+     *
+     * Android 16 Developer Preview 1 introduced LNP: apps cannot reach
+     * internal-network hosts unless explicitly authorized. RTMP / SRT / RIST
+     * / WebRTC / RTSP / NDI servers on the same Wi-Fi (OBS box, hardware
+     * encoder, NDI source) all live in that LAN scope. Outbound streaming
+     * to a public RTMP ingest (Twitch, YouTube Live) is **not** gated by
+     * LNP — that's plain internet egress.
+     *
+     * This is a pure URL inspection so it can run before any streaming
+     * library is wired. The UI uses it to decide whether to show the
+     * one-time "NovaCut needs Local Network access" consent sheet before
+     * attempting the connection.
+     */
+    enum class LocalNetworkScope {
+        /** Public internet host — no LNP gate. */
+        PUBLIC_INTERNET,
+        /** RFC1918 LAN host — LNP gate applies on Android 16+. */
+        LOCAL_LAN,
+        /** Multicast group — LNP gate applies on Android 16+. */
+        MULTICAST,
+        /** Loopback / localhost — gated only on hardened profiles. */
+        LOOPBACK
+    }
+
+    /**
+     * Classify a destination URL by network scope. Returns
+     * [LocalNetworkScope.PUBLIC_INTERNET] when the host segment is missing
+     * or cannot be parsed; callers should already have run
+     * [validateDestination] before reaching this.
+     */
+    fun classifyNetworkScope(url: String): LocalNetworkScope {
+        val host = extractHost(url) ?: return LocalNetworkScope.PUBLIC_INTERNET
+        val lower = host.lowercase()
+        if (lower == "localhost" || lower == "ip6-localhost") return LocalNetworkScope.LOOPBACK
+        val octets = lower.split('.').mapNotNull { it.toIntOrNull() }
+        if (octets.size == 4 && octets.all { it in 0..255 }) {
+            val a = octets[0]
+            val b = octets[1]
+            return when {
+                a == 127 -> LocalNetworkScope.LOOPBACK
+                a == 10 -> LocalNetworkScope.LOCAL_LAN                      // 10.0.0.0/8
+                a == 172 && b in 16..31 -> LocalNetworkScope.LOCAL_LAN      // 172.16.0.0/12
+                a == 192 && b == 168 -> LocalNetworkScope.LOCAL_LAN         // 192.168.0.0/16
+                a == 169 && b == 254 -> LocalNetworkScope.LOCAL_LAN         // 169.254.0.0/16 link-local
+                a in 224..239 -> LocalNetworkScope.MULTICAST                // 224.0.0.0/4
+                else -> LocalNetworkScope.PUBLIC_INTERNET
+            }
+        }
+        // IPv6 loopback / link-local / multicast (no full v6 parser — cheap heuristics).
+        if (lower == "::1" || lower == "[::1]") return LocalNetworkScope.LOOPBACK
+        if (lower.startsWith("fe80:") || lower.startsWith("[fe80:")) return LocalNetworkScope.LOCAL_LAN
+        if (lower.startsWith("fc") || lower.startsWith("fd") ||
+            lower.startsWith("[fc") || lower.startsWith("[fd")) {
+            return LocalNetworkScope.LOCAL_LAN                              // fc00::/7 unique local
+        }
+        if (lower.startsWith("ff") || lower.startsWith("[ff")) return LocalNetworkScope.MULTICAST
+        if (lower.endsWith(".local")) return LocalNetworkScope.LOCAL_LAN    // mDNS
+        return LocalNetworkScope.PUBLIC_INTERNET
+    }
+
+    /**
+     * Whether the URL targets a host inside the user's LAN (or multicast
+     * group) and therefore needs Android 16 LNP authorization. Loopback is
+     * **not** included — it's an in-process connection.
+     */
+    fun requiresLocalNetworkPermission(url: String): Boolean {
+        return when (classifyNetworkScope(url)) {
+            LocalNetworkScope.LOCAL_LAN, LocalNetworkScope.MULTICAST -> true
+            LocalNetworkScope.PUBLIC_INTERNET, LocalNetworkScope.LOOPBACK -> false
+        }
+    }
+
+    /**
+     * Extract the host segment from a URL of the shape
+     * `scheme://[user[:pass]@]host[:port]/path`. IPv6 hosts wrapped in
+     * brackets are preserved with brackets so the IPv6 heuristics in
+     * [classifyNetworkScope] still trigger. Returns null when the URL is
+     * malformed enough that the host cannot be located.
+     */
+    private fun extractHost(url: String): String? {
+        val trimmed = url.trim()
+        val schemeEnd = trimmed.indexOf("://")
+        if (schemeEnd <= 0) return null
+        val rest = trimmed.substring(schemeEnd + 3)
+        if (rest.isEmpty()) return null
+        // Cut off the path / query.
+        val pathStart = rest.indexOfAny(charArrayOf('/', '?', '#'))
+        val authority = if (pathStart >= 0) rest.substring(0, pathStart) else rest
+        if (authority.isEmpty()) return null
+        // Drop optional userinfo.
+        val at = authority.lastIndexOf('@')
+        val hostPort = if (at >= 0) authority.substring(at + 1) else authority
+        if (hostPort.isEmpty()) return null
+        // Strip optional :port — but keep IPv6 brackets intact.
+        return if (hostPort.startsWith("[")) {
+            val close = hostPort.indexOf(']')
+            if (close < 0) hostPort else hostPort.substring(0, close + 1)
+        } else {
+            val colon = hostPort.indexOf(':')
+            if (colon < 0) hostPort else hostPort.substring(0, colon)
+        }
+    }
+
+    /**
      * Pick a target bitrate for a destination from a curated table of
      * platform defaults. Stays a pure function so the caller can preview
      * the value before constructing an [OutputDestination].
