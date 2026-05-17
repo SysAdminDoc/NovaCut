@@ -43,6 +43,22 @@
   reframed and README's permission table corrected (NovaCut requests no
   broad `READ_MEDIA_*` perms — the system Photo Picker grants per-URI
   access exclusively).
+- **R8.3 — Edge-to-edge audit.** `MainActivity.onCreate` now sets
+  `window.isNavigationBarContrastEnforced = false` (API 29+ guarded) so
+  the 3-button-nav scrim no longer paints over edge-to-edge content. The
+  NavHost root modifier moved from `systemBarsPadding()` to
+  `safeDrawingPadding()` so every nav destination handles cutouts + IME
+  alongside system bars without per-screen Scaffold rewrites.
+- **R8.4 — Predictive back verified done by existing pattern.**
+  AndroidManifest already declares `android:enableOnBackInvokedCallback`;
+  the single `BackHandler` in `EditorScreen` is gated on dirty-state
+  predicates so the system runs the back-to-home predictive animation
+  whenever the editor is idle.
+- **R8.10 — Stylus handwriting verified default-on.** Compose BOM
+  2026.05.00 pulls `foundation` ≥ 1.7.0; a grep showed zero
+  `KeyboardType.Password` declarations across the codebase, so every
+  shipping caption / marker / project-rename / AutoEdit text field is
+  eligible for system-managed stylus handwriting on Android 14+.
 - **Verification recovery.** Restored the JVM unit-test baseline by making
   `AutoSaveState.deserialize()` accept an injectable URI parser with Android's
   parser as the production default, so JVM tests can use the repo's `FakeUri`
