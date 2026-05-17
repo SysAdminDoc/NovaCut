@@ -1,48 +1,38 @@
 package com.novacut.editor.engine
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.FFmpegKitConfig
+import com.arthenica.ffmpegkit.ReturnCode
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 /**
- * Stub engine for FFmpeg-backed export paths that Media3 Transformer does not cover.
+ * Engine for FFmpeg-backed export paths that Media3 Transformer does not cover.
  *
- * ## Activation path (Tier A.9, refreshed in Round 6 R6.5)
+ * ## Dependency path (Tier A.9, refreshed in Round 6 R6.5)
  *
- * The recommended FFmpeg distribution for NovaCut is now
- * `com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1` on Maven Central — it is the
- * actively maintained successor to the archived arthenica/ffmpeg-kit, ships with
- * 16 KB page-size aligned native libs (mandatory for Play Store on `targetSdk = 36`,
- * see [docs/models.md](../../../../../../docs/models.md) §2), and is built with
- * NDK r27d, Full-GPL, and MediaCodec support.
- *
- * To activate this engine:
- *   1. Add to `gradle/libs.versions.toml`:
- *        ffmpegKit = "6.1.1"
- *        ffmpeg-kit-16kb = { group = "com.moizhassan.ffmpeg",
- *                            name = "ffmpeg-kit-16kb",
- *                            version.ref = "ffmpegKit" }
- *   2. Add `implementation(libs.ffmpeg.kit.16kb)` to `app/build.gradle.kts`.
- *   3. Replace the bodies of [execute], [streamCopyTrim], [concat], [changeSpeed],
- *      [extractAudioToWav], [burnSubtitles], [normalizeLoudness] with the
- *      corresponding `FFmpegKit.executeAsync(...)` / `MediaInformation.fromUri(...)`
- *      bridges. Wire progress callbacks through `FFmpegKitConfig.enableStatisticsCallback`.
- *   4. Add the LGPL/GPL notice + offer-of-source to LICENSE per FFmpeg's license
- *      (Full-GPL build).
+ * NovaCut pins `com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1`, the 16 KB
+ * page-size rebuilt FFmpegKit successor used by R6.5. The AAR is verified by
+ * the local `scripts/check_16kb_alignment.py` gate after every native dep
+ * change and carries GPLv3/source-offer license resources in the packaged APK.
  *
  * ## License note
  *
- * NovaCut itself is MIT-licensed; bundling a Full-GPL `.so` does not relicense
- * NovaCut's Kotlin source but does require shipping the FFmpeg license addendum
- * with release artifacts. If we want to dodge that obligation, the LGPL-only
- * `ffmpeg-kit` build variant exists at the cost of losing libx264/libx265/libfdk —
- * we would have to fall back to MediaCodec for H.264/HEVC encoding (which is
- * fine because Media3 Transformer already covers those codecs).
+ * NovaCut itself is MIT-licensed; bundling an AAR whose packaged license
+ * resources carry GPLv3 text does not relicense NovaCut's Kotlin source, but it
+ * does require shipping the FFmpeg license addendum and source offer with
+ * release artifacts. If we need a no-GPL distribution channel, use a separate
+ * LGPL-only/no-FFmpeg flavor and keep Media3 Transformer as the H.264/HEVC path.
  *
  * ## Use cases beyond Media3 Transformer
  *
@@ -68,8 +58,7 @@ class FFmpegEngine @Inject constructor(
         command: String,
         onProgress: (Float) -> Unit = {}
     ): Int = withContext(Dispatchers.IO) {
-        Log.d(TAG, "execute: stub -- requires FFmpeg Android dependency")
-        -1
+        executeCommand(command, onProgress = onProgress)
     }
 
     /**
@@ -81,8 +70,17 @@ class FFmpegEngine @Inject constructor(
         sampleRate: Int = 16000,
         channels: Int = 1
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "extractAudioToWav: stub -- requires FFmpeg Android dependency")
-        false
+        executeArguments(
+            listOf(
+                "-y",
+                "-i", inputUri,
+                "-vn",
+                "-ac", channels.coerceAtLeast(1).toString(),
+                "-ar", sampleRate.coerceAtLeast(1).toString(),
+                "-f", "wav",
+                outputFile.absolutePath
+            )
+        ) == 0
     }
 
     /**
@@ -94,12 +92,24 @@ class FFmpegEngine @Inject constructor(
         outputFile: File,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "burnSubtitles: stub -- requires FFmpeg Android dependency")
-        false
+        val filter = "subtitles=${escapeFilterPath(subtitleFile.absolutePath)}"
+        executeArguments(
+            listOf(
+                "-y",
+                "-i", inputFile.absolutePath,
+                "-vf", filter,
+                "-c:a", "copy",
+                outputFile.absolutePath
+            ),
+            progressDurationMs = mediaDurationMs(inputFile),
+            onProgress = onProgress
+        ) == 0
     }
 
     /**
-     * Two-pass loudness normalization via FFmpeg loudnorm filter.
+     * Loudness normalization via FFmpeg loudnorm filter. The first wired path
+     * uses FFmpeg's single-pass linear analysis; exact two-pass JSON analysis
+     * can layer onto [execute] without changing callers.
      */
     suspend fun normalizeLoudness(
         inputFile: File,
@@ -108,20 +118,34 @@ class FFmpegEngine @Inject constructor(
         truePeakDb: Float = -1f,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "normalizeLoudness: stub -- requires FFmpeg Android dependency")
-        false
+        executeArguments(
+            listOf(
+                "-y",
+                "-i", inputFile.absolutePath,
+                "-af", "loudnorm=I=${targetLufs}:TP=${truePeakDb}:LRA=11",
+                "-c:v", "copy",
+                outputFile.absolutePath
+            ),
+            progressDurationMs = mediaDurationMs(inputFile),
+            onProgress = onProgress
+        ) == 0
     }
 
     /**
      * Check if an FFmpeg Android library is available at runtime.
      *
-     * Uses reflection so this engine can be queried before the dep is wired
-     * (see class docstring for the `ffmpeg-kit-16kb:6.1.1` activation path).
+     * Uses reflection so this engine can still be queried if a release flavor
+     * excludes FFmpeg. Plain JVM unit tests intentionally return false because
+     * the native FFmpegKit libraries are Android-only.
      * Once wired, callers can use this gate to choose between Media3 Transformer
      * and FFmpeg paths without an explicit feature flag.
      */
     fun isAvailable(): Boolean {
         if (cachedAvailability != null) return cachedAvailability == true
+        if (!isAndroidRuntime()) {
+            cachedAvailability = false
+            return false
+        }
         val available = try {
             // Both arthenica/ffmpeg-kit and its 16 KB-aligned successor share the
             // `com.arthenica.ffmpegkit.FFmpegKit` entry point — checking either
@@ -148,13 +172,23 @@ class FFmpegEngine @Inject constructor(
      * FFmpeg emits a warning but still succeeds. ~50x faster than Transformer.
      */
     suspend fun streamCopyTrim(
-        inputUri: android.net.Uri,
+        inputUri: Uri,
         startMs: Long,
         endMs: Long,
         outputPath: String
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "streamCopyTrim: stub $inputUri [$startMs..$endMs] -> $outputPath")
-        false
+        if (endMs <= startMs) return@withContext false
+        executeArguments(
+            listOf(
+                "-y",
+                "-ss", msToSeconds(startMs),
+                "-to", msToSeconds(endMs),
+                "-i", ffmpegInput(inputUri),
+                "-c", "copy",
+                "-avoid_negative_ts", "make_zero",
+                outputPath
+            )
+        ) == 0
     }
 
     /**
@@ -165,8 +199,28 @@ class FFmpegEngine @Inject constructor(
         outputFile: File,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "concat: stub -- requires FFmpeg Android dependency")
-        false
+        if (inputFiles.isEmpty()) return@withContext false
+        val listFile = File.createTempFile("novacut-ffmpeg-concat-", ".txt", context.cacheDir)
+        try {
+            listFile.writeText(
+                inputFiles.joinToString(separator = "\n") { file ->
+                    "file '${escapeConcatPath(file.absolutePath)}'"
+                }
+            )
+            executeArguments(
+                listOf(
+                    "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", listFile.absolutePath,
+                    "-c", "copy",
+                    outputFile.absolutePath
+                ),
+                onProgress = onProgress
+            ) == 0
+        } finally {
+            listFile.delete()
+        }
     }
 
     /**
@@ -178,9 +232,128 @@ class FFmpegEngine @Inject constructor(
         speedFactor: Float,
         onProgress: (Float) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "changeSpeed: stub -- requires FFmpeg Android dependency")
-        false
+        if (speedFactor <= 0f) return@withContext false
+        val setPts = String.format(Locale.US, "%.6f", 1f / speedFactor)
+        val filter = "[0:v]setpts=${setPts}*PTS[v];[0:a]${buildAtempoChain(speedFactor)}[a]"
+        executeArguments(
+            listOf(
+                "-y",
+                "-i", inputFile.absolutePath,
+                "-filter_complex", filter,
+                "-map", "[v]",
+                "-map", "[a]",
+                outputFile.absolutePath
+            ),
+            progressDurationMs = mediaDurationMs(inputFile),
+            onProgress = onProgress
+        ) == 0
     }
+
+    private suspend fun executeCommand(
+        command: String,
+        progressDurationMs: Long? = null,
+        onProgress: (Float) -> Unit = {}
+    ): Int {
+        if (!isAvailable()) {
+            Log.d(TAG, "executeCommand: FFmpeg Android dependency unavailable")
+            return -1
+        }
+        return suspendCancellableCoroutine { continuation ->
+            val session = FFmpegKit.executeAsync(
+                command,
+                { completed ->
+                    val code = returnCodeValue(completed.returnCode)
+                    if (code == 0) notifyProgress(onProgress, 1f)
+                    if (continuation.isActive) continuation.resume(code)
+                },
+                { log ->
+                    val message = log.message?.trim().orEmpty()
+                    if (message.isNotEmpty()) Log.v(TAG, message)
+                },
+                { stats ->
+                    progressFromStats(stats.time, progressDurationMs)?.let { notifyProgress(onProgress, it) }
+                }
+            )
+            continuation.invokeOnCancellation { session.cancel() }
+        }
+    }
+
+    private suspend fun executeArguments(
+        arguments: List<String>,
+        progressDurationMs: Long? = null,
+        onProgress: (Float) -> Unit = {}
+    ): Int {
+        if (!isAvailable()) {
+            Log.d(TAG, "executeArguments: FFmpeg Android dependency unavailable")
+            return -1
+        }
+        return suspendCancellableCoroutine { continuation ->
+            val session = FFmpegKit.executeWithArgumentsAsync(
+                arguments.toTypedArray(),
+                { completed ->
+                    val code = returnCodeValue(completed.returnCode)
+                    if (code == 0) notifyProgress(onProgress, 1f)
+                    if (continuation.isActive) continuation.resume(code)
+                },
+                { log ->
+                    val message = log.message?.trim().orEmpty()
+                    if (message.isNotEmpty()) Log.v(TAG, message)
+                },
+                { stats ->
+                    progressFromStats(stats.time, progressDurationMs)?.let { notifyProgress(onProgress, it) }
+                }
+            )
+            continuation.invokeOnCancellation { session.cancel() }
+        }
+    }
+
+    private fun returnCodeValue(returnCode: ReturnCode?): Int = when {
+        returnCode != null && ReturnCode.isSuccess(returnCode) -> 0
+        returnCode != null -> returnCode.value
+        else -> -1
+    }
+
+    private fun progressFromStats(timeMs: Double, durationMs: Long?): Float? {
+        val duration = durationMs?.takeIf { it > 0L } ?: return null
+        if (timeMs.isNaN() || timeMs.isInfinite() || timeMs <= 0.0) return null
+        return (timeMs / duration.toDouble()).toFloat().coerceIn(0f, 0.99f)
+    }
+
+    private fun notifyProgress(onProgress: (Float) -> Unit, progress: Float) {
+        runCatching { onProgress(progress.coerceIn(0f, 1f)) }
+            .onFailure { Log.w(TAG, "FFmpeg progress callback failed", it) }
+    }
+
+    private fun isAndroidRuntime(): Boolean {
+        return System.getProperty("java.vm.name")
+            .orEmpty()
+            .contains("dalvik", ignoreCase = true)
+    }
+
+    private fun ffmpegInput(uri: Uri): String = when (uri.scheme?.lowercase()) {
+        "content" -> FFmpegKitConfig.getSafParameterForRead(context, uri)
+        "file" -> uri.path ?: uri.toString()
+        else -> uri.toString()
+    }
+
+    private fun mediaDurationMs(file: File): Long? {
+        if (!file.exists()) return null
+        // Duration probing will move to FFprobe once callers need precise
+        // progress for every FFmpeg path. A null duration still gives
+        // completion progress without risking slow preflight work.
+        return null
+    }
+
+    private fun escapeFilterPath(path: String): String {
+        return path
+            .replace("\\", "\\\\")
+            .replace(":", "\\:")
+            .replace("'", "\\'")
+    }
+
+    private fun escapeConcatPath(path: String): String = path.replace("'", "'\\''")
+
+    private fun msToSeconds(ms: Long): String = String.format(Locale.US, "%.3f", ms / 1000.0)
 
     /**
      * Build atempo filter chain -- FFmpeg atempo only supports 0.5-100.0 per instance,
@@ -197,7 +370,7 @@ class FFmpegEngine @Inject constructor(
             parts.add("atempo=0.5")
             remaining /= 0.5
         }
-        parts.add("atempo=${"%.4f".format(remaining)}")
+        parts.add("atempo=${String.format(Locale.US, "%.4f", remaining)}")
         return parts.joinToString(",")
     }
 
