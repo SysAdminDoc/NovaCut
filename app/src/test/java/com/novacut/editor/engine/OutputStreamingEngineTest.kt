@@ -155,4 +155,124 @@ class OutputStreamingEngineTest {
     fun isAvailable_returnsFalseWhenNoStreamingLibraryOnClasspath() {
         assertEquals(false, engine.isAvailable())
     }
+
+    // --- R8.15 LNP classification ---
+
+    @Test
+    fun classifyNetworkScope_publicInternetHostnames() {
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.PUBLIC_INTERNET,
+            engine.classifyNetworkScope("rtmp://live.twitch.tv/app/streamkey")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.PUBLIC_INTERNET,
+            engine.classifyNetworkScope("rtmps://a.rtmp.youtube.com/live2/streamkey")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.PUBLIC_INTERNET,
+            engine.classifyNetworkScope("srt://ingest.example.com:9999?streamid=foo")
+        )
+    }
+
+    @Test
+    fun classifyNetworkScope_rfc1918BlocksAreLocalLan() {
+        listOf(
+            "rtmp://10.0.0.5/app",
+            "rtmp://10.255.255.254/app",
+            "rtmp://172.16.0.10/app",
+            "rtmp://172.31.255.254/app",
+            "rtmp://192.168.1.42/app",
+            "rtmp://192.168.0.1/app",
+            "rtsp://169.254.1.2/stream"
+        ).forEach { url ->
+            assertEquals(
+                "URL $url should classify as LOCAL_LAN",
+                OutputStreamingEngine.LocalNetworkScope.LOCAL_LAN,
+                engine.classifyNetworkScope(url)
+            )
+        }
+    }
+
+    @Test
+    fun classifyNetworkScope_multicastAddresses() {
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.MULTICAST,
+            engine.classifyNetworkScope("rist://224.0.0.1:5000")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.MULTICAST,
+            engine.classifyNetworkScope("rist://239.255.255.250:1900")
+        )
+    }
+
+    @Test
+    fun classifyNetworkScope_loopbackAddresses() {
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOOPBACK,
+            engine.classifyNetworkScope("rtmp://localhost:1935/app")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOOPBACK,
+            engine.classifyNetworkScope("rtmp://127.0.0.1:1935/app")
+        )
+    }
+
+    @Test
+    fun classifyNetworkScope_ipv6HeuristicsCoverLoopbackLinkLocalAndMulticast() {
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOOPBACK,
+            engine.classifyNetworkScope("rtmp://[::1]:1935/app")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOCAL_LAN,
+            engine.classifyNetworkScope("rtmp://[fe80::1]:1935/app")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOCAL_LAN,
+            engine.classifyNetworkScope("rtmp://[fd00::1]:1935/app")
+        )
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.MULTICAST,
+            engine.classifyNetworkScope("rist://[ff02::1]:5000")
+        )
+    }
+
+    @Test
+    fun classifyNetworkScope_mdnsHostnamesAreLocalLan() {
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOCAL_LAN,
+            engine.classifyNetworkScope("rtmp://stream.local/app")
+        )
+    }
+
+    @Test
+    fun classifyNetworkScope_userInfoIsStripped() {
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.LOCAL_LAN,
+            engine.classifyNetworkScope("rtmp://user:pass@192.168.5.10:1935/app")
+        )
+    }
+
+    @Test
+    fun classifyNetworkScope_malformedUrlsFallToPublic() {
+        // No scheme separator.
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.PUBLIC_INTERNET,
+            engine.classifyNetworkScope("not-a-url")
+        )
+        // Empty authority.
+        assertEquals(
+            OutputStreamingEngine.LocalNetworkScope.PUBLIC_INTERNET,
+            engine.classifyNetworkScope("rtmp:///app")
+        )
+    }
+
+    @Test
+    fun requiresLocalNetworkPermission_truthTable() {
+        // True for LAN + multicast, false for public + loopback.
+        assertTrue(engine.requiresLocalNetworkPermission("rtmp://192.168.1.5/app"))
+        assertTrue(engine.requiresLocalNetworkPermission("rist://224.0.0.1:5000"))
+        assertEquals(false, engine.requiresLocalNetworkPermission("rtmp://live.twitch.tv/app"))
+        assertEquals(false, engine.requiresLocalNetworkPermission("rtmp://localhost/app"))
+    }
 }
