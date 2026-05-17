@@ -12,6 +12,7 @@ coroutines = "1.11.0"
 lifecycle = "2.10.0"
 navigation = "2.8.5"
 activity = "1.9.3"
+window = "1.5.1"
 coreKtx = "1.15.0"
 coil = "2.7.0"
 datastore = "1.2.1"
@@ -26,6 +27,7 @@ json = "20240303"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity" }
+androidx-window = { group = "androidx.window", name = "window", version.ref = "window" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }

@@ -428,6 +428,7 @@ fun EditorScreen(
     val oneHandedMode by viewModel.oneHandedMode.collectAsStateWithLifecycle()
     val desktopOverride by viewModel.desktopOverride.collectAsStateWithLifecycle()
     val layoutMode = rememberLayoutMode(oneHandedMode, desktopOverride)
+    val isTabletopPosture = LocalTabletopPosture.current
     val whisperState by viewModel.whisperModelState.collectAsStateWithLifecycle()
     val whisperProgress by viewModel.whisperDownloadProgress.collectAsStateWithLifecycle()
     val segmentationState by viewModel.segmentationModelState.collectAsStateWithLifecycle()
@@ -502,11 +503,13 @@ fun EditorScreen(
     val adaptiveLayoutDecision = remember(
         configuration.screenWidthDp,
         configuration.screenHeightDp,
-        layoutMode
+        layoutMode,
+        isTabletopPosture
     ) {
         AdaptiveEditorLayoutPolicy.decide(
             widthDp = configuration.screenWidthDp,
             heightDp = configuration.screenHeightDp,
+            isTabletop = isTabletopPosture,
             desktopLike = layoutMode == LayoutMode.DESKTOP
         )
     }
@@ -514,6 +517,7 @@ fun EditorScreen(
     val isCompactEditorHeight = adaptiveLayoutDecision.compactTimeline || screenHeightDp < 820
     val selectedPreviewHeight = when {
         !isClipMode -> 0.dp
+        adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TABLETOP_SPLIT -> 360.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.THREE_PANE -> 300.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TWO_PANE -> 280.dp
         isToolPanelExpanded -> 154.dp
@@ -521,6 +525,7 @@ fun EditorScreen(
         else -> 252.dp
     }
     val timelineMinHeight = when {
+        adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TABLETOP_SPLIT -> 280.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.THREE_PANE -> 280.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TWO_PANE -> 252.dp
         isClipMode && isToolPanelExpanded -> 184.dp
@@ -529,6 +534,7 @@ fun EditorScreen(
         else -> 240.dp
     }
     val timelineMaxHeight = when {
+        adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TABLETOP_SPLIT -> 380.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.THREE_PANE -> 420.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TWO_PANE -> 360.dp
         isClipMode && isToolPanelExpanded -> 208.dp

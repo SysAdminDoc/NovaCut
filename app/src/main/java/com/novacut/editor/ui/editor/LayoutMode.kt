@@ -29,6 +29,7 @@ enum class LayoutMode {
 }
 
 val LocalLayoutMode = staticCompositionLocalOf { LayoutMode.PHONE }
+val LocalTabletopPosture = staticCompositionLocalOf { false }
 
 @Composable
 fun rememberLayoutMode(
