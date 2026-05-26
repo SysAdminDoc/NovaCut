@@ -62,17 +62,31 @@ Single source of truth for the in-flight batch. Pulled forward from [RESEARCH_FE
 ### Batch 16 — RTL bidi text policy
 - [x] **`BidiTextPolicy` + `BidiFormatter.unicodeWrap` wiring** — Engine: pure Unicode first-strong classifier with 13 tests covering every RTL block Android renders. UI: `StrokedTextBitmapOverlay.drawBitmap(rawText)` and `ExportTextOverlay.getText(...)` now gate `BidiFormatter.getInstance().unicodeWrap(...)` on `BidiTextPolicy.needsBidiWrap(text)` — pure-ASCII captions skip the wrap so the common path stays allocation-free; any caption with a strong RTL character gets correct paragraph direction + alignment via the injected U+200E / U+200F marks.
 
+### Batch 23 — Privacy Dashboard panel
+- [x] **`PrivacyDashboardPanel` composable** — new `ui/settings/PrivacyDashboardPanel.kt` consumes `PrivacyDashboard.groupForDisplay()` directly. Risk-ordered sections (Cloud + Telemetry / Stored on this device / Opt-in features) with section-specific icon + accent (Cloud/Peach, Computer/Sky, LockOpen/Green). Per-entry cards show category name + storage + retention + collected-by + control summary. `onEntryClicked` callback for the host to wire Export / Delete / Opt-out actions.
+
+### Batch 24 — Caption translation panel
+- [x] **`CaptionTranslationPanel` composable** — new `ui/editor/CaptionTranslationPanel.kt` consumes `CaptionTranslationEngine.EditorRow` directly. Target-language chip row + quality chip (Excellent/Green, Good/Sky, Fair/Yellow, Experimental/Peach, Unknown/Subtext0) + `LazyColumn` of source/target row cards with inline `BasicTextField` editing, per-row Regenerate button, and status chip per `EditorRowState`. Host owns the engine and threads `onUserEdit` / `onRegenerate` back through `engine.applyUserEdit` / `engine.markRegeneratePending`.
+
+### Batch 25 — CutAssistantFilterChips wired
+- [x] **Adoption in `CutAssistantReviewPanel`** — chip row inserted above the proposal `LazyColumn`. State managed via `mutableStateOf<Set<ProposalCategory>>(ProposalCategory.entries.toSet())` (all-on default). Filtering goes through `SilenceDetectionEngine().filterByCategory(review.proposals, enabledCategories)`. Existing silence/filler count pills retained — chips supersede the labels but the pill row is a separate UX element that needs a visual review pass before deletion.
+
+### Batch 26 — AiUseConfidenceRow wired
+- [x] **Adoption in `ExportSheet`** — one call site added directly after `DeviceTierOutlook` inside the `videoModeEnabled` branch. Same `aiUsageEntries` memo already used by the existing disclosure summary feeds `AiUsageLedger.summarizeForChips`. Empty ledger renders the "No AI assistance recorded" empty state.
+
+### Batch 27 — Compound nav breadcrumb
+- [x] **`CompoundNavBreadcrumb` composable** — new `ui/editor/CompoundNavBreadcrumb.kt` consumes `CompoundNavStack.formatBreadcrumb(...)`. Hidden at root depth; tap-anywhere-to-exit (leading back arrow + full path label). Mauve accent matches the editor's compound clip badge convention. Predictive-back integration is the remaining wiring step at the EditorScreen level — gate the existing `BackHandler` on `stack.depth > 0`.
+
 ### Defer to a later pull
 - **Tier A.10 Oboe resampler activation** — needs dep wire + 16 KB AAR verify; pair with audio mixer regression suite.
 - **Adjustment-layer track surface (Tier C.11 UI)** — needs Room schema v7 + autosave compat; M complexity.
 - **Keyframe bezier graph panel (Tier C.12 UI)** — needs touch-handle UX pass; M complexity.
-- **Compound nav gesture wiring** — RadialActionMenu "Open compound" entry + breadcrumb chip composable + EditorViewModel `openCompoundClip(clipId)` orchestrator + predictive-back gate. Needs Timeline.kt (127 KB) edit; deserves a focused IDE pass.
-- **Caption translation panel** — Compose two-up rows + language chip + per-row Regenerate consuming `CaptionTranslationEngine.buildEditorRows`. Belongs alongside the existing `CaptionEditorPanel`.
-- **PrivacyDashboardPanel composable** — adopts `PrivacyDashboard.groupForDisplay()` / `controlSummary()`. Sits in Settings.
+- **Compound nav gesture wiring** — RadialActionMenu "Open compound" entry + EditorViewModel `openCompoundClip(clipId)` orchestrator + predictive-back gate (breadcrumb composable now ready to render). Needs Timeline.kt (127 KB) edit; deserves a focused IDE pass.
+- **Caption translation panel host wiring** — `EditorViewModel` needs `captionTranslationState` + `applyTranslationEdit(idx, text)` / `regenerateTranslation(idx)` so the panel can be dropped into the existing Captions tab. Engine + composable are both ready.
+- **`PrivacyDashboardPanel` adoption in Settings** — add a Settings row → opens the new panel. One call site in `SettingsScreen.kt`.
 - **B.5 mixed-render orchestrator** — `VideoEngine.exportMixed(plan)` that consumes `MixedRenderComposer.CompositionPlan` and calls `StreamCopyExportEngine` / Transformer / `FFmpegEngine.concat()` per run. Needs Android-runtime verification of FFmpeg concat path.
 - **`AiModelRequirementSheet` adoption** — replace the existing model-gate toast surface in `AiToolsDelegate`'s `runAiTool` path with a sheet call site that consumes `AiToolRequirements.requirementFor(toolId)`.
-- **`AiUseConfidenceRow` adoption** — add one call site in `ExportSheet.kt` alongside the existing color/HDR confidence row band.
-- **`CutAssistantFilterChips` adoption** — add to the `CutAssistantReviewPanel` header band; delete `FillerRemovalPanel`; reroute `AiToolsDelegate`'s filler-removal action to open Cut Assistant Review with `enabled = { SINGLE_WORD_FILLER, MULTI_WORD_FILLER }` pre-selected.
+- **`FillerRemovalPanel` deletion + re-route** — `AiToolsDelegate`'s filler-removal action should now open `CutAssistantReviewPanel` with `enabled = { SINGLE_WORD_FILLER, MULTI_WORD_FILLER }` pre-selected. Filler panel becomes deletable once routes migrate.
 
 ---
 
