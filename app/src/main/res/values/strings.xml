@@ -57,6 +57,15 @@
     <string name="export_fast_trim_description">Use stream-copy for untouched single-source trims and fall back to a full render when edits require it.</string>
     <string name="export_color_confidence_title">Color / HDR confidence</string>
     <string name="export_color_confidence_description">NovaCut checks the chosen codec, metadata intent, and advertised device limits before export.</string>
+
+    <!-- AI use confidence row (Highest-Value #2: pre-export AI provenance preview) -->
+    <string name="export_ai_use_title">AI use</string>
+    <string name="export_ai_use_description">Summarises every AI-assisted edit the export will declare in its provenance sidecar.</string>
+    <string name="export_ai_use_empty">No AI assistance recorded for this project.</string>
+    <string name="export_ai_use_chip_format">%1$s · %2$s</string>
+    <string name="export_ai_use_severity_required">Disclose</string>
+    <string name="export_ai_use_severity_recommended">Recommended</string>
+    <string name="export_ai_use_severity_internal">Internal</string>
     <string name="export_device_tier_title">Device tier: %1$s</string>
     <string name="export_hardware_hevc">Hardware HEVC</string>
     <string name="export_hardware_av1">Hardware AV1</string>
