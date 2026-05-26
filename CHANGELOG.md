@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+### Autonomous roadmap continuation — 2026-05-25 (Loop 2)
+
+Four-batch follow-up loop. Picks up after the first 2026-05-25 loop with
+deferred items from `ROADMAP.md`'s "Defer to a later pull" section plus
+remaining UI-helper data layers. Pure engine code only — every batch is
+JVM-testable without an Android runtime; Compose UI integrations remain
+deferred. All commits local on master only — origin/master is
+parallel-history, do not push from this VM.
+
+- **Batch 13 — B.5 mixed-render composer plan.** New `MixedRenderComposer`
+  takes a `List<SmartRenderEngine.RenderRun>` (output of `planRuns`) and
+  emits a `CompositionPlan(benefit, runs, concat, issues)`. Decision table:
+  empty input → NoBenefit + warning; single run → SingleRun, run output
+  named as the final output, no concat; all re-encode runs → NoBenefit
+  (caller should use the existing whole-timeline Transformer path);
+  mixed copy+re-encode → Mixed with `ConcatStep(inputs, outputFileName)`.
+  Per-run output names encode index + engine tag (`vlog-run00-cp.mp4` /
+  `-run01-re.mp4`). Short stream-copy runs (<250 ms by default) emit a
+  keyframe-alignment warning. `sanitiseStem(...)` produces FAT32-safe
+  stems capped at 48 chars. 10 new tests in `MixedRenderComposerTest`.
+  Commit `e771dda`.
+- **Batch 14 — ProjectShortcutPlanner.** Pure planner for the dynamic
+  launcher long-press shortcuts that complement the static
+  `res/xml/shortcuts.xml` entries. `planDynamic(State)` returns the
+  ordered list the orchestrator should pass to
+  `ShortcutManagerCompat.setDynamicShortcuts`. Decision table: fresh
+  install → empty; user opted out → empty; last project without recovery
+  → Open-last only; last project + recovery → Resume ranked first, Open
+  second. Truncates project names to 25 chars for the chip label,
+  bundles project-id in the intent extras, caps at MAX_DYNAMIC_SHORTCUTS
+  (= 2) so dynamic + static together stay under the launcher's
+  per-activity ceiling. 9 new tests in `ProjectShortcutPlannerTest`.
+  Commit `0db40c3`.
+- **Batch 15 — PrivacyDashboard display helpers.** New
+  `Section { CLOUD_AND_TELEMETRY, ON_DEVICE_COLLECTED, ON_DEVICE_OPT_IN }`
+  + `sectionFor(entry)` + `sortForDisplay()` (cloud rows first, then
+  collected-by-default, then opt-in; original Category enum order
+  preserved within sections) + `groupForDisplay()` (LinkedHashMap with
+  empty sections omitted) + `controlSummary(entry)` ("Export · Delete ·
+  Opt out" / "Read-only"). 8 new tests in `PrivacyDashboardDisplayTest`
+  including a guard that every cloud category offers an opt-out toggle.
+  Commit `d5e20a6`.
+- **Batch 16 — RTL bidi text policy.** New `BidiTextPolicy` first-strong
+  Unicode classifier returns `Direction { LTR, RTL, MIXED }`. Coverage of
+  every RTL Unicode block Android renders today: Hebrew + Hebrew
+  Presentation Forms, Arabic + Arabic Supplement, NKo, Syriac, Thaana,
+  Arabic Presentation Forms A and B. `recommendAlignment(direction)` maps
+  RTL → END and LTR/MIXED → START. Cheap `needsBidiWrap(text)` predicate
+  so the overlay renderer skips `BidiFormatter.unicodeWrap(...)` on the
+  common ASCII caption path. 13 new tests in `BidiTextPolicyTest`.
+  Commit `594518c`.
+
 ### Autonomous roadmap continuation — 2026-05-25
 
 Twelve-batch loop. Engine layer for every Highest-Value item in

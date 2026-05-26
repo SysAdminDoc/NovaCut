@@ -50,13 +50,23 @@ Single source of truth for the in-flight batch. Pulled forward from [RESEARCH_FE
 ### Batch 12 — Project-wide working colour space + display transform
 - [x] **`ProjectColorPolicy` data model shipped** — Held separately from the Room-backed `Project` entity so adopting today doesn't force a schema migration (autosave JSON persists it via the existing `peekSchemaVersion` future-gate). Two enums: `WorkingColorSpace { SDR_BT709, HDR10_BT2020_PQ, HDR_HLG, ACES_AP1 }` (each with `isHdr` flag) and `DisplayTransform { NONE, BT2390_TONEMAP, HABLE_TONEMAP }`. Pure helpers: `coherence()` returns the {COHERENT, SDR_TONEMAP_NOOP, HDR_PASSTHROUGH, HDR_TO_SDR_TONEMAP} decision table, `deliversHdr` predicate drives the future HDR badge. 7 new tests in `ProjectColorPolicyTest` lock the coherence table + enum drift guard. `ExportColorConfidenceEngine` consumer wiring + Settings panel follow when Room schema v7 lands.
 
+### Batch 13 — B.5 mixed-render composer (engine layer)
+- [~] **`MixedRenderComposer` shipped** — `plan(runs, projectStem, finalOutputName, ...)` returns a `CompositionPlan(benefit, runs, concat, issues)`. Benefit enum routes orchestration: SingleRun skips concat; NoBenefit shortcuts to whole-timeline Transformer; Mixed emits per-run + concat. Short stream-copy runs flagged with keyframe-alignment warning. 10 new tests in `MixedRenderComposerTest`. `VideoEngine.exportMixed(plan)` orchestrator that consumes a plan + calls `StreamCopyExportEngine` / Transformer / `FFmpegEngine.concat()` per run is the remaining wire-up.
+
+### Batch 14 — Dynamic launcher shortcuts
+- [~] **`ProjectShortcutPlanner` shipped** — `planDynamic(State)` returns the dynamic-shortcut list the launcher should show right now. Cases locked: fresh install → empty; opted out → empty; last project + recovery → Resume ranked first, Open second; cap at `MAX_DYNAMIC_SHORTCUTS = 2`. 9 new tests in `ProjectShortcutPlannerTest`. The Android-only side effect (`ShortcutManagerCompat.setDynamicShortcuts` in `ProjectListViewModel`) is a follow-up that consumes the planner output.
+
+### Batch 15 — Privacy Dashboard display helpers
+- [~] **Display-layer helpers shipped** — `PrivacyDashboard.Section { CLOUD_AND_TELEMETRY, ON_DEVICE_COLLECTED, ON_DEVICE_OPT_IN }` + `sortForDisplay()` (risk-ordered: cloud first), `groupForDisplay()` (LinkedHashMap, empty sections omitted), `controlSummary(entry)`. 8 new tests in `PrivacyDashboardDisplayTest` including the invariant that every cloud category offers an opt-out toggle. Compose `PrivacyDashboardPanel` in Settings is the remaining UI step.
+
+### Batch 16 — RTL bidi text policy
+- [~] **`BidiTextPolicy` engine shipped** — pure Unicode first-strong classifier covering every RTL block Android renders today: Hebrew, Hebrew Presentation Forms, Arabic, Arabic Supplement, NKo, Syriac, Thaana, Arabic Presentation Forms A and B. `Direction { LTR, RTL, MIXED }` + `recommendAlignment(direction)` + cheap `needsBidiWrap(text)` predicate so the overlay renderer skips wrapping ASCII-only captions. 13 new tests in `BidiTextPolicyTest`. The Android side (`BidiFormatter.unicodeWrap(...)` call in `StrokedTextBitmapOverlay` / `ExportTextOverlay`) is the remaining wire-up.
+
 ### Defer to a later pull
-- Tier B.5 mixed copy/re-encode composer — depends on FFmpeg concat path + per-range badges in ExportSheet; M complexity, deserves its own loop.
 - Tier A.10 Oboe resampler activation — needs dep wire + 16 KB AAR verify; pair with audio mixer regression suite.
 - Adjustment-layer track surface (Tier C.11 UI) — needs Room schema v7 + autosave compat; M complexity.
 - Keyframe bezier graph panel (Tier C.12 UI) — needs touch-handle UX pass; M complexity.
-- RTL bidi text in overlays — needs golden-text test harness; M complexity.
-- Privacy Dashboard panel (R5.5c UI) — gated on Settings UX review.
+- Compose UI integrations for the engine layers shipped above (B.5 orchestrator, dynamic shortcut push, Privacy Dashboard panel, BidiFormatter wrap call, ExportSheet AI-use row, AiModelRequirementSheet, Compound nav gesture, Caption translation panel, Cut Assistant chip row + FillerRemovalPanel deletion) — each is a single focused UI commit consuming a now-frozen data contract.
 
 ---
 
