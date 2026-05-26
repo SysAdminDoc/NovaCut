@@ -70,6 +70,7 @@ import com.novacut.editor.ui.theme.Spacing
 import com.novacut.editor.ui.theme.TouchTarget
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
@@ -477,6 +478,17 @@ fun EditorScreen(
                 Log.w("EditorScreen", "Could not persist relink media permission", e)
             }
             viewModel.relinkMedia(oldUri, uri)
+        }
+    }
+
+    // Sticker image import — direct Photo Picker (ImageOnly) so users don't have
+    // to navigate the full MediaPicker just for a single overlay image. Selected
+    // Photos compatibility is automatic with PickVisualMedia on API 33+.
+    val stickerImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.addImageOverlay(uri, com.novacut.editor.model.ImageOverlayType.STICKER)
         }
     }
     LaunchedEffect(showLutPicker) {
@@ -2191,7 +2203,13 @@ fun EditorScreen(
                 },
                 onImportFromGallery = {
                     viewModel.hideStickerPicker()
-                    viewModel.showMediaPicker()
+                    // R8.6 / Highest-Value #9: route image stickers through the
+                    // system Photo Picker directly rather than the full MediaPicker
+                    // tab sheet. Per-URI grants survive background kill and no
+                    // READ_MEDIA_IMAGES permission is requested.
+                    stickerImageLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
                 },
                 onClose = viewModel::hideStickerPicker
             )
