@@ -32,7 +32,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -45,7 +48,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
 import com.novacut.editor.engine.CutAssistantEngine
+import com.novacut.editor.engine.SilenceDetectionEngine
 import com.novacut.editor.engine.SilenceDetectionEngine.CutProposal
+import com.novacut.editor.engine.SilenceDetectionEngine.ProposalCategory
 import com.novacut.editor.model.Clip
 import com.novacut.editor.model.Track
 import com.novacut.editor.ui.theme.Mocha
@@ -155,6 +160,17 @@ fun CutAssistantReviewPanel(
         if (review.proposals.isEmpty()) {
             CutAssistantEmptyState(onClose = onClose)
         } else {
+            // Highest-Value #6 — unified Cut Assistant review with chip
+            // bucket filtering. Default all-on so first-open shows every
+            // proposal; the user narrows via the chip row.
+            var enabledCategories by remember(review.proposals) {
+                mutableStateOf(ProposalCategory.entries.toSet())
+            }
+            val filterEngine = remember { SilenceDetectionEngine() }
+            val visibleProposals = remember(review.proposals, enabledCategories) {
+                filterEngine.filterByCategory(review.proposals, enabledCategories)
+            }
+
             PremiumPanelCard(accent = Mocha.Blue) {
                 Text(
                     text = stringResource(R.string.cut_assistant_review_title),
@@ -167,6 +183,27 @@ fun CutAssistantReviewPanel(
                     color = Mocha.Subtext0
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+                CutAssistantFilterChips(
+                    proposals = review.proposals,
+                    enabled = enabledCategories,
+                    onToggle = { cat ->
+                        enabledCategories = if (cat in enabledCategories) {
+                            enabledCategories - cat
+                        } else {
+                            enabledCategories + cat
+                        }
+                    },
+                    onToggleAll = {
+                        enabledCategories =
+                            if (enabledCategories.size == ProposalCategory.entries.size) {
+                                emptySet()
+                            } else {
+                                ProposalCategory.entries.toSet()
+                            }
+                    },
+                )
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -174,7 +211,7 @@ fun CutAssistantReviewPanel(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
-                        items = review.proposals,
+                        items = visibleProposals,
                         key = { it.id }
                     ) { proposal ->
                         CutProposalReviewCard(
