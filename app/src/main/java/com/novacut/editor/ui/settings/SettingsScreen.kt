@@ -81,6 +81,7 @@ fun SettingsScreen(
     val canRemoveWhisperModel = whisperModelState == WhisperModelState.READY && aiModelStorage.whisperBytes > 0L
     val canRemoveSegmentationModel = segmentationModelState == SegmentationModelState.READY && aiModelStorage.segmentationBytes > 0L
     var pendingAiModelRemoval by remember { mutableStateOf<SettingsAiModelRemovalTarget?>(null) }
+    var showPrivacyDashboard by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshAiModelStorage()
@@ -469,6 +470,23 @@ fun SettingsScreen(
             )
         }
 
+        // Privacy (R5.5c UI) — opens the PrivacyDashboardPanel in a dialog.
+        // Engine helpers (groupForDisplay / controlSummary) are pure so the
+        // panel re-renders without any view-model state today.
+        SettingsSection(
+            title = stringResource(R.string.settings_privacy_section_title),
+            description = stringResource(R.string.settings_privacy_section_description)
+        ) {
+            SettingsActionRow(
+                icon = Icons.Default.Shield,
+                accent = Mocha.Mauve,
+                label = stringResource(R.string.settings_privacy_open_label),
+                description = stringResource(R.string.settings_privacy_open_description),
+                actionLabel = stringResource(R.string.settings_privacy_open_action),
+                onClick = { showPrivacyDashboard = true }
+            )
+        }
+
         // About
         SettingsSection(
             title = stringResource(R.string.settings_about),
@@ -498,6 +516,35 @@ fun SettingsScreen(
                     pendingAiModelRemoval = null
                 }
             )
+        }
+
+        if (showPrivacyDashboard) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showPrivacyDashboard = false }
+            ) {
+                androidx.compose.material3.Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(Radius.xxl),
+                    color = Mocha.PanelHighest,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 640.dp)
+                ) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        PrivacyDashboardPanel()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            NovaCutSecondaryButton(
+                                text = stringResource(R.string.settings_privacy_close),
+                                onClick = { showPrivacyDashboard = false }
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

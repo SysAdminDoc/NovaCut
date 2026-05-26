@@ -65,6 +65,12 @@
     <string name="compound_breadcrumb_exit_cd">Exit compound clip</string>
 
     <!-- Privacy Dashboard panel (R5.5c UI) -->
+    <string name="settings_privacy_section_title">Privacy</string>
+    <string name="settings_privacy_section_description">Review what NovaCut keeps on this device and what it never sends anywhere.</string>
+    <string name="settings_privacy_open_label">Open privacy dashboard</string>
+    <string name="settings_privacy_open_description">Tap to see every category NovaCut collects, where it lives, and how to control it.</string>
+    <string name="settings_privacy_open_action">Open</string>
+    <string name="settings_privacy_close">Close</string>
     <string name="privacy_dashboard_title">Privacy</string>
     <string name="privacy_dashboard_subtitle">What NovaCut collects, where it lives, and how to control it.</string>
     <string name="privacy_dashboard_section_cloud">Cloud and telemetry</string>
