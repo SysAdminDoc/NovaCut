@@ -68,6 +68,85 @@ class DiagnosticExportEngine @Inject constructor(
     )
 
     /**
+     * Optional opt-in payload included in the diagnostic ZIP as
+     * `timeline-shape.json` when the user enables "Include sanitized timeline
+     * shape" in Settings.
+     *
+     * Carries counts only — never clip names, source URIs, captions, transcripts,
+     * file paths, or any other user content. The single ".kt -> .json" boundary
+     * is the [toJsonString] method below; if a future field needs to land here,
+     * verify it adds zero personal data before adding it.
+     *
+     * The motivation is support triage: knowing a stuck-export bug comes from a
+     * timeline with 47 clips on 6 tracks and 23 transitions is much higher
+     * signal than asking the user to share their project file (which we
+     * intentionally never do).
+     */
+    data class TimelineShape(
+        val trackCount: Int,
+        val totalDurationMs: Long,
+        val perTrackClipCount: List<TrackClipCount>,
+        val perEffectTypeCount: Map<String, Int>,
+        val perTransitionTypeCount: Map<String, Int>,
+    ) {
+        data class TrackClipCount(val trackType: String, val clipCount: Int)
+
+        fun toJsonString(): String {
+            // Hand-rolled JSON keeps this file free of an org.json compile-time
+            // dep at the engine layer; org.json is JVM-test-friendly and works
+            // on Android, but adding it would couple the diagnostic engine to
+            // the AutoSave path. Counts-only output is small enough that hand-
+            // rolling is safer than reaching for a JSON library.
+            val sb = StringBuilder()
+            sb.append("{\n")
+            sb.append("  \"schema\": \"com.novacut.timeline-shape.v1\",\n")
+            sb.append("  \"trackCount\": ").append(trackCount).append(",\n")
+            sb.append("  \"totalDurationMs\": ").append(totalDurationMs).append(",\n")
+            sb.append("  \"perTrackClipCount\": [")
+            perTrackClipCount.forEachIndexed { i, c ->
+                if (i > 0) sb.append(",")
+                sb.append("\n    {\"trackType\": \"")
+                    .append(escapeJsonString(c.trackType))
+                    .append("\", \"clipCount\": ")
+                    .append(c.clipCount).append("}")
+            }
+            sb.append("\n  ],\n")
+            appendStringIntMap(sb, "perEffectTypeCount", perEffectTypeCount)
+            sb.append(",\n")
+            appendStringIntMap(sb, "perTransitionTypeCount", perTransitionTypeCount)
+            sb.append("\n}\n")
+            return sb.toString()
+        }
+
+        private fun appendStringIntMap(sb: StringBuilder, name: String, map: Map<String, Int>) {
+            sb.append("  \"").append(name).append("\": {")
+            val entries = map.entries.sortedBy { it.key }
+            entries.forEachIndexed { i, e ->
+                if (i > 0) sb.append(",")
+                sb.append("\n    \"")
+                    .append(escapeJsonString(e.key))
+                    .append("\": ")
+                    .append(e.value)
+            }
+            sb.append("\n  }")
+        }
+
+        private fun escapeJsonString(s: String): String = buildString(s.length + 2) {
+            for (c in s) {
+                when {
+                    c == '\\' -> append("\\\\")
+                    c == '"' -> append("\\\"")
+                    c == '\n' -> append("\\n")
+                    c == '\r' -> append("\\r")
+                    c == '\t' -> append("\\t")
+                    c.code < 0x20 -> append("\\u%04x".format(c.code))
+                    else -> append(c)
+                }
+            }
+        }
+    }
+
+    /**
      * Build the diagnostic ZIP and return the file. The file is placed under
      * `filesDir/diagnostics/diagnostic-{timestamp}.zip`. The directory is
      * created if missing, and any older diagnostic ZIPs are pruned past the
@@ -76,11 +155,15 @@ class DiagnosticExportEngine @Inject constructor(
      * @param modelRegistry optional snapshot of registered models. The Settings
      *   integration pulls this from `ModelDownloadManager`. Pass `emptyList()`
      *   when the engine is exercised in isolation (tests, CLI).
+     * @param timelineShape optional [TimelineShape] summary. When non-null the
+     *   ZIP includes `timeline-shape.json`. The shape carries counts only and
+     *   never includes clip names, URIs, or captions — see [TimelineShape].
      * @param now wall-clock-millis stamp injected for deterministic tests.
      * @param retainCount keep at most this many ZIPs in the diagnostics dir.
      */
     suspend fun exportDiagnosticBundle(
         modelRegistry: List<ModelSnapshot> = emptyList(),
+        timelineShape: TimelineShape? = null,
         now: Long = System.currentTimeMillis(),
         retainCount: Int = 3,
     ): File = withContext(Dispatchers.IO) {
@@ -88,7 +171,7 @@ class DiagnosticExportEngine @Inject constructor(
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
             .format(Date(now))
         val zipFile = File(outDir, "diagnostic-$stamp.zip")
-        writeBundle(zipFile, modelRegistry, now)
+        writeBundle(zipFile, modelRegistry, timelineShape, now)
         pruneOldBundles(outDir, retainCount)
         zipFile
     }
@@ -101,6 +184,7 @@ class DiagnosticExportEngine @Inject constructor(
     fun writeBundle(
         target: File,
         modelRegistry: List<ModelSnapshot>,
+        timelineShape: TimelineShape? = null,
         now: Long = System.currentTimeMillis(),
     ): Long {
         target.parentFile?.mkdirs()
@@ -109,6 +193,9 @@ class DiagnosticExportEngine @Inject constructor(
         entries["device-info.txt"] = buildDeviceInfo().toByteArray(Charsets.UTF_8)
         entries["media-codecs.txt"] = buildMediaCodecSummary().toByteArray(Charsets.UTF_8)
         entries["model-registry.txt"] = buildModelRegistry(modelRegistry).toByteArray(Charsets.UTF_8)
+        if (timelineShape != null) {
+            entries["timeline-shape.json"] = timelineShape.toJsonString().toByteArray(Charsets.UTF_8)
+        }
         entries["logcat-tail.txt"] = buildLogcatTail().toByteArray(Charsets.UTF_8)
         entries["manifest.txt"] = buildManifest(entries).toByteArray(Charsets.UTF_8)
         target.outputStream().use { fos ->
@@ -228,6 +315,53 @@ class DiagnosticExportEngine @Inject constructor(
     companion object {
         const val DIAG_DIR = "diagnostics"
         private const val LOGCAT_LINES = 200
+
+        /**
+         * Build a [TimelineShape] summary from a list of project tracks. Pure
+         * function — no Android dependencies — so the Settings opt-in toggle
+         * can compute the shape on a background thread and pass it to
+         * [exportDiagnosticBundle] without coupling to the editor view model.
+         *
+         * Compound clips are walked once (their immediate `compoundClips`
+         * children are counted as siblings under the same track, so a single
+         * compound clip with three nested clips contributes 4 entries to the
+         * per-track count — matching the user's mental model when they look
+         * at the timeline).
+         */
+        fun summarizeTimelineShape(
+            tracks: List<com.novacut.editor.model.Track>,
+        ): TimelineShape {
+            val perTrack = mutableListOf<TimelineShape.TrackClipCount>()
+            val effectCounts = mutableMapOf<String, Int>()
+            val transitionCounts = mutableMapOf<String, Int>()
+            var totalDurationMs = 0L
+
+            for (track in tracks) {
+                var clipCount = 0
+                for (clip in track.clips) {
+                    clipCount += 1 + clip.compoundClips.size
+                    val end = clip.timelineStartMs + (clip.trimEndMs - clip.trimStartMs)
+                    if (end > totalDurationMs) totalDurationMs = end
+                    for (effect in clip.effects) {
+                        val key = effect.type.name
+                        effectCounts[key] = (effectCounts[key] ?: 0) + 1
+                    }
+                    clip.transition?.let { t ->
+                        val key = t.type.name
+                        transitionCounts[key] = (transitionCounts[key] ?: 0) + 1
+                    }
+                }
+                perTrack += TimelineShape.TrackClipCount(track.type.name, clipCount)
+            }
+
+            return TimelineShape(
+                trackCount = tracks.size,
+                totalDurationMs = totalDurationMs,
+                perTrackClipCount = perTrack,
+                perEffectTypeCount = effectCounts,
+                perTransitionTypeCount = transitionCounts,
+            )
+        }
 
         // Pattern set used to scrub sensitive substrings before they enter the
         // bundle. These are intentionally conservative; the goal is "don't leak
