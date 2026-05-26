@@ -67,6 +67,90 @@ class ProjectAutoSave @Inject constructor(
         return getAutoSaveFile(projectId).exists()
     }
 
+    /**
+     * Schema-aware load result for callers that need to distinguish a corrupt
+     * autosave from one written by a newer NovaCut build (R5/AS-Schema gate).
+     *
+     * `loadRecoveryData` keeps its `AutoSaveState?` return for back-compat —
+     * future-schema files fall through to `null` there, which existing call
+     * sites already handle as "no recovery available." UI surfaces that want
+     * to render a "Project needs newer NovaCut" dialog should call
+     * [loadRecoveryDataWithOutcome] instead.
+     */
+    sealed class LoadOutcome {
+        data class Loaded(val state: AutoSaveState) : LoadOutcome()
+        data class FutureSchema(val fileVersion: Int, val supportedVersion: Int) : LoadOutcome()
+        data class Corrupt(val cause: Throwable) : LoadOutcome()
+        data object NotFound : LoadOutcome()
+    }
+
+    /**
+     * Like [loadRecoveryData] but distinguishes future-schema files from
+     * genuinely corrupt ones. A future-schema main file blocks the backup
+     * attempt — the backup is almost certainly also future-schema, and
+     * silently downgrading to a stale, *older* backup that happens to load
+     * would discard work the user did on the newer build.
+     */
+    suspend fun loadRecoveryDataWithOutcome(projectId: String): LoadOutcome = withContext(Dispatchers.IO) {
+        saveMutex.withLock {
+            val tempFile = getTempFile(projectId)
+            if (tempFile.exists()) {
+                Log.w(TAG, "Cleaning up stale temp file for $projectId")
+                tempFile.delete()
+            }
+            val file = getAutoSaveFile(projectId)
+            val backupFile = getBackupFile(projectId)
+            if (!file.exists() && backupFile.exists()) {
+                Log.w(TAG, "Restoring auto-save from backup for $projectId")
+                moveFileReplacing(backupFile, file)
+            }
+            if (!file.exists()) return@withLock LoadOutcome.NotFound
+            val raw = try {
+                readAutoSaveText(file)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to read auto-save for $projectId", e)
+                return@withLock LoadOutcome.Corrupt(e)
+            }
+            val peek = AutoSaveState.peekSchemaVersion(raw)
+            if (peek != null && peek > AutoSaveState.FORMAT_VERSION) {
+                Log.w(
+                    TAG,
+                    "Auto-save for $projectId was written by a newer NovaCut " +
+                        "(schema $peek > supported ${AutoSaveState.FORMAT_VERSION}); " +
+                        "refusing to load to avoid data loss"
+                )
+                return@withLock LoadOutcome.FutureSchema(peek, AutoSaveState.FORMAT_VERSION)
+            }
+            try {
+                val state = AutoSaveState.deserialize(raw)
+                backupFile.delete()
+                LoadOutcome.Loaded(state)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load recovery data for $projectId", e)
+                if (!backupFile.exists()) return@withLock LoadOutcome.Corrupt(e)
+                val backupRaw = try {
+                    readAutoSaveText(backupFile)
+                } catch (readErr: Exception) {
+                    Log.e(TAG, "Backup auto-save read failed for $projectId", readErr)
+                    return@withLock LoadOutcome.Corrupt(readErr)
+                }
+                val backupPeek = AutoSaveState.peekSchemaVersion(backupRaw)
+                if (backupPeek != null && backupPeek > AutoSaveState.FORMAT_VERSION) {
+                    return@withLock LoadOutcome.FutureSchema(backupPeek, AutoSaveState.FORMAT_VERSION)
+                }
+                try {
+                    Log.w(TAG, "Primary auto-save is corrupt; attempting backup restore for $projectId")
+                    val state = AutoSaveState.deserialize(backupRaw)
+                    moveFileReplacing(backupFile, file)
+                    LoadOutcome.Loaded(state)
+                } catch (backupError: Exception) {
+                    Log.e(TAG, "Backup auto-save restore failed for $projectId", backupError)
+                    LoadOutcome.Corrupt(backupError)
+                }
+            }
+        }
+    }
+
     suspend fun loadRecoveryData(projectId: String): AutoSaveState? = withContext(Dispatchers.IO) {
         // Serialize load against in-flight writes. Without the mutex a load that
         // races a `saveState()` (temp-write → rename) could see the rename
@@ -275,7 +359,12 @@ data class AutoSaveState(
 ) {
     fun serialize(): String {
         val json = JSONObject().apply {
+            // Write both keys: `version` is the historic name, kept so older
+            // builds reading newer files don't lose the version signal.
+            // `schemaVersion` is the canonical forward-going name and is what
+            // peekSchemaVersion prefers when both are present.
             put("version", FORMAT_VERSION)
+            put("schemaVersion", FORMAT_VERSION)
             put("projectId", projectId)
             put("timestamp", timestamp)
             put("playheadMs", playheadMs)
@@ -411,6 +500,32 @@ data class AutoSaveState(
 
     companion object {
         const val FORMAT_VERSION = 1
+
+        /**
+         * Cheap top-level inspection of an autosave JSON's schema version
+         * without paying the cost (or risk) of a full deserialize.
+         *
+         * Returns:
+         *  - `null` when the raw text is not valid JSON or the version field is
+         *    missing — callers should treat as "unknown schema, attempt
+         *    best-effort load."
+         *  - The integer schema version otherwise.
+         *
+         * Used by [loadRecoveryDataWithOutcome] to gate future-schema loads
+         * and by UI pre-flight checks. Pure — no I/O, safe to call on the
+         * main thread for small JSON.
+         */
+        fun peekSchemaVersion(raw: String): Int? = try {
+            val obj = JSONObject(raw)
+            when {
+                obj.has("schemaVersion") -> obj.optInt("schemaVersion", 0)
+                obj.has("version") -> obj.optInt("version", 0)
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+
         private const val MAX_TRANSCRIPT_WORDS = 20_000
         private const val MAX_TRACKS = 64
         private const val MAX_CLIPS_PER_TRACK = 2_000
