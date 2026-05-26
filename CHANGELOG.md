@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Autonomous roadmap continuation — 2026-05-25 (Loop 4)
+
+Five-batch follow-up loop. Picks up after Loop 3 with two remaining
+standalone composables (Privacy Dashboard, Caption Translation), two
+in-place wire-ups (CutAssistantFilterChips → CutAssistantReviewPanel,
+AiUseConfidenceRow → ExportSheet), and the compound nav breadcrumb
+chip. All commits local on master only.
+
+- **Batch 23 — PrivacyDashboardPanel composable.** New
+  `ui/settings/PrivacyDashboardPanel.kt` consumes
+  `PrivacyDashboard.groupForDisplay()` for risk-ordered sections (cloud
+  + telemetry first, then on-device collected by default, then opt-in).
+  Per-section icon + accent: Cloud/Peach, Computer/Sky, LockOpen/Green.
+  Per-entry cards render category name + storage location + retention +
+  collected-by list + control summary (Export · Delete · Opt out). Host
+  wires `onEntryClicked` to the corresponding engine action. Commit
+  `92601e5`.
+- **Batch 24 — CaptionTranslationPanel composable.** New
+  `ui/editor/CaptionTranslationPanel.kt` consumes
+  `CaptionTranslationEngine.EditorRow` directly. Target-language chip
+  row + quality chip (Excellent/Green, Good/Sky, Fair/Yellow,
+  Experimental/Peach, Unknown/Subtext0) + `LazyColumn` of source/target
+  row cards. Inline `BasicTextField` editing per row, status chip
+  (Translated/Edited/Regenerating...) per `EditorRowState`, Regenerate
+  button per row. Host owns the engine and threads `onUserEdit` /
+  `onRegenerate` back through `engine.applyUserEdit` /
+  `engine.markRegeneratePending`. Commit `dddfe6e`.
+- **Batch 25 — CutAssistantFilterChips wired.** Drop-in adoption in
+  `CutAssistantReviewPanel`: chip row inserted above the proposal
+  `LazyColumn`. Filter state via `mutableStateOf<Set<ProposalCategory>>`
+  (all-on default). Filtering goes through
+  `SilenceDetectionEngine().filterByCategory(proposals, enabled)`.
+  Commit `5a0fa27`.
+- **Batch 26 — AiUseConfidenceRow wired.** One call site added in
+  `ExportSheet.kt` after `DeviceTierOutlook` inside the
+  `videoModeEnabled` branch. Same `aiUsageEntries` memo already used by
+  the existing disclosure summary feeds
+  `AiUsageLedger.summarizeForChips`. Commit `1cd6cc7`.
+- **Batch 27 — CompoundNavBreadcrumb composable.** New
+  `ui/editor/CompoundNavBreadcrumb.kt` consumes
+  `CompoundNavStack.formatBreadcrumb(...)`. Hidden at root depth;
+  tap-anywhere-to-exit semantics with leading back arrow + full path
+  label in Mauve accent. Predictive-back gate on `stack.depth > 0` is
+  the remaining EditorScreen-level wiring. New strings:
+  `compound_breadcrumb_*`. Commit `012387a`.
+
 ### Autonomous roadmap continuation — 2026-05-25 (Loop 3)
 
 Five-batch follow-up loop. Picks up after Loop 2 with the UI-integration
