@@ -164,6 +164,99 @@ class CaptionTranslationEngine @Inject constructor(
         }
     }
 
+    // --- R5.4a UI-helper layer ---
+    //
+    // Pure functions consumed by the Compose translation panel. Each helper
+    // is small enough to test on the JVM without standing up the panel and
+    // without invoking the (still-stubbed) translate() call.
+
+    /**
+     * Single editor-row view model: source + target + quality + state. The
+     * panel renders one of these per caption row, with chip colour driven by
+     * [editorState] and [quality].
+     */
+    data class EditorRow(
+        val index: Int,
+        val segment: TranslatedSegment,
+        val quality: LanguagePairQuality,
+    ) {
+        val isPendingRegenerate: Boolean
+            get() = segment.editorState == EditorRowState.REGENERATE_PENDING
+
+        val isUserEdited: Boolean
+            get() = segment.editorState == EditorRowState.USER_EDITED
+    }
+
+    /**
+     * Build the editor-row view model list. The [quality] is computed once
+     * per pair (not per row) because (variant, src, tgt) is identical
+     * across all rows of one translation pass.
+     */
+    fun buildEditorRows(
+        segments: List<TranslatedSegment>,
+        variant: ModelVariant,
+        sourceLang: String,
+        targetLang: String,
+    ): List<EditorRow> {
+        val quality = pairQuality(variant, sourceLang, targetLang)
+        return segments.mapIndexed { index, seg ->
+            EditorRow(index = index, segment = seg, quality = quality)
+        }
+    }
+
+    /**
+     * Replace a single row's target text and mark it [EditorRowState.USER_EDITED].
+     * Returns a fresh list — the panel rebinds against the result. No-op when
+     * [index] is out of bounds.
+     */
+    fun applyUserEdit(
+        segments: List<TranslatedSegment>,
+        index: Int,
+        newTargetText: String,
+    ): List<TranslatedSegment> {
+        if (index !in segments.indices) return segments
+        return segments.mapIndexed { i, s ->
+            if (i == index) s.copy(
+                targetText = newTargetText,
+                editorState = EditorRowState.USER_EDITED,
+            ) else s
+        }
+    }
+
+    /**
+     * Tag a row [EditorRowState.REGENERATE_PENDING] so the panel can render a
+     * spinner while the engine reruns translation for that segment only.
+     */
+    fun markRegeneratePending(
+        segments: List<TranslatedSegment>,
+        index: Int,
+    ): List<TranslatedSegment> {
+        if (index !in segments.indices) return segments
+        return segments.mapIndexed { i, s ->
+            if (i == index) s.copy(editorState = EditorRowState.REGENERATE_PENDING) else s
+        }
+    }
+
+    /**
+     * Replace a pending row with fresh engine output. Sets state back to
+     * [EditorRowState.TRANSLATED]. Used by the regenerate completion path.
+     */
+    fun completeRegenerate(
+        segments: List<TranslatedSegment>,
+        index: Int,
+        newTargetText: String,
+        newWords: List<SherpaAsrEngine.WordTimestamp> = emptyList(),
+    ): List<TranslatedSegment> {
+        if (index !in segments.indices) return segments
+        return segments.mapIndexed { i, s ->
+            if (i == index) s.copy(
+                targetText = newTargetText,
+                words = newWords.ifEmpty { s.words },
+                editorState = EditorRowState.TRANSLATED,
+            ) else s
+        }
+    }
+
     companion object {
         private const val TAG = "CaptionTranslate"
 
