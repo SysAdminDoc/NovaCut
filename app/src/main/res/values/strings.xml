@@ -194,6 +194,24 @@
     <string name="ai_requirement_review_models">Review AI models</string>
     <string name="ai_requirement_not_now">Not now</string>
 
+    <!-- AiModelRequirementSheet (Highest-Value #10 pre-flight sheet) -->
+    <string name="ai_requirement_title_ready">Ready to use</string>
+    <string name="ai_requirement_title_download">Download required</string>
+    <string name="ai_requirement_title_dependency">Not yet in this build</string>
+    <string name="ai_requirement_title_cloud">Cloud upload</string>
+    <string name="ai_requirement_body_ready">The model is installed on this device. Tap to run.</string>
+    <string name="ai_requirement_body_download_format">%1$s needs to download about %2$d MB. The model runs on this device — no uploads.</string>
+    <string name="ai_requirement_body_dependency">%1$s isn\'t bundled in this build yet. We\'ll add it in a future release.</string>
+    <string name="ai_requirement_body_cloud_format">%1$s sends frames to a cloud service. NovaCut never makes a network call until you confirm here.</string>
+    <string name="ai_requirement_size_format">Download size · %1$d MB</string>
+    <string name="ai_requirement_license_format">License · %1$s</string>
+    <string name="ai_requirement_runtime_on_device">Runs on this device</string>
+    <string name="ai_requirement_runtime_cloud">Sent to the cloud service</string>
+    <string name="ai_requirement_consent_label">I understand this will use the network</string>
+    <string name="ai_requirement_download_action">Download model</string>
+    <string name="ai_requirement_use_action">Use now</string>
+    <string name="ai_requirement_cloud_action">Send and run</string>
+
     <!-- NoiseReductionPanel -->
     <string name="noise_reduction_title">AI Noise Reduction</string>
     <string name="noise_reduction_description">Analyzes audio to detect noise type (hiss, hum, broadband) and automatically applies the best DSP filters.</string>
