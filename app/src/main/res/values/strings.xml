@@ -58,6 +58,14 @@
     <string name="export_color_confidence_title">Color / HDR confidence</string>
     <string name="export_color_confidence_description">NovaCut checks the chosen codec, metadata intent, and advertised device limits before export.</string>
 
+    <!-- Cut Assistant unified filter chips (Highest-Value #6: Cut Assistant + Filler Removal merge) -->
+    <string name="cut_filter_all">All</string>
+    <string name="cut_filter_silence">Silence</string>
+    <string name="cut_filter_single_filler">Um / Uh</string>
+    <string name="cut_filter_multi_filler">You know / I mean</string>
+    <string name="cut_filter_other">Other</string>
+    <string name="cut_filter_count_format">%1$s (%2$d)</string>
+
     <!-- AI use confidence row (Highest-Value #2: pre-export AI provenance preview) -->
     <string name="export_ai_use_title">AI use</string>
     <string name="export_ai_use_description">Summarises every AI-assisted edit the export will declare in its provenance sidecar.</string>
