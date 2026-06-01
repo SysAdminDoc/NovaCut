@@ -75,6 +75,13 @@ A professional Android video editor built with Kotlin and Jetpack Compose. Open 
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history.
 
+## Project planning
+
+- [ROADMAP.md](ROADMAP.md) tracks active and future work.
+- [COMPLETED.md](COMPLETED.md) summarizes shipped roadmap work.
+- [RESEARCH_REPORT.md](RESEARCH_REPORT.md) summarizes product, platform, and ecosystem research.
+- Historical roadmap and research inputs live under [docs/archive](docs/archive/).
+
 ## Features
 
 ### Timeline Editing
