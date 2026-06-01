@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Documentation consolidation — 2026-06-01
+
+- Consolidated root planning docs: active work now lives in `ROADMAP.md`, shipped work in `COMPLETED.md`, and research synthesis in `RESEARCH_REPORT.md`.
+- Archived the previous expanded roadmap, cross-project roadmap, and May 25 research plans under `docs/archive/`.
+- Left ignored local research artifacts (`RESEARCH.md`, `HostShield-Research-Report.md`, and `research/`) untouched.
+
 ### Autonomous roadmap continuation — 2026-05-25 (Loop 5)
 
 Five-batch follow-up loop. Picks up after Loop 4 with adoption wire-ups
@@ -211,14 +217,14 @@ parallel-history, do not push from this VM.
 ### Autonomous roadmap continuation — 2026-05-25
 
 Twelve-batch loop. Engine layer for every Highest-Value item in
-`RESEARCH_FEATURE_PLAN_2026-05-25.md` Phase 1-3 plus the Forward View "Now"
+`docs/archive/research/RESEARCH_FEATURE_PLAN_2026-05-25.md` Phase 1-3 plus the Forward View "Now"
 tier. Compose UI integrations are deferred to a focused panel-only commit.
 All commits local on master only — origin/master is parallel-history,
 do not push from this VM (see [[novacut-local-remote-divergence]]).
 
 - **Batch 0 — Roadmap consolidation.** New "Active Work — 2026-05-25" section
   at the top of `ROADMAP.md` pulls forward Phase 1-3 items as a single
-  checklist; items move here on completion. `RESEARCH_FEATURE_PLAN_2026-05-25.md`
+  checklist; items move here on completion. `docs/archive/research/RESEARCH_FEATURE_PLAN_2026-05-25.md`
   committed as supporting evidence. Commit `f5621a7`.
 - **Batch 1 — CI + repo hygiene.** `.github/workflows/build.yml` now fires on
   push/PR to master (was tag-only); concurrency group cancels stale runs.
@@ -1480,7 +1486,7 @@ Three features from the backlog: extended filename tokens, export pre-flight war
 ### Notes
 - No DB schema or dependency changes.
 - Four new string resources: the three pre-flight warnings + an updated filename-template description.
-- Subtitle encoding auto-detect was investigated and dropped from this release — NovaCut has no subtitle IMPORT path, and the existing export already writes UTF-8. Re-evaluate if/when an import path is added (e.g. for the subtitle-aware scene-cut feature at §6.9 in CROSS-PROJECT-ROADMAP.md).
+- Subtitle encoding auto-detect was investigated and dropped from this release — NovaCut has no subtitle IMPORT path, and the existing export already writes UTF-8. Re-evaluate if/when an import path is added (e.g. for the subtitle-aware scene-cut feature at §6.9 in `docs/archive/roadmap/CROSS-PROJECT-ROADMAP.md`).
 
 ## v3.51.0 — Post-Audit Follow-ups
 
@@ -1586,7 +1592,7 @@ Builds on v3.47.0. Ships two small Tier-1 wins: roadmap §1.3 preset discoverabi
 
 ## v3.47.0 — Scratchpad Notes + Visible Recovery Dialog (Wave 2 Port)
 
-Continuation of the cross-project port initiative. Ships two Tier-1 features from [CROSS-PROJECT-ROADMAP.md](CROSS-PROJECT-ROADMAP.md): **Scratchpad notes per project (§6.4)** and **Visible crash-recovery dialog (§1.6)**.
+Continuation of the cross-project port initiative. Ships two Tier-1 features from [docs/archive/roadmap/CROSS-PROJECT-ROADMAP.md](docs/archive/roadmap/CROSS-PROJECT-ROADMAP.md): **Scratchpad notes per project (§6.4)** and **Visible crash-recovery dialog (§1.6)**.
 
 ### Scratchpad
 - New `Project.notes: String = ""` field persisted in Room. DB schema bumped to v6 with `MIGRATION_5_6` (`ALTER TABLE projects ADD COLUMN notes TEXT NOT NULL DEFAULT ''`).

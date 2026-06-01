@@ -1,6 +1,6 @@
 # NovaCut Project Context
 
-Last consolidated: 2026-05-17. Last implementation update: 2026-05-17.
+Last consolidated: 2026-06-01. Last implementation update: 2026-05-17.
 
 This file is the committed project memory for future work. It reconciles the live repository, local instruction files, prior memory, current roadmap, and the deep research run in [.ai/research/2026-05-17](.ai/research/2026-05-17/).
 
@@ -21,7 +21,10 @@ Use these files first:
 
 - [README.md](README.md): product summary, install/build notes, feature list, and tech stack.
 - [ROADMAP.md](ROADMAP.md): current prioritized roadmap and research-backed implementation queue.
-- [CHANGELOG.md](CHANGELOG.md): shipped release history.
+- [COMPLETED.md](COMPLETED.md): shipped roadmap summary.
+- [CHANGELOG.md](CHANGELOG.md): full shipped release history.
+- [RESEARCH_REPORT.md](RESEARCH_REPORT.md): product, platform, and ecosystem research synthesis.
+- [docs/archive](docs/archive/): historical detailed roadmaps and research plans.
 - [docs/models.md](docs/models.md): model registry, licensing, privacy, Play Asset Delivery, F-Droid, and activation gates.
 - [docs/templates.md](docs/templates.md): template/plugin format and animation compatibility matrix.
 - [app/build.gradle.kts](app/build.gradle.kts) and [gradle/libs.versions.toml](gradle/libs.versions.toml): build and dependency truth.
@@ -156,7 +159,7 @@ The detailed source index is [SOURCE_REGISTER.md](.ai/research/2026-05-17/SOURCE
 
 ## Working Rules for Future Sessions
 
-- Start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [ROADMAP.md](ROADMAP.md), and the latest `.ai/research/<date>/CHANGESET_SUMMARY.md`.
+- Start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [ROADMAP.md](ROADMAP.md), [COMPLETED.md](COMPLETED.md), [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and the latest `.ai/research/<date>/CHANGESET_SUMMARY.md` when available.
 - Verify memory-derived claims against live files and `git log`.
 - Prefer completing existing scaffolded engine/UI surfaces over adding new speculative features.
 - Keep privacy, offline operation, F-Droid viability, and explicit user consent in every AI/cloud/model decision.
