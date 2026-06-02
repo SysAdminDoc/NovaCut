@@ -1,5 +1,68 @@
 # Changelog
 
+## v3.74.10 — 2026-06-02
+
+Hardening pass. The previous merge of divergent histories left `master` in a
+non-compiling state; this release restores a clean build and fixes a batch of
+correctness, data-loss, crash, resource-leak, and configuration defects found
+in a full-codebase review. Unit suite: 581 passing.
+
+### Build repair (master did not compile)
+- **ProjectAutoSave** — removed a duplicated `const val` block in the
+  `AutoSaveState` companion object (conflicting declarations).
+- **Cut Assistant review** — `CutAssistantReviewPanel`/`CutAssistantFilterChips`
+  were passing `CutAssistantEngine.ReviewProposal` into filter helpers typed for
+  `SilenceDetectionEngine.CutProposal`. Retyped the chip row + panel filter to
+  `ReviewProposal` with a shared `reviewProposalCategory()` classifier.
+- **ProjectListViewModel** — inside `Intent(...).apply { }`, bare `extras`
+  resolved to `Intent.extras` (a non-iterable `Bundle?`) instead of the
+  shortcut's `Map<String, String>`. Qualified the outer extension receiver.
+
+### Data loss
+- **Smart Reframe** now calls `saveProject()` — the new aspect ratio survived
+  only until the next auto-save tick before.
+- **Snapshot restore** now restores `beatMarkers`, `trackedObjects`, and the
+  transcript (these were captured in the snapshot but dropped on restore).
+- **Mask edits** (`updateMask` / `updateMaskPoint` / freehand) are now persisted
+  on mask-editor close; geometry changes were lost on restart.
+
+### Crashes / races
+- **Timeline trim** — guarded two `coerceIn` calls in `trimClipOnTrack` that
+  threw `IllegalArgumentException` ("empty range") when trimming a sub-100ms clip.
+- **Color match** — the generated grade was applied to the *currently selected*
+  clip rather than the clip captured when the action started (wrong-clip on fast
+  reselect); frame analysis also ran on the main thread (ANR risk). Now targets
+  the captured clip id and analyzes on `Dispatchers.IO`.
+
+### Export
+- **Stream-copy fast-path** no longer leaks the foreground `ExportService`. The
+  service observes only the Transformer's state, which the stream-copy path never
+  drives, so it (and its notification) stayed pinned forever on every successful
+  trim-export. The service is now started only when falling through to the
+  Transformer path.
+- **GIF export** — the logical screen descriptor is sized from the largest frame
+  rather than frame[0], so mixed-size frames (gap frames / unscaled narrow
+  sources) no longer overflow the canvas and corrupt the file. Frame delay is
+  floored at 1 centisecond.
+
+### Resource leaks
+- **AiFeatures** — `detectScenes` no longer leaks both frame bitmaps (and aborts
+  the whole scan) if frame-diff throws; `generateAutoEdit` recycles its scaled
+  frames in a `finally`.
+- **Lottie overlay** — shader objects are deleted before the link-failure throw
+  (previously leaked on every failed program link).
+
+### Configuration
+- **FileProvider** — removed a duplicate `name="archives"` path entry (the map
+  collision could make archive sharing throw) and added the missing
+  `templates/` external root so template sharing no longer crashes.
+
+### Other hardening
+- **Whisper** — `resample` guards a 0/negative source sample rate (a malformed
+  container otherwise produced an infinite ratio → OOM).
+- **Transform overlay** — rotation handle now rotates by the delta from the grab
+  point instead of snapping to the absolute finger angle.
+
 ## Unreleased
 
 ### Documentation consolidation — 2026-06-01

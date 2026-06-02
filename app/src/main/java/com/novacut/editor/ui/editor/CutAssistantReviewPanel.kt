@@ -48,7 +48,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
 import com.novacut.editor.engine.CutAssistantEngine
-import com.novacut.editor.engine.SilenceDetectionEngine
 import com.novacut.editor.engine.SilenceDetectionEngine.CutProposal
 import com.novacut.editor.engine.SilenceDetectionEngine.ProposalCategory
 import com.novacut.editor.model.Clip
@@ -166,9 +165,12 @@ fun CutAssistantReviewPanel(
             var enabledCategories by remember(review.proposals) {
                 mutableStateOf(ProposalCategory.entries.toSet())
             }
-            val filterEngine = remember { SilenceDetectionEngine() }
             val visibleProposals = remember(review.proposals, enabledCategories) {
-                filterEngine.filterByCategory(review.proposals, enabledCategories)
+                when {
+                    enabledCategories.isEmpty() -> emptyList()
+                    enabledCategories.size == ProposalCategory.entries.size -> review.proposals
+                    else -> review.proposals.filter { reviewProposalCategory(it) in enabledCategories }
+                }
             }
 
             PremiumPanelCard(accent = Mocha.Blue) {

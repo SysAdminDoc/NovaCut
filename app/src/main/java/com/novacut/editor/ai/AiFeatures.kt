@@ -839,7 +839,15 @@ class AiFeatures @Inject constructor(
                     currentMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                 )
                 if (frame != null && previousFrame != null) {
-                    val difference = calculateFrameDifference(previousFrame, frame)
+                    // Guard the diff: if createScaledBitmap throws (OOM / odd dims) we must
+                    // still recycle both frames below and keep scanning, not leak + abort
+                    // the whole scan with an uncaught exception (this fun has no outer catch).
+                    val difference = try {
+                        calculateFrameDifference(previousFrame, frame)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Scene-diff failed at ${currentMs}ms", e)
+                        0f
+                    }
                     val threshold = 0.3f + (1f - sensitivity) * 0.5f
                     if (difference > threshold) {
                         scenes.add(SceneChange(
@@ -1921,27 +1929,34 @@ class AiFeatures @Inject constructor(
                         midTime * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
                     )
                     if (frame != null) {
-                        val scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
-                        if (scaled !== frame) frame.recycle()
+                        // All bitmaps recycled in finally so a throw from createScaledBitmap
+                        // or any scoring step can't leak the frame/scaled copies.
+                        var scaled: Bitmap? = null
+                        var frame2: Bitmap? = null
+                        var scaled2: Bitmap? = null
+                        try {
+                            scaled = Bitmap.createScaledBitmap(frame, 64, 36, true)
 
-                        // Sharpness via Laplacian variance approximation
-                        qualityScore = computeSharpness(scaled)
+                            // Sharpness via Laplacian variance approximation
+                            qualityScore = computeSharpness(scaled)
 
-                        // Face presence via skin-tone pixel ratio
-                        faceScore = detectSkinToneRatio(scaled)
+                            // Face presence via skin-tone pixel ratio
+                            faceScore = detectSkinToneRatio(scaled)
 
-                        // Motion: compare two frames
-                        val frame2 = retriever.getFrameAtTime(
-                            (midTime + 500) * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                        )
-                        if (frame2 != null) {
-                            val scaled2 = Bitmap.createScaledBitmap(frame2, 64, 36, true)
-                            if (scaled2 !== frame2) frame2.recycle()
-                            motionScore = calculateFrameDifference(scaled, scaled2)
-                            scaled2.recycle()
+                            // Motion: compare two frames
+                            frame2 = retriever.getFrameAtTime(
+                                (midTime + 500) * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                            )
+                            if (frame2 != null) {
+                                scaled2 = Bitmap.createScaledBitmap(frame2, 64, 36, true)
+                                motionScore = calculateFrameDifference(scaled, scaled2)
+                            }
+                        } finally {
+                            if (scaled != null && scaled !== frame) scaled.recycle()
+                            if (scaled2 != null && scaled2 !== frame2) scaled2.recycle()
+                            frame.recycle()
+                            frame2?.recycle()
                         }
-
-                        scaled.recycle()
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Auto-edit clip quality scoring failed", e)

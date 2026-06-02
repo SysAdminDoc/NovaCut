@@ -184,7 +184,10 @@ class ProjectListViewModel @Inject constructor(
             // Launch the existing MainActivity entry point. The action string
             // is the routing key handleIncomingIntent reads.
             setClassName(ctx, MainActivity::class.java.name)
-            for ((key, value) in extras) putExtra(key, value)
+            // Qualify the receiver: bare `extras` inside this Intent.apply{} block
+            // resolves to Intent.extras (a non-iterable Bundle?), not the shortcut's
+            // Map<String, String>. Use the outer extension receiver explicitly.
+            for ((key, value) in this@toShortcutInfoCompat.extras) putExtra(key, value)
         }
         return ShortcutInfoCompat.Builder(ctx, shortcutId)
             .setShortLabel(shortLabel)

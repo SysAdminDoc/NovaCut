@@ -174,6 +174,11 @@ private class LottieOverlayProgram(
         GLES30.glAttachShader(glProgram, vs)
         GLES30.glAttachShader(glProgram, fs)
         GLES30.glLinkProgram(glProgram)
+        // Delete the shaders now that they're linked into the program — must happen
+        // BEFORE the link-failure throw below, otherwise the early return leaks both
+        // shader objects on every failed link (matches LutEngine + ShaderEffect).
+        GLES30.glDeleteShader(vs)
+        GLES30.glDeleteShader(fs)
         // Check link status — some Intel / PowerVR drivers silently produce a
         // corrupt program on link failure. Writing to an unlinked program
         // would render black or, worse, corrupt vertex state for the next
@@ -187,8 +192,6 @@ private class LottieOverlayProgram(
             android.util.Log.e("LottieOverlay", "Program link failed: $log")
             throw RuntimeException("Lottie overlay program link failed: $log")
         }
-        GLES30.glDeleteShader(vs)
-        GLES30.glDeleteShader(fs)
 
         val quadVerts = floatArrayOf(
             -1f, -1f, 0f, 0f,

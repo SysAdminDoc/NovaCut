@@ -444,23 +444,28 @@ class ExportDelegate(
                 preferredOutputName = preferredOutputName ?: currentState.project.name
             )
 
-            val serviceIntent = Intent(appContext, ExportService::class.java).apply {
-                putExtra(ExportService.EXTRA_OUTPUT_PATH, outputFile.absolutePath)
-            }
-            appContext.startForegroundService(serviceIntent)
-
             try {
                 // v3.69 stream-copy fast-path. Only runs when the caller opted
                 // in via `allowStreamCopy` AND the timeline is a single
                 // unmodified clip with only head/tail cuts. Falls back to the
                 // Transformer path below on any failure so we never leave the
                 // user stuck if the MediaMuxer rejects the source.
+                //
+                // The foreground ExportService observes ONLY videoEngine's export
+                // state, which the stream-copy path never touches. Starting it
+                // before this fast-path would leave the service (and its ongoing
+                // notification) pinned forever on every successful stream-copy.
+                // So start the service only when we fall through to the Transformer.
                 if (tryStreamCopy(
                         tracks, configWithChapters, textOverlays, currentState, outputFile
                     )
                 ) {
                     return@launch
                 }
+                val serviceIntent = Intent(appContext, ExportService::class.java).apply {
+                    putExtra(ExportService.EXTRA_OUTPUT_PATH, outputFile.absolutePath)
+                }
+                appContext.startForegroundService(serviceIntent)
                 videoEngine.export(
                     tracks = tracks,
                     config = configWithChapters,
@@ -935,8 +940,12 @@ class ExportDelegate(
     private fun encodeGif(frames: List<android.graphics.Bitmap>, delayMs: Int, output: java.io.OutputStream) {
         // GIF89a header
         output.write("GIF89a".toByteArray())
-        val width = frames.first().width
-        val height = frames.first().height
+        // Logical screen must be at least as large as the LARGEST frame — frames vary in
+        // size (gap frames use the export aspect, real frames keep their source aspect /
+        // narrower-than-maxWidth sources stay unscaled). Sizing from frame[0] alone made
+        // any larger later frame overflow the canvas and corrupt the GIF in strict decoders.
+        val width = frames.maxOf { it.width }
+        val height = frames.maxOf { it.height }
         // Logical screen descriptor
         output.write(width and 0xFF)
         output.write((width shr 8) and 0xFF)
@@ -973,7 +982,9 @@ class ExportDelegate(
             }
             while (palette.size < 256) palette.add(0)
 
-            val delayCentiseconds = delayMs / 10
+            // Floor at 1 centisecond — a 0 delay is undefined in GIF89a and most decoders
+            // clamp it to a slow default, so a high-fps GIF would play at the wrong speed.
+            val delayCentiseconds = (delayMs / 10).coerceAtLeast(1)
             // Graphic control extension
             output.write(0x21)
             output.write(0xF9)
