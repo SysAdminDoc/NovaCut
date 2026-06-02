@@ -89,10 +89,11 @@ internal fun trimClipOnTrack(
     var updatedClip = track.clips[clipIndex]
 
     requestedTrimStartMs?.let { requested ->
-        val clampedRequest = requested.coerceIn(
-            0L,
-            updatedClip.trimEndMs - MIN_TIMELINE_CLIP_DURATION_MS
-        )
+        // Guard the coerceIn range: a sub-100ms clip makes the upper bound negative,
+        // and Long.coerceIn(0, negative) throws "Cannot coerce value to an empty range".
+        val startUpperBound = updatedClip.trimEndMs - MIN_TIMELINE_CLIP_DURATION_MS
+        if (startUpperBound < 0L) return@let
+        val clampedRequest = requested.coerceIn(0L, startUpperBound)
         val desired = updatedClip.copy(trimStartMs = clampedRequest)
         val minStart = previousClip?.timelineEndMs ?: 0L
         val maxStart = updatedClip.timelineEndMs - MIN_TIMELINE_CLIP_DURATION_MS
@@ -110,10 +111,11 @@ internal fun trimClipOnTrack(
     }
 
     requestedTrimEndMs?.let { requested ->
-        val clampedRequest = requested.coerceIn(
-            updatedClip.trimStartMs + MIN_TIMELINE_CLIP_DURATION_MS,
-            updatedClip.sourceDurationMs
-        )
+        // Guard the coerceIn range: when the source is shorter than trimStart + 100ms the
+        // lower bound exceeds the upper bound, and coerceIn throws on the empty range.
+        val endLowerBound = updatedClip.trimStartMs + MIN_TIMELINE_CLIP_DURATION_MS
+        if (endLowerBound > updatedClip.sourceDurationMs) return@let
+        val clampedRequest = requested.coerceIn(endLowerBound, updatedClip.sourceDurationMs)
         val desired = updatedClip.copy(trimEndMs = clampedRequest)
         val minEnd = updatedClip.timelineStartMs + MIN_TIMELINE_CLIP_DURATION_MS
         val maxEnd = nextClip?.timelineStartMs ?: Long.MAX_VALUE

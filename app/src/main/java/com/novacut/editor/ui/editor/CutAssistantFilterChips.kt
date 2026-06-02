@@ -19,11 +19,33 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
-import com.novacut.editor.engine.SilenceDetectionEngine
+import com.novacut.editor.engine.CutAssistantEngine
 import com.novacut.editor.engine.SilenceDetectionEngine.CutProposal
 import com.novacut.editor.engine.SilenceDetectionEngine.ProposalCategory
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.Radius
+
+/**
+ * Classify a Cut Assistant [CutAssistantEngine.ReviewProposal] into a filter
+ * bucket. Mirrors [SilenceDetectionEngine.categorize] (which operates on the
+ * lower-level per-clip `CutProposal`) but works on the timeline-level review
+ * proposals the panel actually renders — both carry `reason` + `matchedText`,
+ * which is all the classification needs. Single source of truth for the chip
+ * row and the panel's visible-proposal filter.
+ */
+internal fun reviewProposalCategory(
+    proposal: CutAssistantEngine.ReviewProposal
+): ProposalCategory = when (proposal.reason) {
+    CutProposal.Reason.SILENCE -> ProposalCategory.SILENCE
+    CutProposal.Reason.FILLER_WORD -> {
+        val matched = proposal.matchedText?.trim().orEmpty()
+        when {
+            matched.isEmpty() -> ProposalCategory.OTHER
+            matched.contains(' ') -> ProposalCategory.MULTI_WORD_FILLER
+            else -> ProposalCategory.SINGLE_WORD_FILLER
+        }
+    }
+}
 
 /**
  * Filter-chip row for the unified Cut Assistant Review panel
@@ -58,7 +80,7 @@ import com.novacut.editor.ui.theme.Radius
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CutAssistantFilterChips(
-    proposals: List<CutProposal>,
+    proposals: List<CutAssistantEngine.ReviewProposal>,
     enabled: Set<ProposalCategory>,
     onToggle: (ProposalCategory) -> Unit,
     onToggleAll: () -> Unit,
@@ -66,7 +88,7 @@ fun CutAssistantFilterChips(
 ) {
     // Per-category count drives the chip label; precomputed once per recomposition.
     val countsByCategory = remember(proposals) {
-        SilenceDetectionEngine().groupByCategory(proposals).mapValues { it.value.size }
+        proposals.groupingBy { reviewProposalCategory(it) }.eachCount()
     }
     val total = proposals.size
     val allOn = enabled.size == ProposalCategory.entries.size

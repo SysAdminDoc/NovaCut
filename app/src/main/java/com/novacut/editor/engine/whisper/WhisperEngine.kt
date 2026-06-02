@@ -594,6 +594,9 @@ class WhisperEngine @Inject constructor(
      */
     private fun resample(input: FloatArray, srcRate: Int, dstRate: Int): FloatArray {
         if (srcRate == dstRate) return input
+        // A malformed container can report a 0/negative sample rate; without this guard
+        // ratio becomes Infinity → outLen overflows → OOM/crash. Skip resampling instead.
+        if (srcRate <= 0 || dstRate <= 0) return input
         val ratio = dstRate.toDouble() / srcRate.toDouble()
         val outLen = (input.size * ratio).roundToInt()
         val output = FloatArray(outLen)

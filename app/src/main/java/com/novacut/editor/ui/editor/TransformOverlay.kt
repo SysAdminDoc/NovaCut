@@ -151,11 +151,18 @@ fun TransformOverlay(
                                 )
                             }
                             HandleType.ROTATE -> {
-                                val angle = atan2(
+                                // Rotate by the delta from where the handle was grabbed,
+                                // not the absolute finger angle — otherwise the clip snaps
+                                // to the finger position on the first drag frame.
+                                val startAngle = atan2(
+                                    dragStartOffset.x - centerX,
+                                    -(dragStartOffset.y - centerY)
+                                ) * 180f / PI.toFloat()
+                                val currentAngle = atan2(
                                     change.position.x - centerX,
                                     -(change.position.y - centerY)
                                 ) * 180f / PI.toFloat()
-                                onRotationChanged(angle)
+                                onRotationChanged(startRotation + (currentAngle - startAngle))
                             }
                             HandleType.ANCHOR -> {
                                 val nx = (change.position.x / size.width).coerceIn(0f, 1f)

@@ -1447,7 +1447,14 @@ class EditorViewModel @Inject constructor(
 
     // --- Mask Editor ---
     fun showMaskEditor() = showPanel(PanelId.MASK_EDITOR)
-    fun hideMaskEditor() { hidePanel(PanelId.MASK_EDITOR); _state.update { it.copy(selectedMaskId = null) } }
+    fun hideMaskEditor() {
+        hidePanel(PanelId.MASK_EDITOR)
+        _state.update { it.copy(selectedMaskId = null) }
+        // Mask geometry edits (updateMaskPoint / setFreehandMaskPoints / updateMask) are
+        // applied per drag-tick without persisting, to avoid disk thrash. Persist once
+        // here on panel close so freehand draws and handle drags survive a restart.
+        saveProject()
+    }
 
     fun selectMask(maskId: String?) {
         _state.update { it.copy(selectedMaskId = maskId) }
@@ -1621,7 +1628,10 @@ class EditorViewModel @Inject constructor(
                     drawingPaths = recovery.drawingPaths,
                     playheadMs = recovery.playheadMs,
                     chapterMarkers = recovery.chapterMarkers,
-                    aiUsageLedger = recovery.aiUsageLedger
+                    aiUsageLedger = recovery.aiUsageLedger,
+                    beatMarkers = recovery.beatMarkers,
+                    trackedObjects = recovery.trackedObjects.ifEmpty { it.trackedObjects },
+                    v369 = it.v369.copy(transcript = recovery.transcript ?: it.v369.transcript)
                 )
             }
             _playheadMs.value = recovery.playheadMs
@@ -2172,6 +2182,7 @@ class EditorViewModel @Inject constructor(
                     exportConfig = it.exportConfig.copy(aspectRatio = targetAspect),
                     isReframing = false
                 ) }
+                saveProject()
                 showToast("Reframed to ${targetAspect.label}")
                 hideSmartReframe()
             } catch (e: Exception) {
@@ -3166,17 +3177,29 @@ class EditorViewModel @Inject constructor(
                 return@launch
             }
             showToast("Analyzing colors...")
-            val refStats = com.novacut.editor.engine.ColorMatchEngine.analyzeFrame(
-                appContext, refClip.sourceUri, refClip.trimStartMs + refClip.durationMs / 2
-            )
-            val targetStats = com.novacut.editor.engine.ColorMatchEngine.analyzeFrame(
-                appContext, targetClip.sourceUri, targetClip.trimStartMs + targetClip.durationMs / 2
-            )
+            // Frame analysis uses a blocking MediaMetadataRetriever — keep it off the
+            // main thread so the UI doesn't ANR on long/large source files.
+            val (refStats, targetStats) = withContext(Dispatchers.IO) {
+                val ref = com.novacut.editor.engine.ColorMatchEngine.analyzeFrame(
+                    appContext, refClip.sourceUri, refClip.trimStartMs + refClip.durationMs / 2
+                )
+                val target = com.novacut.editor.engine.ColorMatchEngine.analyzeFrame(
+                    appContext, targetClip.sourceUri, targetClip.trimStartMs + targetClip.durationMs / 2
+                )
+                ref to target
+            }
 
             if (refStats != null && targetStats != null) {
+                // Apply to the clip captured when the action started, not whatever is
+                // selected now — selection can change during the async analysis above.
+                if (_state.value.tracks.flatMap { it.clips }.none { it.id == targetClipId }) {
+                    showToast("Clip no longer exists")
+                    return@launch
+                }
                 saveUndoState("Color match")
                 val grade = com.novacut.editor.engine.ColorMatchEngine.generateColorMatch(refStats, targetStats)
-                updateClipColorGrade(grade)
+                updateClipById(targetClipId) { it.copy(colorGrade = grade) }
+                updatePreview()
                 saveProject()
                 showToast("Color matched to reference clip")
             } else {
