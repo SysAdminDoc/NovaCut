@@ -11,7 +11,7 @@ archived under [docs/archive](docs/archive/).
 Current version: **v3.74.44** (`versionCode` 181). Last consolidated:
 2026-06-04.
 
-> Last researched: Cycle 17 - 2026-06-04.
+> Last researched: Cycle 18 - 2026-06-04.
 
 ## ▶ Implementer Instructions (for the build machine)
 
@@ -1591,3 +1591,81 @@ instead of a generic search/download stub.
   https://freemusicarchive.org/faq/
 - Free Music Archive License Guide:
   https://freemusicarchive.org/License_Guide
+
+### Researcher Queue (Cycle 18 - 2026-06-04)
+
+Focus: make original-media metadata retention and archive sharing explicit,
+minimal, and testable.
+
+#### Media Privacy & Project Archives
+
+- [ ] 🔬🤖 P2 — Add original-media metadata disclosure and scrubbed archive/share paths
+  - Why: NovaCut's local-first model is good for privacy, but "local" is not the
+    same as "metadata-free." Imported photos/videos and external camera captures
+    can carry provider-supplied metadata such as camera details, timestamps,
+    location tags, filenames, and content-provider URI details. NovaCut keeps
+    source bytes for editing and project restore, then packages those bytes into
+    `.novacut` archives. Users need clear archive/share copy, redacted archive
+    manifests, and a best-effort scrubbed path when they are preparing media for
+    another person or platform.
+  - Evidence: `importUriToManagedMedia(...)` copies the selected URI's input
+    stream into `filesDir/media/imports` via a `.partial` file and rename.
+    `finalizePendingCameraCapture(...)` moves or copies the camera-capture MP4
+    into the same managed-media directory. `ProjectArchive.exportArchive(...)`
+    calls `collectArchivedMedia(state)`, writes each source stream into the ZIP
+    under `media/<index>_<sanitized-name>`, and writes `media_manifest.json`
+    entries with `originalUri` plus `entryName`. `PrivacyDashboard.Category.MEDIA_METADATA`
+    currently says only "durations, codecs, dimensions," and the codebase has no
+    `ExifInterface` import, no `ACCESS_MEDIA_LOCATION` permission, no media
+    location strings, and no tests that prove archive manifests avoid original
+    URI leaks or that scrubbed media can be produced.
+  - Current-source check: Android Photo Picker docs describe the picker as a
+    privacy-preserving way for users to grant an app access only to selected
+    images/videos, not the whole media library:
+    https://developer.android.com/training/data-storage/shared/photo-picker
+    Android media-storage docs say photo location information is hidden by
+    default under scoped storage, and unredacted EXIF location requires
+    `ACCESS_MEDIA_LOCATION` plus explicit user consent:
+    https://developer.android.com/training/data-storage/shared/media#media-location-permission
+    `MediaStore.setRequireOriginal(...)` is the exact-byte path and may require
+    `ACCESS_MEDIA_LOCATION` to avoid sensitive metadata redaction:
+    https://developer.android.com/reference/android/provider/MediaStore#setRequireOriginal(android.net.Uri)
+    AndroidX ExifInterface exposes GPS latitude/longitude tags for supported
+    image formats:
+    https://developer.android.com/reference/androidx/exifinterface/media/ExifInterface
+  - Touches: `PrivacyDashboard` media row copy, project archive/export copy,
+    `media_manifest.json` schema, archive import compatibility, managed-media
+    metadata inspection helper, optional AndroidX ExifInterface dependency,
+    image scrubber for supported still formats, video/camera metadata warning
+    policy, direct-publish/share/export handoff copy, diagnostics redaction, and
+    JVM/fixture tests.
+  - Acceptance: NovaCut does not request `ACCESS_MEDIA_LOCATION` by default and
+    never calls `setRequireOriginal(...)` unless a future user-visible feature
+    explicitly needs unredacted location metadata. Project archives no longer
+    expose raw `file://`, `content://`, or provider-specific source URIs in a
+    shareable manifest; import still rewrites archived media through stable
+    opaque IDs. The privacy dashboard and archive sheet state that archives
+    include original media bytes and may retain source metadata. A user can
+    choose a scrubbed archive/share/export path for supported still images that
+    removes GPS and high-risk EXIF fields while preserving render correctness;
+    unsupported video/container metadata is disclosed with a warning or routed
+    through an explicit re-encode-only scrub path.
+  - Verify: add fixture-based JVM tests with a JPEG containing GPS EXIF to prove
+    the scrubbed path removes location tags and the normal managed-media path
+    preserves edit bytes when scrub is off. Add archive tests proving manifests
+    use opaque IDs rather than original URIs, old archives still import, and
+    no diagnostic ZIP leaks source URI strings. Add privacy-dashboard tests for
+    the expanded media-metadata disclosure and UI tests for archive/export copy
+    across default, scrubbed, and unsupported-video states.
+  - Complexity: L
+
+#### Appendix — Cycle 18 Sources
+
+- Android Photo Picker:
+  https://developer.android.com/training/data-storage/shared/photo-picker
+- Android media location permission:
+  https://developer.android.com/training/data-storage/shared/media#media-location-permission
+- Android `MediaStore.setRequireOriginal(...)`:
+  https://developer.android.com/reference/android/provider/MediaStore#setRequireOriginal(android.net.Uri)
+- AndroidX ExifInterface:
+  https://developer.android.com/reference/androidx/exifinterface/media/ExifInterface

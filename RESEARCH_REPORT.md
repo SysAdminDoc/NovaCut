@@ -6,6 +6,37 @@ roadmaps are archived under [docs/archive/roadmap](docs/archive/roadmap/).
 
 Last refreshed: 2026-06-04.
 
+## 2026-06-04 Cycle 18 Original-Media Metadata Privacy Refresh
+
+- [Verified] NovaCut's local import path copies provider-supplied media bytes
+  into `filesDir/media/imports` with an atomic `.partial` rename, and
+  camera-capture finalization moves or copies the captured MP4 into the same
+  managed-media directory. `ProjectArchive.exportArchive(...)` then copies each
+  clip/image-overlay source stream into the `.novacut` ZIP and writes
+  `media_manifest.json` entries containing the original URI string. There is no
+  EXIF/GPS scrub, source-URI redaction, or user-facing "archive includes
+  original media metadata" disclosure in these paths.
+- [Verified] The privacy dashboard row for media metadata currently describes
+  "durations, codecs, dimensions" collected by `MediaImportEngine` and
+  `MediaPickerSheet`, but the retained bytes can also include provider-supplied
+  image/video metadata such as camera, timestamp, location, source filename, or
+  content-provider URI details depending on the source. Grep finds no
+  `ExifInterface`, no `ACCESS_MEDIA_LOCATION`, no media-location copy, and no
+  tests that assert archive manifests avoid leaking original URIs or that
+  export/share/archive flows can produce sanitized media.
+- [Verified] Android's current media docs say Photo Picker is a privacy-safe
+  way to grant access only to selected images/videos, while MediaStore hides
+  photo location information by default under scoped storage. Accessing
+  unredacted EXIF location requires explicit `ACCESS_MEDIA_LOCATION` consent and
+  `MediaStore.setRequireOriginal(...)`; AndroidX ExifInterface exposes GPS
+  latitude/longitude tags that can be inspected or rewritten for supported image
+  formats.
+- [Promoted] Added a P2 roadmap item for an original-media metadata privacy
+  contract: disclose that project archives include source media bytes, avoid
+  requesting location metadata by default, redact archive source identifiers,
+  and add an opt-in scrubbed archive/share/export path with tests for EXIF/GPS
+  and manifest leaks.
+
 ## 2026-06-04 Cycle 17 Stock Asset Provider Terms Refresh
 
 - [Verified] `StockAssetEngine` is still a stub: `isProviderConfigured(...)`
