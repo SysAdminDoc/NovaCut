@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 168`, `versionName = "3.74.31"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.31`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 169`, `versionName = "3.74.32"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.32`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -475,8 +475,25 @@ High-level modules and patterns:
   debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
   `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
   `:app:assembleDebugAndroidTest` passed.
-- Next roadmap item: continue P1 Timeline refactor with clip layout, overlay
-  drawing, and remaining gesture-body extractions.
+- Followed by the P1 Timeline chrome/drawing helper extraction in v3.74.32.
+
+2026-06-04 timeline chrome and drawing helper extraction continuation:
+
+- Continued the P1 Timeline refactor in v3.74.32 by extracting toolbar buttons,
+  info chips, text action chips, mini icon buttons, clip badges, track icons,
+  and compact timeline label formatters into `TimelineChrome`.
+- Extracted time-ruler drawing, timeline waveform drawing, deterministic
+  waveform placeholder drawing, and sorted volume-keyframe selection into
+  `TimelineDrawing`.
+- Kept `Timeline.kt` focused on the main renderer; it dropped from 2,058 lines
+  after v3.74.31 to 1,752 lines after this pass.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
+  `:app:assembleDebugAndroidTest` passed.
+- Next roadmap item: P0 Android 15 `mediaProcessing` foreground-service timeout
+  handling from the Cycle 2 researcher queue.
 
 2026-05-17 autonomous continuation:
 
