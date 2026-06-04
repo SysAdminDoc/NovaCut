@@ -74,8 +74,11 @@ class OverlayDelegate(
         showToast("Sticker added")
     }
 
-    fun updateImageOverlay(id: String, positionX: Float? = null, positionY: Float? = null, scale: Float? = null, rotation: Float? = null, opacity: Float? = null) {
+    fun beginImageOverlayAdjust() {
         saveUndoState("Edit sticker")
+    }
+
+    fun updateImageOverlay(id: String, positionX: Float? = null, positionY: Float? = null, scale: Float? = null, rotation: Float? = null, opacity: Float? = null) {
         stateFlow.update { s ->
             s.copy(imageOverlays = s.imageOverlays.map { o ->
                 if (o.id == id) o.copy(
@@ -87,6 +90,9 @@ class OverlayDelegate(
                 ) else o
             })
         }
+    }
+
+    fun endImageOverlayAdjust() {
         saveProject()
     }
 

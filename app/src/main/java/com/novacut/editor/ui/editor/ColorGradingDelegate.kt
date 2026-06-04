@@ -56,6 +56,10 @@ class ColorGradingDelegate(
         saveUndoState("Color grade")
     }
 
+    fun endColorGradeAdjust() {
+        saveProject()
+    }
+
     fun updateClipColorGrade(colorGrade: ColorGrade) {
         val clipId = stateFlow.value.selectedClipId ?: return
         stateFlow.update { s ->
@@ -66,7 +70,6 @@ class ColorGradingDelegate(
             })
         }
         updatePreview()
-        saveProject()
     }
 
     fun importLut() {

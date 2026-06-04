@@ -250,6 +250,10 @@ class ExportDelegate(
 
     fun startExport(outputDir: File, preferredOutputName: String? = null) {
         val currentState = stateFlow.value
+        if (currentState.exportState == ExportState.EXPORTING) {
+            showToast("Export already in progress")
+            return
+        }
         if (currentState.tracks.flatMap { it.clips }.isEmpty()) {
             showToast("No clips to export")
             return
