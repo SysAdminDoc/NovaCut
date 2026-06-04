@@ -210,7 +210,7 @@ data class EditorState(
     // `AiModelRequirementSheet` composable renders in EditorScreen.
     val aiModelRequirement: com.novacut.editor.engine.AiToolRequirements.ToolRequirement? = null,
     // R5.4a — caption-translation editor surface. Populated by
-    // EditorViewModel.refreshCaptionTranslation(); the panel
+    // EditorViewModel.runCaptionTranslation(); the panel
     // (CaptionTranslationPanel) consumes these fields directly.
     val captionTranslationRows: List<com.novacut.editor.engine.CaptionTranslationEngine.EditorRow> = emptyList(),
     val captionTranslationSourceLang: String = "en",
@@ -470,6 +470,7 @@ class EditorViewModel @Inject constructor(
     private var lastAutoSaveRunning: Boolean? = null
     private var lastAutoSaveIntervalSec: Int? = null
     private var mediaRelinkProbeJob: Job? = null
+    private var captionTranslationJob: Job? = null
 
     private val _state = MutableStateFlow(EditorState())
     val state: StateFlow<EditorState> = _state.asStateFlow()
@@ -3569,7 +3570,10 @@ class EditorViewModel @Inject constructor(
     }
 
     // --- Captions ---
-    fun showCaptionEditor() = showPanel(PanelId.CAPTION_EDITOR)
+    fun showCaptionEditor() {
+        showPanel(PanelId.CAPTION_EDITOR)
+        _state.value.captionTranslationTargetLang?.let(::runCaptionTranslation)
+    }
     fun hideCaptionEditor() = hidePanel(PanelId.CAPTION_EDITOR)
 
     fun generateAutoCaption() {
@@ -4417,6 +4421,51 @@ class EditorViewModel @Inject constructor(
     // source text unchanged — the editor surface still works because all
     // four state-mutation helpers are pure.
 
+    fun captionTranslationTargets(): List<String> =
+        captionTranslationEngine.getSupportedLanguages(_state.value.captionTranslationVariant)
+
+    fun runCaptionTranslation(targetLang: String) {
+        setCaptionTranslationTarget(targetLang)
+        val state = _state.value
+        val selectedClipId = state.selectedClipId
+        val clip = selectedClipId?.let { id ->
+            state.tracks.flatMap { it.clips }.firstOrNull { it.id == id }
+        }
+        val segments = captionsToTranslationSegments(clip?.captions ?: emptyList())
+        if (segments.isEmpty()) {
+            captionTranslationJob?.cancel()
+            _state.update { it.copy(captionTranslationRows = emptyList()) }
+            return
+        }
+
+        val sourceLang = state.captionTranslationSourceLang
+        val variant = state.captionTranslationVariant
+        captionTranslationJob?.cancel()
+        captionTranslationJob = viewModelScope.launch {
+            val translated = captionTranslationEngine.translate(
+                segments = segments,
+                sourceLang = sourceLang,
+                targetLang = targetLang,
+            )
+            val rows = captionTranslationEngine.buildEditorRows(
+                segments = translated,
+                variant = variant,
+                sourceLang = sourceLang,
+                targetLang = targetLang,
+            )
+            _state.update { current ->
+                if (current.captionTranslationTargetLang != targetLang) {
+                    current
+                } else {
+                    current.copy(
+                        captionTranslationRows = rows,
+                        captionTranslationQuality = rows.firstOrNull()?.quality ?: current.captionTranslationQuality,
+                    )
+                }
+            }
+        }
+    }
+
     fun setCaptionTranslationTarget(targetLang: String) {
         val variant = _state.value.captionTranslationVariant
         val source = _state.value.captionTranslationSourceLang
@@ -4465,6 +4514,9 @@ class EditorViewModel @Inject constructor(
      */
     fun regenerateCaptionTranslation(rowIndex: Int) {
         val rows = _state.value.captionTranslationRows
+        val row = rows.getOrNull(rowIndex) ?: return
+        val sourceLang = _state.value.captionTranslationSourceLang
+        val targetLang = _state.value.captionTranslationTargetLang ?: return
         val updated = captionTranslationEngine.markRegeneratePending(
             segments = rows.map { it.segment },
             index = rowIndex,
@@ -4480,6 +4532,17 @@ class EditorViewModel @Inject constructor(
                             ?: com.novacut.editor.engine.CaptionTranslationEngine.LanguagePairQuality.UNKNOWN,
                     )
                 },
+            )
+        }
+        viewModelScope.launch {
+            val translated = captionTranslationEngine.translate(
+                segments = listOf(translatedSegmentToTranscriptionSegment(row.segment)),
+                sourceLang = sourceLang,
+                targetLang = targetLang,
+            ).firstOrNull()
+            completeCaptionTranslationRegenerate(
+                rowIndex = rowIndex,
+                newTargetText = translated?.targetText ?: row.segment.sourceText,
             )
         }
     }

@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.novacut.editor.R
+import com.novacut.editor.engine.CaptionTranslationEngine.EditorRow
+import com.novacut.editor.engine.CaptionTranslationEngine.LanguagePairQuality
 import com.novacut.editor.model.Caption
 import com.novacut.editor.model.CaptionStyle
 import com.novacut.editor.model.CaptionStyleType
@@ -57,6 +59,14 @@ fun CaptionEditorPanel(
     onUpdateCaption: (Caption) -> Unit,
     onDeleteCaption: (String) -> Unit,
     onGenerateAutoCaption: () -> Unit,
+    translationRows: List<EditorRow> = emptyList(),
+    translationSourceLang: String = "en",
+    translationTargetLang: String? = null,
+    translationQuality: LanguagePairQuality? = null,
+    translationTargets: List<String> = emptyList(),
+    onTranslationTargetSelected: (String) -> Unit = {},
+    onTranslationUserEdit: (rowIndex: Int, newTargetText: String) -> Unit = { _, _ -> },
+    onTranslationRegenerate: (rowIndex: Int) -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -202,6 +212,21 @@ fun CaptionEditorPanel(
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PremiumPanelCard(accent = Mocha.Green) {
+            CaptionTranslationPanel(
+                rows = translationRows,
+                sourceLang = translationSourceLang,
+                targetLang = translationTargetLang,
+                currentQuality = translationQuality,
+                availableTargets = translationTargets,
+                onTargetSelected = onTranslationTargetSelected,
+                onUserEdit = onTranslationUserEdit,
+                onRegenerate = onTranslationRegenerate,
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))

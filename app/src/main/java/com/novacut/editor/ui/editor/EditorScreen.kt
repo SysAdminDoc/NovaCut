@@ -1842,6 +1842,14 @@ fun EditorScreen(
                 onUpdateCaption = viewModel::updateCaption,
                 onDeleteCaption = viewModel::removeCaption,
                 onGenerateAutoCaption = viewModel::generateAutoCaption,
+                translationRows = state.captionTranslationRows,
+                translationSourceLang = state.captionTranslationSourceLang,
+                translationTargetLang = state.captionTranslationTargetLang,
+                translationQuality = state.captionTranslationQuality,
+                translationTargets = viewModel.captionTranslationTargets(),
+                onTranslationTargetSelected = viewModel::runCaptionTranslation,
+                onTranslationUserEdit = viewModel::applyCaptionTranslationEdit,
+                onTranslationRegenerate = viewModel::regenerateCaptionTranslation,
                 onClose = viewModel::hideCaptionEditor
             )
         }

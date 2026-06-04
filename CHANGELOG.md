@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.74.16 — 2026-06-04
+
+### Caption translation panel call site
+- Embedded `CaptionTranslationPanel` inside the Captions editor panel and
+  passed translation rows, source/target language state, target choices, edit
+  callbacks, and regenerate callbacks from `EditorScreen`.
+- Added `CaptionTranslationBridge` so selected-clip captions become
+  `SherpaAsrEngine.TranscriptionSegment` values for the existing
+  `CaptionTranslationEngine` surface.
+- Added `EditorViewModel.runCaptionTranslation(targetLang)` to populate
+  `captionTranslationRows` when users choose a target language.
+- Row regeneration now marks a row pending and self-completes through the
+  current stub translation engine so the panel does not get stuck waiting for a
+  model backend that is still gated.
+- Added JVM coverage for the caption-to-translation bridge.
+- Bumped runtime metadata to `versionName 3.74.16` / `versionCode 153`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest, and
+  `:app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+  :app:assembleDebugAndroidTest` passed.
+
 ## v3.74.15 — 2026-06-04
 
 ### Compound clip gesture closure
