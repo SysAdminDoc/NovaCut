@@ -8,7 +8,7 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.37** (`versionCode` 174). Last consolidated:
+Current version: **v3.74.38** (`versionCode` 175). Last consolidated:
 2026-06-04.
 
 > Last researched: Cycle 11 - 2026-06-04.
@@ -78,6 +78,10 @@ v3.74.37 closed the active timeline-refactor lane by moving visible clip layout,
 clip-content thresholds, trim/slip/slide drag-action policy, and slide snap
 target/haptic decisions out of `Timeline.kt` into focused helpers with JVM
 coverage.
+v3.74.38 closed the model activation gate lane by adding tested delivery,
+F-Droid, active-registry, and runtime-checksum metadata to every AI tool
+requirement and refreshing `docs/models.md` with a gate matrix that blocks
+planned unpinned models from presenting as downloadable.
 
 ## Current State
 
@@ -175,6 +179,12 @@ coverage.
   clip bounds, clip badge thresholds, unified trim/slip/slide drag-action
   resolution, slide snap target collection, and snap haptic policy from
   `Timeline.kt` into `TimelineClipLayout` with focused JVM tests.
+- v3.74.38 adds explicit model activation gate metadata to `AiToolRequirements`
+  and refreshes `docs/models.md` with a tested AI tool gate matrix covering
+  source locator, SHA-256 posture, license posture, delivery mode, F-Droid
+  posture, and runtime checksum behavior. Planned AnimeGAN/Fast NST,
+  Real-ESRGAN, and SAM/MobileSAM tools now stay dependency-missing until exact
+  bytes and runtime loaders are pinned.
 
 ## Source Archives
 
@@ -188,7 +198,7 @@ coverage.
 | Priority | Work | Exit criteria |
 |---|---|---|
 | ✅ P1 | Timeline refactor | Implemented in v3.74.37: clip layout, badge visibility, trim/slip/slide drag-action policy, and slide snap target/haptic decisions now live outside `Timeline.kt` with focused JVM tests. |
-| P1 | Model activation gates | For every active AI/model dependency, keep source locator, SHA-256, license posture, delivery mode, F-Droid posture, and runtime checksum behavior current in `docs/models.md`. |
+| ✅ P1 | Model activation gates | Implemented in v3.74.38: every AI tool has tested source/delivery/F-Droid/runtime-checksum posture, and planned unpinned models no longer advertise downloads. |
 | P2 | Project color policy consumers | Wire `ProjectColorPolicy` into Settings/export confidence once the Room/autosave migration plan is ready. |
 | P2 | Diagnostic ZIP timeline-shape toggle | Expose the privacy-preserving timeline-shape summary as an explicit Settings export option. |
 | P2 | Dependabot grouping and dependency freshness review | Group dependency updates by toolchain risk, evaluate auto-tagging from `CHANGELOG.md` headings, and stage the current Compose BOM / Room / Kotlin freshness batch only after the editor-state migration has a clean compile baseline. |

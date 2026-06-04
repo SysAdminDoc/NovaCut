@@ -2,7 +2,7 @@
 
 Authoritative list of every ML model and native AAR that NovaCut may fetch or bundle. Pairs with the [ModelDownloadManager](../app/src/main/java/com/novacut/editor/engine/ModelDownloadManager.kt) and is the single reference for F-Droid `NonFreeNet` audits, license review, reproducible build verification, and 16 KB page-size compliance tracking.
 
-**Last refresh:** 2026-05-17 · See [ROADMAP.md](../ROADMAP.md) Round 5 §R5.6, §R5.9 and Round 6 §R6.1, §R6.2, §R6.6, §R6.8 for the policy that gates each entry.
+**Last refresh:** 2026-06-04 · See [ROADMAP.md](../ROADMAP.md) Round 5 §R5.6, §R5.9, Round 6 §R6.1, §R6.2, §R6.6, §R6.8, and the Active Queue model activation gate for the policy that gates each entry.
 
 ---
 
@@ -56,7 +56,7 @@ These models are *named in the roadmap* but not yet fetched at runtime. They get
 | A.1 / R6.8 | Moonshine v2 Tiny EN (Sherpa-ONNX) | https://github.com/k2-fsa/sherpa-onnx/releases | ~33 MB | Default English ASR; Sherpa-ONNX target. |
 | A.1 / R6.8 | Whisper Tiny multilingual (Sherpa-ONNX bundle) | https://github.com/k2-fsa/sherpa-onnx/releases | ~100 MB | Default multilingual fallback. |
 | A.1 / R6.8 | Whisper Large V3 Turbo (ONNX) | https://huggingface.co/onnx-community/whisper-large-v3-turbo | ~800 MB (FP16) | Premium-tier multilingual; gated on ≥6 GB RAM + premium-models setting (codified as `SherpaAsrEngine.ModelVariant.WHISPER_LARGE_V3_TURBO_MULTILINGUAL` with `requiresPremiumTier = true`, `minimumRamMb = 6_144`). |
-| A.6 | RobustVideoMatting (RVM) | https://github.com/PeterL1n/RobustVideoMatting | ~15 MB | Replaces MediaPipe binary mask for green-screen quality. |
+| A.6 | RobustVideoMatting (RVM) | https://github.com/PeterL1n/RobustVideoMatting | ~15 MB | Replaces MediaPipe binary mask for green-screen quality. Upstream code is GPL-3.0, so activation needs an explicit license review and F-Droid posture before any dependency lands. |
 | A.5 | Real-ESRGAN x4plus | https://github.com/xinntao/Real-ESRGAN | ~17 MB | Upscaling export pass. |
 | A.7 / R6.4 | SAM 2.1 Hiera Tiny ONNX | https://huggingface.co/onnx-community/sam2.1-hiera-tiny-ONNX | ~160 MB model + 96 MB state cache | Premium-tier; ≥6 GB RAM. SAM 3 / SAM 3.1 is a watch item only (R6.4); upstream has no Tiny ONNX export yet. |
 | A.7 fallback | MobileSAM ONNX | https://github.com/ChaoningZhang/MobileSAM | ~10 MB model + 24 MB state cache | Small-device fallback. |
@@ -91,7 +91,35 @@ NovaCut's F-Droid build (R5.6b) must declare `NonFreeNet` for any model fetched 
 | `central.sonatype.com` / Maven Central | OK |
 | Qualcomm AI Hub (login-walled) | **NonFreeNet** — gate to opt-in only |
 
-## 6. Reproducible build pin requirements
+## 6. AI tool activation gate matrix
+
+This matrix is the implementer-facing gate between `AiToolRequirements` and the
+model registry above. A tool may show `MODEL_DOWNLOAD_REQUIRED` or `READY` only
+when it maps to a §1 active model/dependency row and the runtime/build path has
+an explicit checksum behavior. Planned rows in §2/§3 stay
+`DEPENDENCY_MISSING` until exact bytes, SHA-256 pins, license posture, delivery
+mode, and F-Droid posture are recorded here and in code.
+
+| Tool ID | Registry source | Delivery mode | F-Droid posture | Runtime checksum behavior | Activation status |
+|---|---|---|---|---|---|
+| `auto_captions` | §1 `whisper.tiny.en.onnx` | Explicit `ModelDownloadManager` download from Hugging Face revision `2575352d61be1bf7225cf8f8b268a4678025fc58` | OK | `checksumRequired = true` for encoder, decoder, and vocab; SHA-256 pins in §1 | `MODEL_DOWNLOAD_REQUIRED` |
+| `remove_bg` | §1 `selfie_segmenter.tflite` | Explicit `ModelDownloadManager` download from MediaPipe GCS generation `1683436453600523` | OK | `checksumRequired = true`; SHA-256 pin in §1 | `MODEL_DOWNLOAD_REQUIRED` |
+| `object_remove` | §1 `lama_dilated.onnx` | Explicit `ModelDownloadManager` download from the public Qualcomm Hugging Face revision | OK with NOTICE/license review | `checksumRequired = true`; SHA-256 pin in §1 | `MODEL_DOWNLOAD_REQUIRED` |
+| `denoise` | §1 `deep_filter_mobile_model` plus §2 `android-deepfilternet:0.0.8` | Bundled Maven AAR dependency | OK | Model-file and AAR SHA-256 pins documented in §1; build/release artifact checks cover packaged bytes | `READY` |
+| `ai_background` | §3 RVM planning row | Dependency not bundled | Review required because upstream is GPL-3.0 | Blocked until an exact model export, SHA-256, delivery mode, and redistribution posture are recorded | `DEPENDENCY_MISSING` |
+| `ai_stabilize` | §2 OpenCV Android planning row | Dependency not bundled | Review required | Blocked until the selected AAR/source build has SHA-256, 16 KB evidence, and license/NOTICE review | `DEPENDENCY_MISSING` |
+| `ai_style_transfer` | §3 AnimeGANv2 / Fast NST planning row | Dependency not bundled | Review required per style | Blocked until each style model has exact source bytes, SHA-256, and redistribution terms | `DEPENDENCY_MISSING` |
+| `video_upscale` | §3 Real-ESRGAN planning row | Dependency not bundled | OK once the exact ONNX/NCNN export is pinned | Blocked until the chosen model artifact has a SHA-256 pin and loader wiring | `DEPENDENCY_MISSING` |
+| `frame_interp` | §2/§3 RIFE NCNN planning row | Dependency not bundled | OK with native-build review | Blocked until self-built native libs and model files have SHA-256 pins and 16 KB evidence | `DEPENDENCY_MISSING` |
+| `tap_segment` | §3 SAM 2.1 / MobileSAM planning rows | Dependency not bundled | OK once exact exports are pinned | Blocked until selected SAM/MobileSAM bytes and state-cache delivery are documented with SHA-256 pins | `DEPENDENCY_MISSING` |
+| `stem_separation` | §3 Demucs planning row | Dependency not bundled | OK with model-weight review | Blocked until htdemucs export bytes, SHA-256, and STFT pre/post runtime path are documented | `DEPENDENCY_MISSING` |
+| `voice_clone` | §3 Sherpa-ONNX / voice-clone planning row | Dependency not bundled | Review required for voice model terms and consent copy | Blocked until model bytes, SHA-256, consent gate, and runtime enrollment path are documented | `DEPENDENCY_MISSING` |
+| `tts_offline` | §3 Piper/Sherpa planning row | Dependency not bundled | Review required per voice because Piper is MIT but eSpeak voice stack has GPL considerations | Blocked until each voice pair has source locator, SHA-256, and license disclosure | `DEPENDENCY_MISSING` |
+| `caption_translate` | §3 MADLAD-400 / Bergamot planning rows | Dependency not bundled | OK with license review and per-language download disclosure | Blocked until chosen model/pair bytes, SHA-256, size, and delivery mode are pinned | `DEPENDENCY_MISSING` |
+| `generative_video` | §4 cloud-only providers | Cloud only | NonFreeNet / opt-in only | Not applicable to local checksum; provider, destination, upload size, and retention disclosure are required before any call | `CLOUD_OPT_IN` |
+| `lip_sync` | §4 cloud-only providers | Cloud only | NonFreeNet / opt-in only | Not applicable to local checksum; provider/license review and explicit upload consent are required before any call | `CLOUD_OPT_IN` |
+
+## 7. Reproducible build pin requirements
 
 For reproducibility (R5.6c), every entry above with a download URL must also record:
 - **Source URL** (column 2)
@@ -99,6 +127,6 @@ For reproducibility (R5.6c), every entry above with a download URL must also rec
 - **Approximate size** for the user disclosure sheet (column 5)
 - **License** for the LICENSE/NOTICE shipping requirement (column 6)
 
-As of the 2026-05-17 R7.2 pass, every §1 active model row has an exact source locator and SHA-256 pin that is also wired through `ModelDownloadManager.ModelFile(checksumRequired = true)`. `app/src/test/java/com/novacut/editor/engine/ModelRegistryDocumentationTest.kt` fails the JVM test suite if §1 reintroduces `TBD` checksum placeholders or malformed SHA-256 values.
+As of the 2026-06-04 v3.74.38 pass, every §1 active model row has an exact source locator and SHA-256 pin that is also wired through `ModelDownloadManager.ModelFile(checksumRequired = true)` or a documented build-artifact checksum path. `app/src/test/java/com/novacut/editor/engine/ModelRegistryDocumentationTest.kt` fails the JVM test suite if §1 reintroduces `TBD` checksum placeholders, malformed SHA-256 values, floating active URLs, or an AI tool gate matrix that omits a registered tool.
 
 Future rows in §3 remain planning targets only. They must move into §1 with a public source locator, exact SHA-256, size disclosure, license posture, PAD/F-Droid decision, and runtime checksum wiring before any corresponding Tier A engine activates.

@@ -1,6 +1,7 @@
 package com.novacut.editor.engine
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
@@ -77,6 +78,38 @@ class ModelRegistryDocumentationTest {
         )
     }
 
+    @Test
+    fun aiToolActivationGateMatrixCoversEveryRequirementTool() {
+        val documentedToolIds = aiToolGateRows().map { row ->
+            row.columns().first().trim('`')
+        }.toSet()
+        val registryToolIds = AiToolRequirements.Tool.entries.map { it.toolId }.toSet()
+
+        assertEquals(
+            "docs/models.md AI tool gate matrix must cover every requirement tool",
+            registryToolIds,
+            documentedToolIds
+        )
+    }
+
+    @Test
+    fun runnableRequirementModelsAreDocumentedAsActiveRows() {
+        val activeModelIds = activeModelRows().map { row ->
+            row.columns().first().trim('`')
+        }.toSet()
+        val runnableModelIds = AiToolRequirements.Tool.entries.mapNotNull { tool ->
+            val requirement = AiToolRequirements.requirementFor(tool.toolId)
+            requirement?.modelRegistryId?.takeIf {
+                requirement.availability != AiToolRequirements.Availability.DEPENDENCY_MISSING
+            }
+        }.toSet()
+
+        assertTrue(
+            "Runnable/downloadable AI tools must point to active docs/models.md rows: $runnableModelIds",
+            activeModelIds.containsAll(runnableModelIds)
+        )
+    }
+
     private fun activeModelRows(): List<String> {
         val docs = locateModelsDoc()
             ?: error("Could not locate docs/models.md from the test working directory")
@@ -84,6 +117,20 @@ class ModelRegistryDocumentationTest {
         val start = text.indexOf("## 1. Active models")
         val end = text.indexOf("## 2. Native AARs")
         require(start >= 0 && end > start) { "docs/models.md active model section not found" }
+        return text.substring(start, end)
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("| `") }
+            .toList()
+    }
+
+    private fun aiToolGateRows(): List<String> {
+        val docs = locateModelsDoc()
+            ?: error("Could not locate docs/models.md from the test working directory")
+        val text = docs.readText()
+        val start = text.indexOf("## 6. AI tool activation gate matrix")
+        val end = text.indexOf("## 7. Reproducible build pin requirements")
+        require(start >= 0 && end > start) { "docs/models.md AI tool activation gate matrix not found" }
         return text.substring(start, end)
             .lineSequence()
             .map { it.trim() }

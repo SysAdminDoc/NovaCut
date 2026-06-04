@@ -104,6 +104,91 @@ class AiToolRequirementsTest {
     }
 
     @Test
+    fun futureModelsDoNotAdvertiseDownloadsBeforePinsAndRuntimeWiring() {
+        val plannedOnlyTools = listOf(
+            "ai_style_transfer",
+            "video_upscale",
+            "tap_segment"
+        )
+
+        for (toolId in plannedOnlyTools) {
+            val req = AiToolRequirements.requirementFor(toolId)!!
+            assertEquals(
+                "$toolId must stay unavailable until docs/models.md records exact pins and runtime wiring",
+                AiToolRequirements.Availability.DEPENDENCY_MISSING,
+                req.availability
+            )
+            assertEquals(AiToolRequirements.DeliveryMode.DEPENDENCY_NOT_BUNDLED, req.deliveryMode)
+            assertEquals(
+                AiToolRequirements.RuntimeChecksumBehavior.BLOCKED_UNTIL_PINNED,
+                req.runtimeChecksum
+            )
+            assertNull(req.modelRegistryId)
+        }
+    }
+
+    @Test
+    fun runnableOnDeviceToolsReferenceActiveModelRegistryRows() {
+        val activeRegistryIds = setOf(
+            "whisper.tiny.en.onnx",
+            "selfie_segmenter.tflite",
+            "lama_dilated.onnx",
+            "deep_filter_mobile_model"
+        )
+
+        val runnableOrDownloadable = AiToolRequirements.Tool.entries.mapNotNull {
+            AiToolRequirements.requirementFor(it.toolId)
+        }.filter {
+            it.runtimeLocation == AiToolRequirements.Runtime.ON_DEVICE &&
+                it.availability != AiToolRequirements.Availability.DEPENDENCY_MISSING
+        }
+
+        assertEquals(
+            activeRegistryIds,
+            runnableOrDownloadable.map { it.modelRegistryId }.toSet()
+        )
+        for (req in runnableOrDownloadable) {
+            assertNotNull(req.modelRegistryId)
+            assertTrue(
+                "Active model registry ID ${req.modelRegistryId} must be documented",
+                req.modelRegistryId in activeRegistryIds
+            )
+            assertTrue(
+                "Active ${req.tool} must have runtime/build checksum posture",
+                req.runtimeChecksum == AiToolRequirements.RuntimeChecksumBehavior.REQUIRED ||
+                    req.runtimeChecksum == AiToolRequirements.RuntimeChecksumBehavior.BUILD_ARTIFACT_PINNED
+            )
+        }
+    }
+
+    @Test
+    fun deliveryAndFdroidPostureStayConsistentWithRuntime() {
+        for (tool in AiToolRequirements.Tool.entries) {
+            val req = AiToolRequirements.requirementFor(tool.toolId)!!
+            when (req.runtimeLocation) {
+                AiToolRequirements.Runtime.CLOUD -> {
+                    assertEquals(AiToolRequirements.DeliveryMode.CLOUD_ONLY, req.deliveryMode)
+                    assertEquals(AiToolRequirements.FdroidPosture.NON_FREE_NET, req.fdroidPosture)
+                    assertEquals(
+                        AiToolRequirements.RuntimeChecksumBehavior.NOT_APPLICABLE,
+                        req.runtimeChecksum
+                    )
+                }
+                AiToolRequirements.Runtime.ON_DEVICE -> {
+                    assertTrue(
+                        "On-device ${tool.toolId} must not be cloud-only",
+                        req.deliveryMode != AiToolRequirements.DeliveryMode.CLOUD_ONLY
+                    )
+                    assertTrue(
+                        "On-device ${tool.toolId} must declare a checksum gate",
+                        req.runtimeChecksum != AiToolRequirements.RuntimeChecksumBehavior.NOT_APPLICABLE
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun sizeMb_isMegabyteFloor() {
         val auto = AiToolRequirements.requirementFor("auto_captions")!!
         // 152_000_000 bytes / 1_048_576 = ~144 MB (binary). Use floor.
@@ -127,6 +212,10 @@ class AiToolRequirementsTest {
             assertTrue(
                 "License for ${tool.toolId} must not be blank",
                 req.license.isNotBlank()
+            )
+            assertTrue(
+                "Source URL for ${tool.toolId} must not be blank",
+                !req.sourceUrl.isNullOrBlank()
             )
         }
     }

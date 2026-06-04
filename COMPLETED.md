@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.37 (`versionCode` 174).
+- Current version: v3.74.38 (`versionCode` 175).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -147,6 +147,10 @@ Last consolidated: 2026-06-04.
   bounds, badge thresholds, trim/slip/slide drag-action policy, slide snap target
   collection, and snap haptic checks now live outside `Timeline.kt` with focused
   JVM coverage.
+- Model activation gates refreshed in v3.74.38: AI tool requirements now carry
+  delivery, F-Droid, runtime-checksum, and active model-registry metadata;
+  planned unpinned models stay dependency-missing; and `docs/models.md` has a
+  tested gate matrix covering every registered AI tool.
 
 ## Preserved Historical Detail
 
