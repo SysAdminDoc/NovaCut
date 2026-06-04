@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.74.27 — 2026-06-04
+
+### Primary panel router host extraction
+- Added `EditorPrimaryPanelHost` to own the primary bottom-sheet cluster:
+  media picker, effects, speed, transition, text editor, export, audio, and
+  voiceover recorder surfaces.
+- Moved export smart-render/HDR summary calculation, media-picker selection,
+  text-editor save routing, effect insertion, and voiceover start permission
+  callback wiring out of the main `EditorScreen` body.
+- Kept adaptive embedded-export behavior intact by passing the export pane
+  layout decision into the extracted host.
+- Left the remaining specialized and utility panel routes in `EditorScreen`
+  for the next decomposition pass.
+- Bumped runtime metadata to `versionName 3.74.27` / `versionCode 164`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:compileDebugKotlin`, and `:app:testDebugUnitTest :app:assembleDebug
+  :app:assembleRelease :app:assembleDebugAndroidTest` passed.
+
 ## v3.74.26 — 2026-06-04
 
 ### Panel editor-state storage migration

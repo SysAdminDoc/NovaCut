@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.26 (`versionCode` 163).
+- Current version: v3.74.27 (`versionCode` 164).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -105,6 +105,9 @@ Last consolidated: 2026-06-04.
 - Panel editor-state storage migration shipped in v3.74.26: panel visibility,
   selected effect, and text-overlay editing target now live in
   `EditorPanelState`, with compatibility accessors preserving existing reads.
+- Primary panel router host extraction shipped in v3.74.27: media picker,
+  effects, speed, transition, text editor, export, audio, and voiceover recorder
+  routes now live in `EditorPrimaryPanelHost`.
 
 ## Preserved Historical Detail
 
