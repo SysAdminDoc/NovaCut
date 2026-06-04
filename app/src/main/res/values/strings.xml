@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.74.32</string>
+    <string name="app_version">v3.74.33</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -1664,6 +1664,7 @@
     <string name="notif_export_progress_with_thermal">%1$s - %2$s</string>
     <string name="notif_export_cancel">Cancel</string>
     <string name="notif_export_failed_default">Export failed</string>
+    <string name="export_media_processing_timeout_error">Export stopped because Android reached its media-processing background time limit. Start the export again when the device allows more processing time.</string>
     <string name="notif_export_thermal_progress_light">thermal watch</string>
     <string name="notif_export_thermal_progress_heavy">thermal warning</string>
     <string name="notif_export_thermal_progress_pause">too hot</string>
