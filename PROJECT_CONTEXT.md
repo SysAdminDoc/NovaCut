@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 157`, `versionName = "3.74.20"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.20`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 158`, `versionName = "3.74.21"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.21`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -283,8 +283,28 @@ High-level modules and patterns:
 - The active roadmap item was narrowed to storage migration: move constructor
   fields and `copy(...)` call sites onto the new slices domain by domain.
 - Verification: `:app:compileDebugKotlin :app:testDebugUnitTest --tests
+  com.novacut.editor.ui.editor.EditorDomainStateTest`, full debug-unit/debug
+  APK/release APK/androidTest Gradle matrix, release metadata, signature,
+  zipalign, and APK-based 16 KB gates passed.
+- Next roadmap item after this batch was P1 Editor state storage migration.
+
+2026-06-04 AI editor state storage migration continuation:
+
+- Completed the AI slice of P1 editor state storage migration in v3.74.21.
+  `EditorState` now stores AI-related fields in `ai: EditorAiState` instead
+  of flat constructor properties.
+- Added read-only compatibility accessors for existing UI/delegate reads:
+  `aiRequirementPrompt`, `aiModelRequirement`, `aiProcessingTool`,
+  `aiSuggestion`, `aiUsageLedger`, `cutAssistantReview`, smart-reframe,
+  auto-edit, TTS, and noise-analysis flags.
+- Converted AI mutation call sites in `AiToolsDelegate` and `EditorViewModel`
+  to write through `copyAi` / nested `ai.copy(...)`, including requirement
+  sheets, suggestions, usage ledger, Cut Assistant review, smart reframe,
+  auto edit, TTS, and noise reduction.
+- Verification: `:app:compileDebugKotlin :app:testDebugUnitTest --tests
   com.novacut.editor.ui.editor.EditorDomainStateTest` passed.
-- Next roadmap item: P1 Editor state storage migration.
+- Next roadmap item: P1 Editor state storage migration for panel, caption,
+  compound, export, and media slices.
 
 2026-05-17 autonomous continuation:
 

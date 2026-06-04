@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.74.21 — 2026-06-04
+
+### AI editor-state storage migration
+- Moved AI-related editor storage into `EditorAiState`, including requirement
+  prompts, model requirement sheets, active processing tool, AI suggestions,
+  usage ledger, Cut Assistant review, smart-reframe/auto-edit/TTS/noise flags,
+  and noise analysis text.
+- Kept read-only `EditorState` compatibility accessors so existing UI and
+  delegate reads remain stable while mutation call sites move to nested state.
+- Converted `AiToolsDelegate` and `EditorViewModel` AI mutation paths to
+  update `state.ai` through `copyAi` / nested `ai.copy(...)`.
+- Updated `EditorDomainStateTest` to construct the stored AI slice directly.
+- Bumped runtime metadata to `versionName 3.74.21` / `versionCode 158`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:compileDebugKotlin :app:testDebugUnitTest --tests
+  com.novacut.editor.ui.editor.EditorDomainStateTest`, and
+  `:app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+  :app:assembleDebugAndroidTest` passed.
+
 ## v3.74.20 — 2026-06-04
 
 ### Editor domain-state projection

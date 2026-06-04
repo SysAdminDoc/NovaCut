@@ -4,7 +4,29 @@ Research synthesis for planning. The detailed source plans are archived under
 [docs/archive/research](docs/archive/research/), and the previous expanded
 roadmaps are archived under [docs/archive/roadmap](docs/archive/roadmap/).
 
-Last refreshed: 2026-06-03.
+Last refreshed: 2026-06-04.
+
+## 2026-06-04 Freshness Refresh
+
+- [Verified] The Active Queue's "Editor state storage migration" direction is
+  still the next architecture lane. The v3.74.21 / versionCode 158 pass moves
+  AI storage into `EditorAiState` while preserving read-only compatibility
+  accessors for existing UI and delegate reads.
+- [Verified] Current Maven metadata check: Media3 `1.10.1` and WorkManager
+  `2.11.2` match latest release metadata; Compose BOM is `2026.05.00` vs
+  `2026.05.01`; Room is `2.7.2` vs `2.8.4`; Kotlin is `2.1.0` vs `2.4.0`; AGP
+  `8.7.3` has newer `9.3.0-alpha09` metadata, so that should remain a deliberate
+  toolchain lane rather than an automatic bump.
+- [Verified] The existing release-hardening findings still hold in the current
+  tree: no `networkSecurityConfig` / `usesCleartextTraffic`, no
+  `connectedAndroidTest` or Gradle Managed Device CI execution, no SHA-256/cosign
+  release step, and no `slipClip` / `slideClip` gesture call site in
+  `Timeline.kt` or README grep output.
+- [Verified] Focused and full local gates passed with JDK 21: `git diff
+  --check`, release artifact metadata checks, APK-based 16 KB checks,
+  `apksigner verify`, `zipalign -c -P 16 -v 4`, the focused
+  `EditorDomainStateTest`, and the debug-unit/debug-APK/release-APK/androidTest
+  Gradle matrix. The known lint/R8 warnings remain non-fatal.
 
 ## Executive Summary
 
@@ -13,10 +35,12 @@ Compose / Material 3 / Media3 Transformer + ExoPlayer / Room / DataStore / Hilt 
 ONNX Runtime / MediaPipe). The engine, persistence, model-trust, and release-CI
 layers are already hardened: Room ships five sequential migrations, the model
 download manager enforces SHA-256 (with a required-checksum gate), the release
-workflow builds debug/release/instrumentation APKs and runs signature, ZIP, and 16
-KB-alignment verification, and dependency versions are current (Media3 1.10.1 is the
-latest stable line). The prior consolidation already folded legacy roadmaps and
-research plans into the canonical trio plus `docs/archive/`.
+workflow builds debug/release/instrumentation APKs and runs signature, ZIP, and
+16 KB-alignment verification, and core dependency versions are mostly current
+(Media3 1.10.1 and WorkManager 2.11.2 match current metadata; Compose BOM, Room,
+and Kotlin have newer stable metadata to review deliberately). The prior
+consolidation already folded legacy roadmaps and research plans into the
+canonical trio plus `docs/archive/`.
 
 This pass therefore did not re-survey feature ideas. Instead it audited the repo
 against actual source and found the remaining high-value gaps are in **release
@@ -160,9 +184,12 @@ Top opportunities (one line each):
 - **Model trust:** `ModelDownloadManager` enforces SHA-256 with a required-checksum
   gate and deletes corrupt files before retry — R5.9b is implemented, not pending.
   [Verified]
-- **Dependency health:** versions are current (Media3 1.10.1 is the latest stable;
-  AGP 8.7.3, Kotlin 2.1.0, Compose BOM 2026.05). Dependabot groups by ecosystem
-  weekly. No obviously vulnerable/unused declared deps spotted. [Likely]
+- **Dependency health:** Media3 1.10.1 and WorkManager 2.11.2 match current
+  release metadata; Compose BOM 2026.05.00, Room 2.7.2, and Kotlin 2.1.0 have
+  newer stable metadata; AGP's newest observed metadata is 9.3.0-alpha09 and
+  should not be pulled into the release line casually. Dependabot groups by
+  ecosystem weekly. No obviously vulnerable/unused declared deps spotted.
+  [Likely]
 - **Native/16 KB:** no first-party native code yet; native libs arrive via AAR
   (ONNX, MediaPipe, FFmpegKit-16kb fork); CI runs `check_16kb_alignment.py` over
   built APKs. NDK pin documented for when first-party native lands. [Verified]

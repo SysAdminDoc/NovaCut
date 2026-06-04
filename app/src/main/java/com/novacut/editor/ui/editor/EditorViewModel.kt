@@ -203,11 +203,10 @@ data class EditorState(
     // one-shot action snackbar ("N clips deleted — Undo"). Null when no
     // banner is pending or after the user interacts with it.
     val bulkUndoPrompt: BulkUndoPrompt? = null,
-    val aiRequirementPrompt: AiRequirementPrompt? = null,
-    // Registry-backed pre-flight sheet for AI/model tools. The legacy
-    // `aiRequirementPrompt` AlertDialog is now only a fallback for tool IDs
-    // that do not have an AiToolRequirements entry.
-    val aiModelRequirement: com.novacut.editor.engine.AiToolRequirements.ToolRequirement? = null,
+    // First storage slice migrated out of the flat state constructor. Read-only
+    // compatibility accessors below preserve existing UI reads while mutation
+    // call sites move to `copy(ai = state.ai.copy(...))`.
+    val ai: EditorAiState = EditorAiState(),
     // R5.4a — caption-translation editor surface. Populated by
     // EditorViewModel.runCaptionTranslation(); the panel
     // (CaptionTranslationPanel) consumes these fields directly.
@@ -222,7 +221,6 @@ data class EditorState(
     // immutable signal the UI (BackHandler, breadcrumb chip) reads. 0 == root.
     val compoundNavDepth: Int = 0,
     val compoundBreadcrumbText: String = "",
-    val aiProcessingTool: String? = null,
     val lastExportedFilePath: String? = null,
     val copiedEffects: List<Effect> = emptyList(),
     val exportErrorMessage: String? = null,
@@ -262,20 +260,10 @@ data class EditorState(
     val undoHistoryEntries: List<com.novacut.editor.model.UndoHistoryEntry> = emptyList(),
     // Beat sync
     val isAnalyzingBeats: Boolean = false,
-    // Smart reframe
-    val isReframing: Boolean = false,
-    // Auto-edit
-    val isAutoEditing: Boolean = false,
     // Editor mode
     val editorMode: EditorMode = EditorMode.PRO,
     // Timeline collapsed
     val isTimelineCollapsed: Boolean = false,
-    // TTS
-    val isSynthesizingTts: Boolean = false,
-    val isTtsAvailable: Boolean = false,
-    // Noise reduction
-    val isAnalyzingNoise: Boolean = false,
-    val noiseAnalysisResult: String? = null,
     // Saved export config (for restoring after quick preview)
     val savedExportConfig: ExportConfig? = null,
     // Drawing overlay
@@ -283,26 +271,33 @@ data class EditorState(
     val isDrawingMode: Boolean = false,
     val drawingColor: Long = 0xFFF38BA8L,
     val drawingStrokeWidth: Float = 4f,
-    val aiSuggestion: AiSuggestion? = null,
     // v3.69 feature-wave state
     val v369: V369State = V369State(),
     // v3.71 object-aware editing scaffolding. The list lives in editor state so
     // the timeline can light up tracked-subject lanes the moment a tracker
     // populates them; persistence flows through AutoSaveState.trackedObjects.
     val trackedObjects: List<com.novacut.editor.model.TrackedObject> = emptyList(),
-    // R8.9 disclosure ledger. Kept in editor state so export/privacy surfaces
-    // can default disclosure controls without needing telemetry.
-    val aiUsageLedger: List<AiUsageLedger.Entry> = emptyList(),
-    // v3.71 Cut Assistant review state. Null until the user opens the panel;
-    // mutating per-proposal acceptance does not split clips — the apply step is
-    // explicit so undo records a single "Apply Cut Assistant" entry.
-    val cutAssistantReview: com.novacut.editor.engine.CutAssistantEngine.ReviewSet? = null,
     // Trust/report surfaces for operations that can lose data or need follow-up.
     // These are UI-only and intentionally excluded from project persistence.
     val backupImportFeedback: BackupImportFeedback? = null,
     val timelineExchangeFeedback: TimelineExchangeFeedback? = null,
     val mediaRelinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport> = emptyMap()
-)
+) {
+    val aiRequirementPrompt: AiRequirementPrompt? get() = ai.requirementPrompt
+    val aiModelRequirement: com.novacut.editor.engine.AiToolRequirements.ToolRequirement?
+        get() = ai.modelRequirement
+    val aiProcessingTool: String? get() = ai.processingTool
+    val aiSuggestion: AiSuggestion? get() = ai.suggestion
+    val aiUsageLedger: List<AiUsageLedger.Entry> get() = ai.usageLedger
+    val cutAssistantReview: com.novacut.editor.engine.CutAssistantEngine.ReviewSet?
+        get() = ai.cutAssistantReview
+    val isReframing: Boolean get() = ai.isReframing
+    val isAutoEditing: Boolean get() = ai.isAutoEditing
+    val isSynthesizingTts: Boolean get() = ai.isSynthesizingTts
+    val isTtsAvailable: Boolean get() = ai.isTtsAvailable
+    val isAnalyzingNoise: Boolean get() = ai.isAnalyzingNoise
+    val noiseAnalysisResult: String? get() = ai.noiseAnalysisResult
+}
 
 /**
  * State bag for the v3.69 15-feature wave. Lives as a nested block to keep the
@@ -876,7 +871,7 @@ class EditorViewModel @Inject constructor(
                 beatMarkers = recovery.beatMarkers,
                 v369 = it.v369.copy(transcript = recovery.transcript ?: it.v369.transcript),
                 trackedObjects = recovery.trackedObjects.ifEmpty { it.trackedObjects },
-                aiUsageLedger = recovery.aiUsageLedger,
+                ai = it.ai.copy(usageLedger = recovery.aiUsageLedger),
                 totalDurationMs = recovery.tracks.maxOfOrNull { t ->
                     t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L
                 } ?: 0L,
@@ -1358,15 +1353,14 @@ class EditorViewModel @Inject constructor(
     private fun dismissedPanelState(state: EditorState) = normalizeSelectionState(
         state.copy(
             panels = state.panels.closeAll(),
-            noiseAnalysisResult = null,
+            ai = state.ai.copy(
+                noiseAnalysisResult = null,
+                cutAssistantReview = null
+            ),
             selectedEffectId = null,
             editingTextOverlayId = null,
             selectedMaskId = null,
-            isDrawingMode = false,
-            // v3.71 — Cut Assistant review survives panel transitions today, which
-            // leaks a potentially large ReviewSet (proposals + cached words) into
-            // unrelated workflows. Drop it alongside the other auxiliary state.
-            cutAssistantReview = null
+            isDrawingMode = false
         )
     )
 
@@ -1712,7 +1706,7 @@ class EditorViewModel @Inject constructor(
                     drawingPaths = recovery.drawingPaths,
                     playheadMs = recovery.playheadMs,
                     chapterMarkers = recovery.chapterMarkers,
-                    aiUsageLedger = recovery.aiUsageLedger,
+                    ai = it.ai.copy(usageLedger = recovery.aiUsageLedger),
                     beatMarkers = recovery.beatMarkers,
                     trackedObjects = recovery.trackedObjects.ifEmpty { it.trackedObjects },
                     v369 = it.v369.copy(transcript = recovery.transcript ?: it.v369.transcript)
@@ -2179,28 +2173,30 @@ class EditorViewModel @Inject constructor(
 
     // --- AI Suggestions ---
     fun dismissAiSuggestion() {
-        _state.update { it.copy(aiSuggestion = null) }
+        _state.update { it.copyAi { ai -> ai.copy(suggestion = null) } }
     }
 
     fun recordAiUsage(entry: AiUsageLedger.Entry) {
         _state.update { state ->
-            state.copy(
-                aiUsageLedger = AiUsageLedger.mergeOverlaps(
-                    state.aiUsageLedger + entry
+            state.copyAi { ai ->
+                ai.copy(
+                    usageLedger = AiUsageLedger.mergeOverlaps(
+                        state.aiUsageLedger + entry
+                    )
                 )
-            )
+            }
         }
         saveProject()
     }
 
     fun clearAiUsageLedger() {
-        _state.update { it.copy(aiUsageLedger = emptyList()) }
+        _state.update { it.copyAi { ai -> ai.copy(usageLedger = emptyList()) } }
         saveProject()
     }
 
     private fun generateAiSuggestion(clipId: String?) {
         if (clipId == null) {
-            _state.update { it.copy(aiSuggestion = null) }
+            _state.update { it.copyAi { ai -> ai.copy(suggestion = null) } }
             return
         }
         val s = _state.value
@@ -2236,14 +2232,14 @@ class EditorViewModel @Inject constructor(
                 } else null
             }
         }
-        _state.update { it.copy(aiSuggestion = suggestion) }
+        _state.update { it.copyAi { ai -> ai.copy(suggestion = suggestion) } }
     }
 
     // --- Smart Reframe ---
     fun showSmartReframe() = showPanel(PanelId.SMART_REFRAME)
     fun hideSmartReframe() = hidePanel(PanelId.SMART_REFRAME)
     fun applySmartReframe(targetAspect: AspectRatio) {
-        _state.update { it.copy(isReframing = true) }
+        _state.update { it.copyAi { ai -> ai.copy(isReframing = true) } }
         viewModelScope.launch {
             try {
                 // Analyze video for subject positions
@@ -2264,13 +2260,13 @@ class EditorViewModel @Inject constructor(
                 _state.update { it.copy(
                     project = project,
                     exportConfig = it.exportConfig.copy(aspectRatio = targetAspect),
-                    isReframing = false
+                    ai = it.ai.copy(isReframing = false)
                 ) }
                 saveProject()
                 showToast("Reframed to ${targetAspect.label}")
                 hideSmartReframe()
             } catch (e: Exception) {
-                _state.update { it.copy(isReframing = false) }
+                _state.update { it.copyAi { ai -> ai.copy(isReframing = false) } }
                 showToast("Reframe failed: ${e.message}")
             }
         }
@@ -2299,7 +2295,7 @@ class EditorViewModel @Inject constructor(
             .flatMap { it.clips }
         if (clips.isEmpty()) { showToast("Add video clips first"); return }
 
-        _state.update { it.copy(isAutoEditing = true) }
+        _state.update { it.copyAi { ai -> ai.copy(isAutoEditing = true) } }
         viewModelScope.launch {
             try {
                 val autoClips = clips.map { com.novacut.editor.ai.AutoEditClip(it.sourceUri, it.sourceDurationMs) }
@@ -2338,20 +2334,22 @@ class EditorViewModel @Inject constructor(
                             tracks = s.tracks.map { track ->
                                 if (track.id == videoTrack.id) track.copy(clips = newClips) else track
                             },
-                            isAutoEditing = false,
-                            aiUsageLedger = AiUsageLedger.mergeOverlaps(s.aiUsageLedger + aiUsageEntries)
+                            ai = s.ai.copy(
+                                isAutoEditing = false,
+                                usageLedger = AiUsageLedger.mergeOverlaps(s.aiUsageLedger + aiUsageEntries)
+                            )
                         )
                     }
                     rebuildTimeline()
                     saveProject()
                     showToast("Auto-edit created ${result.segments.size} segments")
                 } else {
-                    _state.update { it.copy(isAutoEditing = false) }
+                    _state.update { it.copyAi { ai -> ai.copy(isAutoEditing = false) } }
                     showToast("Could not generate auto-edit")
                 }
                 hideAutoEdit()
             } catch (e: Exception) {
-                _state.update { it.copy(isAutoEditing = false) }
+                _state.update { it.copyAi { ai -> ai.copy(isAutoEditing = false) } }
                 showToast("Auto-edit failed")
             }
         }
@@ -2360,16 +2358,26 @@ class EditorViewModel @Inject constructor(
     // --- TTS ---
     fun showTts() {
         pauseIfPlaying()
-        if (!ttsEngine.isAvailable()) ttsEngine.initialize { _state.update { it.copy(isTtsAvailable = true) } }
-        _state.update { dismissedPanelState(it).copy(panels = it.panels.closeAll().open(PanelId.TTS), isTtsAvailable = ttsEngine.isAvailable()) }
+        if (!ttsEngine.isAvailable()) {
+            ttsEngine.initialize {
+                _state.update { it.copyAi { ai -> ai.copy(isTtsAvailable = true) } }
+            }
+        }
+        _state.update {
+            val dismissed = dismissedPanelState(it)
+            dismissed.copy(
+                panels = it.panels.closeAll().open(PanelId.TTS),
+                ai = dismissed.ai.copy(isTtsAvailable = ttsEngine.isAvailable())
+            )
+        }
     }
     fun hideTts() { ttsEngine.stopPreview(); hidePanel(PanelId.TTS) }
 
     fun synthesizeTts(text: String, style: com.novacut.editor.engine.TtsEngine.VoiceStyle) {
-        _state.update { it.copy(isSynthesizingTts = true) }
+        _state.update { it.copyAi { ai -> ai.copy(isSynthesizingTts = true) } }
         viewModelScope.launch {
             val file = ttsEngine.synthesize(text, style)
-            _state.update { it.copy(isSynthesizingTts = false) }
+            _state.update { it.copyAi { ai -> ai.copy(isSynthesizingTts = false) } }
             if (file != null) {
                 val uri = android.net.Uri.fromFile(file)
                 // Query actual duration from the generated audio file
@@ -2436,7 +2444,10 @@ class EditorViewModel @Inject constructor(
 
     // --- Noise Reduction ---
     fun showNoiseReduction() = showPanel(PanelId.NOISE_REDUCTION)
-    fun hideNoiseReduction() { hidePanel(PanelId.NOISE_REDUCTION); _state.update { it.copy(noiseAnalysisResult = null) } }
+    fun hideNoiseReduction() {
+        hidePanel(PanelId.NOISE_REDUCTION)
+        _state.update { it.copyAi { ai -> ai.copy(noiseAnalysisResult = null) } }
+    }
 
     // --- Sticker Picker ---
     fun showStickerPicker() = showPanel(PanelId.STICKER_PICKER)
@@ -2517,14 +2528,21 @@ class EditorViewModel @Inject constructor(
             showToast("Selected clip has no audio to analyze")
             return
         }
-        _state.update { it.copy(isAnalyzingNoise = true, noiseAnalysisResult = null) }
+        _state.update {
+            it.copyAi { ai ->
+                ai.copy(
+                    isAnalyzingNoise = true,
+                    noiseAnalysisResult = null
+                )
+            }
+        }
         viewModelScope.launch {
             try {
                 // Step 1: Analyze noise profile using NoiseReductionEngine
                 val noiseProfile = noiseReductionEngine.analyzeNoise(clip.sourceUri)
                 val analysisText = "Detected ${noiseProfile.type} noise, SNR: ${noiseProfile.estimatedSnrDb.toInt()} dB" +
                     (noiseProfile.dominantFreqHz?.let { " @ ${it.toInt()} Hz" } ?: "")
-                _state.update { it.copy(noiseAnalysisResult = analysisText) }
+                _state.update { it.copyAi { ai -> ai.copy(noiseAnalysisResult = analysisText) } }
                 showToast(analysisText)
 
                 // Step 2: Apply noise reduction via NoiseReductionEngine
@@ -2542,8 +2560,10 @@ class EditorViewModel @Inject constructor(
 
                     _state.update { s ->
                         s.copy(
-                            isAnalyzingNoise = false,
-                            noiseAnalysisResult = "$analysisText — applied ${mode.displayName} (SNR improved to ${result.processedSnrDb.toInt()} dB)",
+                            ai = s.ai.copy(
+                                isAnalyzingNoise = false,
+                                noiseAnalysisResult = "$analysisText — applied ${mode.displayName} (SNR improved to ${result.processedSnrDb.toInt()} dB)"
+                            ),
                             tracks = s.tracks.map { track ->
                                 track.copy(clips = track.clips.map { c ->
                                     if (c.id == clip.id) {
@@ -2556,11 +2576,18 @@ class EditorViewModel @Inject constructor(
                     saveProject()
                     showToast("Applied ${mode.displayName} noise reduction")
                 } else {
-                    _state.update { it.copy(isAnalyzingNoise = false) }
+                    _state.update { it.copyAi { ai -> ai.copy(isAnalyzingNoise = false) } }
                     showToast("Audio is clean — no noise reduction needed")
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(isAnalyzingNoise = false, noiseAnalysisResult = null) }
+                _state.update {
+                    it.copyAi { ai ->
+                        ai.copy(
+                            isAnalyzingNoise = false,
+                            noiseAnalysisResult = null
+                        )
+                    }
+                }
                 showToast("Noise analysis failed")
             }
         }
@@ -2602,17 +2629,19 @@ class EditorViewModel @Inject constructor(
                 tracks = baseTracks.map { t ->
                     if (t.id == track.id) t.copy(clips = t.clips + clip) else t
                 },
-                aiUsageLedger = if (aiUsageKind != null) {
-                    AiUsageLedger.mergeOverlaps(
-                        s.aiUsageLedger + AiUsageRecordFactory.forClip(
-                            clip = clip,
-                            effectKind = aiUsageKind,
-                            modelName = aiUsageModelName.orEmpty()
+                ai = s.ai.copy(
+                    usageLedger = if (aiUsageKind != null) {
+                        AiUsageLedger.mergeOverlaps(
+                            s.aiUsageLedger + AiUsageRecordFactory.forClip(
+                                clip = clip,
+                                effectKind = aiUsageKind,
+                                modelName = aiUsageModelName.orEmpty()
+                            )
                         )
-                    )
-                } else {
-                    s.aiUsageLedger
-                }
+                    } else {
+                        s.aiUsageLedger
+                    }
+                )
             )
         }
         // Rebuild the preview so the new TTS / voiceover clip is audible immediately, and
@@ -2740,7 +2769,7 @@ class EditorViewModel @Inject constructor(
                 val filteredAudio = perClipAudio.filterKeys { it in validIds }
                 val review = cutAssistantEngine.review(filteredTracks, filteredAudio).acceptAll()
                 _state.update { it.copy(
-                    cutAssistantReview = review,
+                    ai = it.ai.copy(cutAssistantReview = review),
                     panels = it.panels.closeAll()
                 ) }
                 showToast(
@@ -2758,24 +2787,24 @@ class EditorViewModel @Inject constructor(
 
     fun toggleCutProposal(id: String) {
         _state.update { s ->
-            s.copy(cutAssistantReview = s.cutAssistantReview?.toggle(id))
+            s.copyAi { ai -> ai.copy(cutAssistantReview = s.cutAssistantReview?.toggle(id)) }
         }
     }
 
     fun acceptAllCutProposals() {
         _state.update { s ->
-            s.copy(cutAssistantReview = s.cutAssistantReview?.acceptAll())
+            s.copyAi { ai -> ai.copy(cutAssistantReview = s.cutAssistantReview?.acceptAll()) }
         }
     }
 
     fun rejectAllCutProposals() {
         _state.update { s ->
-            s.copy(cutAssistantReview = s.cutAssistantReview?.rejectAll())
+            s.copyAi { ai -> ai.copy(cutAssistantReview = s.cutAssistantReview?.rejectAll()) }
         }
     }
 
     fun dismissCutAssistantReview() {
-        _state.update { it.copy(cutAssistantReview = null) }
+        _state.update { it.copyAi { ai -> ai.copy(cutAssistantReview = null) } }
     }
 
     /**
@@ -2858,7 +2887,7 @@ class EditorViewModel @Inject constructor(
             }
         }
         _state.update { s ->
-            recalculateDuration(s.copy(cutAssistantReview = null))
+            recalculateDuration(s.copyAi { ai -> ai.copy(cutAssistantReview = null) })
         }
         rebuildPlayerTimeline()
         saveProject()
@@ -4307,7 +4336,7 @@ class EditorViewModel @Inject constructor(
         val current = _state.value.aiRequirementPrompt ?: return
         _state.update {
             if (it.aiRequirementPrompt?.id == current.id) {
-                it.copy(aiRequirementPrompt = null)
+                it.copyAi { ai -> ai.copy(requirementPrompt = null) }
             } else {
                 it
             }
@@ -4322,7 +4351,7 @@ class EditorViewModel @Inject constructor(
     fun showAiModelRequirement(toolId: String) = aiToolsDelegate.showAiModelRequirement(toolId)
 
     fun dismissAiModelRequirement() {
-        _state.update { it.copy(aiModelRequirement = null) }
+        _state.update { it.copyAi { ai -> ai.copy(modelRequirement = null) } }
     }
 
     // --- R5.4a Caption translation orchestrator ---
