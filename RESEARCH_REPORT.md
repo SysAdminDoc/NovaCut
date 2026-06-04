@@ -213,15 +213,20 @@ Top opportunities (one line each):
 
 ### Note on this refresh
 
-The seven research-driven items summarized above were prepared for `ROADMAP.md`'s
-`## Research-Driven Additions` section. During this pass a concurrent process began
-modifying `ROADMAP.md` (a `v3.74.16`/versionCode 153 bump and caption-translation
-work) in the working tree. To avoid entangling unrelated uncommitted edits, the
-roadmap body was left untouched and only this report was committed; the full item
-text (Why/Evidence/Touches/Acceptance/Verify/Complexity) lives here under
-"Quality & Friction Findings" and "Architecture & Technical Findings" and can be
-transcribed into `## Research-Driven Additions` once the concurrent roadmap edits
-land.
+The research-driven items summarized above have now been transcribed into
+`ROADMAP.md`'s `## Research-Driven Additions` section as full entries
+(Why/Evidence/Touches/Acceptance/Verify/Complexity), grouped by category with
+Quick Wins and Larger Bets sub-groupings. The previous concurrent `ROADMAP.md`
+edits (the `v3.74.x` version bumps and caption-translation work) have since
+landed, so the additions were appended cleanly under the trailing
+`## Research-Driven Additions` header without entangling unrelated working-tree
+changes. The ten roadmap items expand the seven headline findings here with two
+gesture/accessibility items and an explicit README-claim correction, all tied to
+the same verified evidence. Each finding's claim was re-checked against
+`app/src/main`, `.github/workflows/build.yml`, and `AndroidManifest.xml` on
+2026-06-03: zero slip/slide gesture sites in `Timeline.kt`, no
+`UncaughtExceptionHandler`, no `networkSecurityConfig`, `values/`-only resources,
+and no checksum/emulator step in CI.
 
 ## Archived Research Inputs
 

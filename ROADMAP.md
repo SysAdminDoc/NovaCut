@@ -160,4 +160,176 @@ the concrete candidate detail is not stranded in a local-only file.
 
 ## Research-Driven Additions
 
-<!-- populated by the research pass -->
+*Research conducted 2026-06-03. Items below are new — not duplicates of Existing Planned Work.*
+
+These items came from a source-grounded audit (not a feature-discovery pass). The
+remaining high-value gaps are in release verification depth, network/crash
+hardening, localization delivery, and doc accuracy — none of which the Active
+Queue (scaffold adoption/decomposition), the Research-Backed Engine Candidates
+(engine activations), or the Deferred list already cover. Every claim below was
+checked against `app/src/main`, `.github/workflows/build.yml`, and the manifest.
+
+### Reliability & Security
+
+- [ ] P0 — Install a global uncaught-exception handler
+  - Why: The app ships a diagnostic-ZIP feature but has no crash capture, so a
+    fatal exception is lost — nothing to attach to the diagnostic bundle and no
+    recovery breadcrumb.
+  - Evidence: `grep` for `setDefaultUncaughtExceptionHandler` /
+    `UncaughtExceptionHandler` across `app/src/main/java/` returns zero hits;
+    `DiagnosticExportEngine.kt` exists and is wired to Settings; `NovaCutApp.kt`
+    is the `Application` with an empty-tail `onCreate()` (the natural install
+    point).
+  - Touches: `NovaCutApp.onCreate`, a crash-record writer feeding the existing
+    diagnostic-ZIP path, autosave/recovery handoff.
+  - Acceptance: an uncaught exception writes a redacted crash record into the
+    diagnostic store, chains to any previous default handler, and the next
+    launch surfaces it for export — no PII in the record.
+  - Verify: throw in a debug build, confirm the record is written and exportable;
+    confirm normal crashes still propagate to the platform after capture.
+  - Complexity: M
+
+- [ ] P2 — Add a `networkSecurityConfig` that blocks cleartext app-wide
+  - Why: With the `INTERNET` permission and an OkHttp cloud path, cleartext
+    HTTP is permitted by the platform default on API 26-27; an explicit config
+    closes the downgrade surface and documents the cloud posture.
+  - Evidence: `AndroidManifest.xml` declares `android.permission.INTERNET` with
+    no `usesCleartextTraffic` attribute and no `networkSecurityConfig`; OkHttp
+    5.3.2 is a declared dependency (`libs.versions.toml`).
+  - Touches: `res/xml/network_security_config.xml` (new resource),
+    `AndroidManifest.xml` `application` element.
+  - Acceptance: `cleartextTrafficPermitted="false"` enforced app-wide (with an
+    explicit allowlist only if a cleartext host is genuinely required); cloud
+    calls still succeed over TLS.
+  - Verify: confirm an `http://` request fails fast in a debug build; confirm
+    the existing HTTPS model/cloud paths are unaffected.
+  - Complexity: S
+
+- [ ] P2 — Attach checksums and build provenance to release artifacts
+  - Why: Tagged-release CI uploads APKs with no integrity proof, so a
+    self-host/F-Droid consumer cannot verify a download independently.
+  - Evidence: `.github/workflows/build.yml` builds/verifies/zipaligns/16 KB-checks
+    APKs and uploads them, but contains no `sha256`/`checksum`/`cosign`/
+    `provenance` step; `dependabot.yml` flags cosign as future work.
+  - Touches: release job in `build.yml` (emit `*.sha256` next to each APK; optional
+    SLSA/cosign attestation), release notes/README verification snippet.
+  - Acceptance: every release asset has a published SHA-256 sum; a documented
+    one-line command reproduces and matches it.
+  - Verify: download a release asset and confirm the published sum matches
+    locally computed `sha256sum`.
+  - Complexity: S
+
+### Quality & Friction
+
+- [ ] P1 — Execute the instrumentation smoke suite on an emulator in CI
+  - Why: The v3.74.11 Compose smoke harness is compiled and packaged but never
+    run, so a green pipeline does not prove the app even launches — launch/a11y
+    regressions pass CI silently.
+  - Evidence: `build.yml` builds and packages the `androidTest` APK
+    (`apk/androidTest/debug/*.apk` appears only in alignment/verify loops) but has
+    no `connectedAndroidTest` / `connectedCheck` / emulator / Gradle Managed
+    Device step.
+  - Touches: `.github/workflows/build.yml` (add a Gradle Managed Device or hosted
+    emulator job), test-runner config.
+  - Acceptance: the gallery/blank-editor/picker/export/Settings/privacy smoke
+    tests run on a device image in CI and gate the build.
+  - Verify: confirm the new CI job runs the instrumentation tests green and fails
+    when a smoke test is deliberately broken.
+  - Complexity: M
+
+- [ ] P1 — Ship at least one fully translated locale
+  - Why: The localization scaffold is complete (~1900 externalized strings, RTL
+    `BidiFormatter`, `localeConfig`) but ships zero translated locales — large
+    infra investment with no end-user benefit and no real-build exercise of the
+    RTL path.
+  - Evidence: `res/` contains only `values/` (no `values-*` locale dirs);
+    `strings.xml` is ~1937 lines; `BidiTextPolicyTest` and `locales_config.xml`
+    exist.
+  - Touches: new `res/values-<locale>/strings.xml`, per-app-language QA, README
+    locale list.
+  - Acceptance: one locale fully translated and selectable via per-app language;
+    no missing-string fallbacks in that locale; if RTL is chosen, BidiFormatter
+    is exercised on a real layout.
+  - Verify: switch app language on a build and confirm full coverage and correct
+    bidi rendering.
+  - Complexity: M
+
+- [ ] P1 — Wire slip/slide editing to timeline gestures (or scope it down)
+  - Why: `slipClip()`/`slideClip()` exist in the engine but have no gesture call
+    sites, so the "pro" slip/slide edit is unreachable — a core mobile-NLE
+    table-stakes gap versus KineMaster/PowerDirector.
+  - Evidence: `grep slipClip|slideClip Timeline.kt` returns zero matches; the
+    functions are defined on the edit/engine side; README advertises the feature.
+  - Touches: `Timeline.kt` gesture handling, edit-command dispatch, existing
+    accessibility-action gates.
+  - Acceptance: slip and slide are reachable from timeline drag (and from
+    accessibility actions), routed through the edit-command/undo path.
+  - Verify: perform a slip and a slide on a built editor and confirm correct
+    in/out behavior plus undo.
+  - Complexity: M
+  - Note: overlaps the "Timeline magnetic snapping and command-pattern undo"
+    Engine Candidate's gesture work; sequence after that lands to avoid churn.
+
+### Documentation & Polish
+
+- [ ] P2 — Correct overstated feature claims in README
+  - Why: README lists slip/slide editing as shipped while it is not gesture-wired,
+    which misleads users and inflates the "pro" claim.
+  - Evidence: README slip/slide claim vs. zero `slipClip`/`slideClip` gesture
+    sites in `Timeline.kt` (same evidence as the wiring item above).
+  - Touches: `README.md` feature list.
+  - Acceptance: README marks slip/slide as planned/in-progress (or the wiring
+    item lands first and the claim becomes accurate); no other shipped/unshipped
+    mismatches remain in the feature list.
+  - Verify: cross-check each README "shipped" claim against a call site or test.
+  - Complexity: S
+
+- [ ] P3 — Realign the future-dated consolidation stamps
+  - Why: `ROADMAP.md`, `COMPLETED.md`, and `PROJECT_CONTEXT.md` carry a
+    future-dated "Last consolidated: 2026-06-04" stamp, which undermines doc
+    trust and audit trails.
+  - Evidence: all three files contain `Last consolidated: 2026-06-04` (and
+    `PROJECT_CONTEXT.md` also `Last implementation update: 2026-06-04`), dates
+    ahead of the actual edit history.
+  - Touches: the date-stamp lines in those three docs.
+  - Acceptance: stamps reflect the actual last-consolidation date and are kept in
+    sync on future consolidations.
+  - Verify: confirm each stamp matches the commit that last touched it.
+  - Complexity: S
+
+### Accessibility (audit)
+
+- [ ] P2 — Run a WCAG 2.2 AA audit of the editor surfaces
+  - Why: Edge-to-edge, predictive back, and accessibility actions are shipped,
+    but contrast, 48dp touch targets, and content labels across the dense editor
+    panels are unverified — and the unrun smoke suite means a11y regressions are
+    not caught.
+  - Evidence: COMPLETED.md lists a11y actions as shipped; no device/contrast
+    audit was possible this pass (no emulator run); the CI smoke suite is built
+    but not executed.
+  - Touches: editor/timeline/export/Settings composables (labels, target sizes,
+    color tokens), TalkBack pass.
+  - Acceptance: a documented WCAG 2.2 AA checklist pass for the primary editor
+    flows (contrast ratios, 48dp targets, semantic labels, TalkBack traversal).
+  - Verify: TalkBack walkthrough plus an automated accessibility scanner on the
+    smoke flows, both clean.
+  - Complexity: M
+
+### Quick Wins (P2/P3, < 1hr)
+
+- P2 — Add a `networkSecurityConfig` that blocks cleartext app-wide (small XML
+  resource + one manifest attribute).
+- P2 — Attach SHA-256 sums to release artifacts (one CI step).
+- P2 — Correct overstated slip/slide claim in README.
+- P3 — Realign the future-dated "Last consolidated: 2026-06-04" stamps.
+
+### Larger Bets (P0/P1, staged)
+
+- P0 — Global uncaught-exception handler feeding the diagnostic-ZIP path (crash
+  capture + recovery surfacing).
+- P1 — Execute the instrumentation smoke suite on an emulator/Managed Device in
+  CI (close the "green-but-unverified" gap).
+- P1 — Ship at least one fully translated locale (activate the dormant i18n
+  scaffold; exercise the RTL path on a real build).
+- P1 — Wire slip/slide to timeline gestures (sequenced after the command-pattern
+  undo Engine Candidate).
