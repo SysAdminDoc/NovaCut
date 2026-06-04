@@ -81,6 +81,15 @@ class AiToolsDelegate(
         "bg_replace"
     )
 
+    private val strictRequirementTools = setOf(
+        "frame_interp",
+        "object_remove",
+        "video_upscale",
+        "ai_background",
+        "ai_stabilize",
+        "ai_style_transfer"
+    )
+
     // Whisper model state (exposed for UI binding)
     val whisperModelState get() = aiFeatures.whisperEngine.modelState
     val whisperDownloadProgress get() = aiFeatures.whisperEngine.downloadProgress
@@ -173,6 +182,19 @@ class AiToolsDelegate(
     }
 
     fun runAiTool(toolId: String) {
+        runAiTool(toolId = toolId, requirePreflight = true)
+    }
+
+    fun runAiToolAfterRequirement(toolId: String) {
+        runAiTool(toolId = toolId, requirePreflight = false)
+    }
+
+    fun showAiModelRequirement(toolId: String) {
+        val requirement = resolveAiModelRequirement(toolId) ?: return
+        showAiModelRequirement(requirement)
+    }
+
+    private fun runAiTool(toolId: String, requirePreflight: Boolean) {
         val clip = getSelectedClip()
         if (clip == null) {
             showToast("Select a clip first")
@@ -184,6 +206,14 @@ class AiToolsDelegate(
         }
 
         val clipId = clip.id
+
+        if (requirePreflight && toolId in strictRequirementTools) {
+            val requirement = resolveAiModelRequirement(toolId)
+            if (requirement != null && requirement.availability != AiToolRequirements.Availability.READY) {
+                showAiModelRequirement(requirement)
+                return
+            }
+        }
 
         // Cancel the previous job FIRST so its finally block (which clears aiProcessingTool)
         // runs before we publish our new state — otherwise a trailing `aiProcessingTool = null`
@@ -759,15 +789,59 @@ class AiToolsDelegate(
         saveProject()
     }
 
+    private fun resolveAiModelRequirement(toolId: String): AiToolRequirements.ToolRequirement? {
+        val requirement = AiToolRequirements.requirementFor(toolId) ?: return null
+        val availability = when (toolId) {
+            "frame_interp" -> if (frameInterpolationEngine.isModelReady()) {
+                AiToolRequirements.Availability.READY
+            } else {
+                requirement.availability
+            }
+            "object_remove" -> if (inpaintingEngine.isModelReady()) {
+                AiToolRequirements.Availability.READY
+            } else {
+                requirement.availability
+            }
+            "video_upscale" -> if (upscaleEngine.isModelReady()) {
+                AiToolRequirements.Availability.READY
+            } else {
+                requirement.availability
+            }
+            "ai_stabilize" -> if (stabilizationEngine.isOpenCvAvailable()) {
+                AiToolRequirements.Availability.READY
+            } else {
+                requirement.availability
+            }
+            else -> requirement.availability
+        }
+        return requirement.copy(availability = availability)
+    }
+
+    private fun showAiModelRequirement(requirement: AiToolRequirements.ToolRequirement) {
+        stateFlow.update {
+            it.copy(
+                aiModelRequirement = requirement,
+                aiRequirementPrompt = null
+            )
+        }
+    }
+
     private fun showAiRequirementPrompt(
+        toolId: String,
         title: String,
         body: String,
         modelName: String,
         estimatedSize: String,
         actionLabel: String = appContext.getString(R.string.ai_requirement_review_models)
     ) {
+        val requirement = resolveAiModelRequirement(toolId)
+        if (requirement != null) {
+            showAiModelRequirement(requirement)
+            return
+        }
         stateFlow.update {
             it.copy(
+                aiModelRequirement = null,
                 aiRequirementPrompt = AiRequirementPrompt(
                     title = title,
                     body = body,
@@ -783,6 +857,7 @@ class AiToolsDelegate(
 
     private suspend fun applyFrameInterpolation(clip: Clip) {
         showAiRequirementPrompt(
+            toolId = "frame_interp",
             title = "Frame interpolation needs a model pack",
             body = "Install the RIFE frame interpolation model before generating in-between frames. Until then, NovaCut avoids duplicating frames so motion remains predictable.",
             modelName = "RIFE v4.6",
@@ -793,6 +868,7 @@ class AiToolsDelegate(
     private suspend fun applyObjectRemoval(clip: Clip) {
         if (!inpaintingEngine.isModelReady()) {
             showAiRequirementPrompt(
+                toolId = "object_remove",
                 title = "Object removal needs LaMa",
                 body = "Object removal requires the LaMa inpainting model so masked areas can be rebuilt instead of blurred or hidden. Download it before painting out objects.",
                 modelName = "LaMa inpainting",
@@ -805,6 +881,7 @@ class AiToolsDelegate(
 
     private suspend fun applyVideoUpscale(clip: Clip) {
         showAiRequirementPrompt(
+            toolId = "video_upscale",
             title = "AI upscale needs Real-ESRGAN",
             body = "AI upscale needs the Real-ESRGAN model before rebuilding detail beyond the current project resolution. The standard upscale assist remains available for layout and sharpening.",
             modelName = "Real-ESRGAN x4",
@@ -814,6 +891,7 @@ class AiToolsDelegate(
 
     private suspend fun applyAiBackground(clip: Clip) {
         showAiRequirementPrompt(
+            toolId = "ai_background",
             title = "AI background generation is model-gated",
             body = "Background generation needs the compositing model workflow before NovaCut can synthesize a replacement safely. Use Remove BG or Replace BG when the segmentation model is ready.",
             modelName = "Background composer",
@@ -905,6 +983,7 @@ class AiToolsDelegate(
 
     private suspend fun applyStyleTransfer(clip: Clip) {
         showAiRequirementPrompt(
+            toolId = "ai_style_transfer",
             title = "AI style transfer needs a style model",
             body = "Install a neural style model before applying full-frame artistic transfer. The lightweight style analyzer remains available through Style Transfer.",
             modelName = "AnimeGAN / Fast NST",

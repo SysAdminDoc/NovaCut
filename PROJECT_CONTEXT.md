@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 155`, `versionName = "3.74.18"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.18`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 156`, `versionName = "3.74.19"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.19`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -247,7 +247,28 @@ High-level modules and patterns:
 - Removed panel-only filler-removal strings and the deleted slot's deprecation
   suppression. The menu label `tool_remove_fillers` remains because it still
   opens Cut Assistant Review.
-- Next roadmap item: P1 Per-tool AI requirement adoption.
+- Next roadmap item after this batch was P1 Per-tool AI requirement adoption.
+
+2026-06-04 per-tool AI requirement adoption continuation:
+
+- Completed the P1 per-tool AI requirement adoption in v3.74.19. Strict
+  model/dependency-gated AI tools (`frame_interp`, `object_remove`,
+  `video_upscale`, `ai_background`, `ai_stabilize`, and `ai_style_transfer`)
+  now resolve their `AiToolRequirements` entry after clip compatibility checks
+  and before `aiProcessingTool` is set.
+- `AiModelRequirementSheet` now has a real accepted-run path:
+  `EditorScreen` dispatches through `EditorViewModel.runAiToolAfterRequirement`
+  so ready or consented tools do not reopen their own preflight sheet.
+- The legacy `aiRequirementPrompt` helper now tries the registry first and
+  falls back to the old generic prompt only when a tool ID has no registry
+  entry. Known model-gated call sites pass their tool ID through that helper.
+- `AiToolRequirements` now uses the live editor dispatch IDs for denoise,
+  Real-ESRGAN upscale, and advanced style transfer (`denoise`,
+  `video_upscale`, `ai_style_transfer`), and
+  `AiToolRequirementsTest` locks the active model-aware IDs.
+- Verification: `:app:compileDebugKotlin :app:testDebugUnitTest --tests
+  com.novacut.editor.engine.AiToolRequirementsTest` passed.
+- Next roadmap item: P1 Editor state decomposition.
 
 2026-05-17 autonomous continuation:
 

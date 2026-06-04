@@ -31,11 +31,11 @@ object AiToolRequirements {
         /** AI Stabilize — OpenCV optical flow. */
         AI_STABILIZE("ai_stabilize"),
 
-        /** Style Transfer — AnimeGAN / Fast NST. */
-        AI_STYLE("ai_style"),
+        /** Advanced Style Transfer — AnimeGAN / Fast NST. */
+        AI_STYLE("ai_style_transfer"),
 
         /** Real-ESRGAN upscaler. */
-        AI_UPSCALE("ai_upscale"),
+        AI_UPSCALE("video_upscale"),
 
         /** RIFE frame interpolation. */
         FRAME_INTERP("frame_interp"),
@@ -47,7 +47,7 @@ object AiToolRequirements {
         TAP_SEGMENT("tap_segment"),
 
         /** DeepFilterNet noise reduction. */
-        REDUCE_NOISE("reduce_noise"),
+        REDUCE_NOISE("denoise"),
 
         /** Demucs htdemucs stem separation. */
         STEM_SEPARATION("stem_separation"),

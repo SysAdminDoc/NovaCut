@@ -36,6 +36,24 @@ class AiToolRequirementsTest {
     }
 
     @Test
+    fun activeModelAwareEditorToolIdsHaveRegistryEntries() {
+        val activeModelAwareToolIds = listOf(
+            "auto_captions",
+            "denoise",
+            "remove_bg",
+            "frame_interp",
+            "object_remove",
+            "video_upscale",
+            "ai_background",
+            "ai_stabilize",
+            "ai_style_transfer"
+        )
+        for (toolId in activeModelAwareToolIds) {
+            assertNotNull("$toolId must resolve before AiModelRequirementSheet adoption", AiToolRequirements.requirementFor(toolId))
+        }
+    }
+
+    @Test
     fun cloudToolsRequireExplicitConsentAndAreNeverReady() {
         val cloud = AiToolRequirements.Tool.entries.mapNotNull {
             AiToolRequirements.requirementFor(it.toolId)
@@ -76,7 +94,7 @@ class AiToolRequirementsTest {
         assertEquals(AiToolRequirements.Availability.MODEL_DOWNLOAD_REQUIRED, auto.availability)
         assertTrue(auto.isDownloadable)
 
-        val noise = AiToolRequirements.requirementFor("reduce_noise")!!
+        val noise = AiToolRequirements.requirementFor("denoise")!!
         assertEquals(AiToolRequirements.Availability.READY, noise.availability)
         assertFalse(noise.isDownloadable)
 
