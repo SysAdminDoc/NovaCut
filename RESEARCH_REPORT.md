@@ -6,6 +6,35 @@ roadmaps are archived under [docs/archive/roadmap](docs/archive/roadmap/).
 
 Last refreshed: 2026-06-04.
 
+## 2026-06-04 Cycle 8 Plugin/Interchange Import Refresh
+
+- [Verified] NovaCut's docs and README expose several non-media file formats:
+  the plugin family (`.novacut-template`, `.ncfx`, `.ncstyle`, `.cube`, `.3dl`,
+  `.ncfxd`), LUT import, project archive ZIP export, and OTIO/FCPXML/EDL
+  interchange. Android's current intent guidance says an app is listed for
+  incoming content through matching manifest filters, and its `IntentFilter`
+  API requires action, category, and data type/scheme to match.
+- [Verified] The manifest currently registers only `content://` media
+  `ACTION_VIEW` filters for `video/*`, `image/*`, and `audio/*`. The app's
+  incoming path handles only `ACTION_VIEW`, reads one `intent.data` URI, rejects
+  MIME types that do not start with `video/`, `image/`, or `audio/`, and stores
+  the result in historical `pendingVideoUri` state. That leaves text/plain,
+  application/json, application/octet-stream, XML-like interchange files, and
+  archive ZIPs without a dedicated open/import route.
+- [Verified] The engines are uneven but useful enough for a router:
+  `PluginRegistry` already classifies NovaCut plugin extensions,
+  `ProjectArchive.importArchiveWithReport(...)` already returns structured ZIP
+  import diagnostics, while `TimelineImportEngine` currently detects
+  FCPXML/OTIO/EDL and returns an explicit "not yet implemented" result. The
+  next step should therefore be an import-preview/report router, not a claim
+  that every parser is complete.
+- [Promoted] Added a P2 roadmap item for a non-media document import router:
+  specific document intent filters instead of broad `*/*`, `content://`
+  validation, type/extension/size checks, routing to existing plugin/LUT/archive
+  engines, honest blocked status for pending timeline parsers, and
+  JVM/manifest/device verification across plugin, LUT, archive, OTIO, FCPXML,
+  and EDL inputs.
+
 ## 2026-06-04 Cycle 7 Appearance & Accessibility Refresh
 
 - [Verified] `Theme.kt` defines one hard-coded Catppuccin Mocha
