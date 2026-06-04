@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.39 (`versionCode` 176).
+- Current version: v3.74.43 (`versionCode` 180).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -39,6 +39,9 @@ Last consolidated: 2026-06-04.
 - Dynamic launcher shortcut planner and static app shortcuts shipped.
 - Media relink probe, diagnostic timeline-shape summary, and autosave schema
   future-gate shipped at the engine layer.
+- Dependabot risk grouping and the Compose BOM / Room / Kotlin freshness review
+  shipped in v3.74.43, with changelog-heading auto-tagging deliberately kept in
+  release verification instead of dependency PR automation.
 - UI test harness bootstrap shipped in v3.74.11: shared Compose test tags,
   androidTest dependencies, and a smoke test covering project list,
   blank-project editor open, media picker, export sheet, Settings, and privacy

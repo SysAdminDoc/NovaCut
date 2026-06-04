@@ -1,13 +1,14 @@
 # Dependabot config — see ROADMAP.md R5.9a (security and supply chain).
 #
 # Goals:
-#   - Watch core dependencies (Media3, ONNX Runtime, MediaPipe, Hilt, Compose,
-#     Coil, OkHttp, Lottie, Room) for new releases + advisories.
+#   - Watch core dependencies (toolchain, Media3, ONNX Runtime, MediaPipe, Hilt,
+#     Compose, Coil, OkHttp, Lottie, Room) for new releases + advisories.
 #   - Watch the GitHub Actions used by .github/workflows/build.yml.
 #   - Open PRs into master so each upgrade goes through normal code review.
-#   - Group ecosystem-wide bumps so we get one PR per ecosystem per week, not
-#     one PR per artifact (which would drown the inbox for a single-maintainer
-#     project).
+#   - Group Gradle bumps by risk lane so a toolchain failure does not hide a
+#     safe UI or runtime patch.
+#   - Keep release tagging out of Dependabot: CHANGELOG.md heading/tag matching
+#     is verified by scripts/verify_release_artifacts.py during release builds.
 #
 # Future R5.9 work tracked separately:
 #   - R5.9b model checksum enforcement at runtime (lives in ModelDownloadManager).
@@ -30,37 +31,54 @@ updates:
       prefix: "deps"
       include: "scope"
     groups:
-      androidx-media3:
+      gradle-toolchain:
         patterns:
-          - "androidx.media3:*"
-      androidx-compose:
+          - "com.android.application"
+          - "com.android.test"
+          - "com.google.devtools.ksp"
+          - "org.jetbrains.kotlin.android"
+          - "org.jetbrains.kotlin.plugin.compose"
+          - "org.jetbrains.kotlin:*"
+          - "org.jetbrains.kotlinx:*"
+      androidx-ui-compose:
         patterns:
           - "androidx.compose:*"
           - "androidx.compose.*:*"
-      androidx-core:
+      androidx-runtime:
         patterns:
-          - "androidx.core:*"
           - "androidx.activity:*"
+          - "androidx.core:*"
+          - "androidx.datastore:*"
+          - "androidx.hilt:*"
           - "androidx.lifecycle:*"
           - "androidx.navigation:*"
           - "androidx.room:*"
-          - "androidx.datastore:*"
+          - "androidx.window:*"
           - "androidx.work:*"
+      media3-runtime:
+        patterns:
+          - "androidx.media3:*"
       hilt:
         patterns:
           - "com.google.dagger:hilt-*"
-          - "androidx.hilt:*"
-      ml:
+      ml-native:
         patterns:
-          - "com.microsoft.onnxruntime:*"
           - "com.google.mediapipe:*"
-      kotlin:
+          - "com.microsoft.onnxruntime:*"
+          - "com.moizhassan.ffmpeg:*"
+          - "io.github.kaleyravideo:*"
+      network-and-media-adornments:
         patterns:
-          - "org.jetbrains.kotlin:*"
-          - "org.jetbrains.kotlinx:*"
-      coil:
-        patterns:
+          - "com.airbnb.android:*"
+          - "com.squareup.okhttp3:*"
           - "io.coil-kt:*"
+      test-support:
+        patterns:
+          - "androidx.benchmark:*"
+          - "androidx.profileinstaller:*"
+          - "androidx.test:*"
+          - "androidx.test.ext:*"
+          - "junit:junit"
 
   # GitHub Actions workflow updates
   - package-ecosystem: "github-actions"
