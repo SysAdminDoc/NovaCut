@@ -89,9 +89,9 @@ data class EditorAiState(
 }
 
 data class EditorMediaState(
-    val backupImportFeedback: BackupImportFeedback?,
-    val timelineExchangeFeedback: TimelineExchangeFeedback?,
-    val relinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport>
+    val backupImportFeedback: BackupImportFeedback? = null,
+    val timelineExchangeFeedback: TimelineExchangeFeedback? = null,
+    val relinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport> = emptyMap()
 ) : EditorDomainState {
     override val kind: EditorDomainState.Kind = EditorDomainState.Kind.MEDIA
 }
@@ -134,11 +134,7 @@ val EditorState.domainStates: EditorDomainStates
         ),
         export = export,
         ai = ai,
-        media = EditorMediaState(
-            backupImportFeedback = backupImportFeedback,
-            timelineExchangeFeedback = timelineExchangeFeedback,
-            relinkReports = mediaRelinkReports
-        )
+        media = media
     )
 
 inline fun EditorState.copyAi(transform: (EditorAiState) -> EditorAiState): EditorState =
@@ -146,3 +142,6 @@ inline fun EditorState.copyAi(transform: (EditorAiState) -> EditorAiState): Edit
 
 inline fun EditorState.copyExport(transform: (EditorExportDomainState) -> EditorExportDomainState): EditorState =
     copy(export = transform(export))
+
+inline fun EditorState.copyMedia(transform: (EditorMediaState) -> EditorMediaState): EditorState =
+    copy(media = transform(media))

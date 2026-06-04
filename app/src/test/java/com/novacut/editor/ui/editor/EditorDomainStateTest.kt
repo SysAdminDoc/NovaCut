@@ -3,6 +3,7 @@ package com.novacut.editor.ui.editor
 import com.novacut.editor.engine.AiToolRequirements
 import com.novacut.editor.engine.CaptionTranslationEngine
 import com.novacut.editor.engine.ExportState
+import com.novacut.editor.engine.ProjectArchive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -42,6 +43,24 @@ class EditorDomainStateTest {
             message = "Clean this audio",
             actionId = "denoise"
         )
+        val backupFeedback = BackupImportFeedback(
+            succeeded = true,
+            title = "Backup imported",
+            body = "Review media",
+            report = ProjectArchive.ImportReport(
+                schemaVersion = 1,
+                schemaTooNew = false,
+                originalProjectId = "original",
+                effectiveProjectId = "effective",
+                projectIdCollided = false,
+                idCollisionPolicy = ProjectArchive.IdCollisionPolicy.REGENERATE,
+                mediaTotal = 1,
+                mediaResolved = 1,
+                unresolvedMediaUris = emptyList(),
+                warnings = emptyList(),
+                targetDirCreated = false
+            )
+        )
         val state = EditorState(
             panels = PanelVisibility(openPanels = setOf(PanelId.AI_TOOLS)),
             selectedEffectId = "effect-1",
@@ -69,6 +88,9 @@ class EditorDomainStateTest {
                 isTtsAvailable = true,
                 isAnalyzingNoise = true,
                 noiseAnalysisResult = "Noise profile ready"
+            ),
+            media = EditorMediaState(
+                backupImportFeedback = backupFeedback
             )
         )
 
@@ -97,6 +119,7 @@ class EditorDomainStateTest {
         assertTrue(domains.ai.isTtsAvailable)
         assertTrue(domains.ai.isAnalyzingNoise)
         assertEquals("Noise profile ready", domains.ai.noiseAnalysisResult)
+        assertSame(backupFeedback, domains.media.backupImportFeedback)
         assertTrue(domains.media.relinkReports.isEmpty())
     }
 }
