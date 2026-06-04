@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.30 (`versionCode` 167).
+- Current version: v3.74.31 (`versionCode` 168).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -118,6 +118,10 @@ Last consolidated: 2026-06-04.
   utility sheets/dialogs now live in `EditorUtilityPanelHost`, always-on
   preview/status overlays now live in `EditorOverlayHost`, and shared report row
   rendering now lives in `EditorFeedbackDialogs`.
+- Timeline interaction and overview extraction shipped in v3.74.31: compound
+  long-press dispatch, snap targeting, clip hit testing, accessible split
+  points, keyboard nudge step sizing, and the full-project overview scrollbar
+  now live outside `Timeline.kt` with focused JVM coverage.
 
 ## Preserved Historical Detail
 

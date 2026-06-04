@@ -58,6 +58,87 @@ class TimelineEditingTest {
     }
 
     @Test
+    fun `snap target returns nearest position within threshold`() {
+        val targets = listOf(0L, 1_000L, 1_900L, 4_000L)
+
+        assertEquals(1_900L, findSnapTarget(positionMs = 2_020L, targets = targets, thresholdMs = 150L))
+        assertNull(findSnapTarget(positionMs = 2_020L, targets = targets, thresholdMs = 100L))
+    }
+
+    @Test
+    fun `timeline position hit test includes clip start and excludes clip end`() {
+        val clip = clip(
+            id = "clip",
+            timelineStartMs = 1_000L,
+            trimStartMs = 0L,
+            trimEndMs = 500L,
+            sourceDurationMs = 500L
+        )
+
+        assertFalse(clip.containsTimelinePosition(999L))
+        assertTrue(clip.containsTimelinePosition(1_000L))
+        assertTrue(clip.containsTimelinePosition(1_499L))
+        assertFalse(clip.containsTimelinePosition(1_500L))
+    }
+
+    @Test
+    fun `accessible split point uses playhead inside safe range and midpoint otherwise`() {
+        val clip = clip(
+            id = "clip",
+            timelineStartMs = 1_000L,
+            trimStartMs = 0L,
+            trimEndMs = 1_000L,
+            sourceDurationMs = 1_000L
+        )
+
+        assertEquals(1_250L, clip.accessibleSplitPointMs(1_250L))
+        assertEquals(1_500L, clip.accessibleSplitPointMs(5_000L))
+    }
+
+    @Test
+    fun `accessible split point is unavailable for sub minimum clips`() {
+        val clip = clip(
+            id = "short",
+            timelineStartMs = 0L,
+            trimStartMs = 0L,
+            trimEndMs = 150L,
+            sourceDurationMs = 150L
+        )
+
+        assertNull(clip.accessibleSplitPointMs(50L))
+    }
+
+    @Test
+    fun `keyboard nudge switches to coarse steps when shift is held`() {
+        assertEquals(100L, keyboardNudgeAmountMs(isShiftPressed = false))
+        assertEquals(1_000L, keyboardNudgeAmountMs(isShiftPressed = true))
+    }
+
+    @Test
+    fun `overview tap centers viewport on tapped timeline fraction`() {
+        assertEquals(
+            4_000L,
+            timelineOverviewScrollOffsetForTap(
+                xPx = 50f,
+                widthPx = 100f,
+                totalDurationMs = 10_000L,
+                visibleDurationMs = 2_000L,
+                currentScrollOffsetMs = 250L
+            )
+        )
+        assertEquals(
+            250L,
+            timelineOverviewScrollOffsetForTap(
+                xPx = 50f,
+                widthPx = 0f,
+                totalDurationMs = 10_000L,
+                visibleDurationMs = 2_000L,
+                currentScrollOffsetMs = 250L
+            )
+        )
+    }
+
+    @Test
     fun `leading trim moves the clip start on the timeline`() {
         val clip = clip(
             id = "clip",

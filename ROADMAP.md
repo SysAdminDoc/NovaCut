@@ -8,7 +8,7 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.30** (`versionCode` 167). Last consolidated:
+Current version: **v3.74.31** (`versionCode` 168). Last consolidated:
 2026-06-04.
 
 > Last researched: Cycle 1 - 2026-06-04.
@@ -48,7 +48,10 @@ completed the current panel-router lane by extracting utility sheets/dialogs
 into `EditorUtilityPanelHost`, always-on overlay routes into
 `EditorOverlayHost`, and shared report rows into `EditorFeedbackDialogs`.
 Focused Gradle, APK packaging, release metadata, signature, zipalign, and
-APK-based 16 KB gates passed locally for this batch.
+APK-based 16 KB gates passed locally for this batch. v3.74.31 started the
+timeline refactor by extracting interaction/accessibility policy, the
+full-project overview scrollbar, shared timeline accent colors, and focused JVM
+coverage from `Timeline.kt`.
 
 ## Current State
 
@@ -122,6 +125,9 @@ APK-based 16 KB gates passed locally for this batch.
 - v3.74.30 completes the current EditorScreen panel-router decomposition lane by
   extracting utility sheets/dialogs, always-on overlay routes, and shared report
   dialog rows out of the main screen body.
+- v3.74.31 starts the Timeline refactor by extracting interaction/accessibility
+  policy, the full-project overview scrollbar, and shared track accent colors
+  out of the main timeline renderer with focused JVM tests.
 
 ## Source Archives
 
@@ -134,7 +140,7 @@ APK-based 16 KB gates passed locally for this batch.
 
 | Priority | Work | Exit criteria |
 |---|---|---|
-| P1 | Timeline refactor | Reduce `Timeline.kt` risk by extracting gesture handling, clip layout, overlays, and accessibility actions into focused files with tests where practical. |
+| P1 | Timeline refactor | Continue after v3.74.31 by extracting clip layout, overlay drawing, and remaining gesture bodies from `Timeline.kt` into focused files with tests where practical. |
 | P1 | Model activation gates | For every active AI/model dependency, keep source locator, SHA-256, license posture, delivery mode, F-Droid posture, and runtime checksum behavior current in `docs/models.md`. |
 | P2 | Project color policy consumers | Wire `ProjectColorPolicy` into Settings/export confidence once the Room/autosave migration plan is ready. |
 | P2 | Diagnostic ZIP timeline-shape toggle | Expose the privacy-preserving timeline-shape summary as an explicit Settings export option. |

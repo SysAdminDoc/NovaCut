@@ -51,7 +51,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
@@ -65,10 +64,6 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 private const val BASE_SCALE = 0.15f // pixels per ms at zoom 1.0
-private const val ACCESSIBILITY_NUDGE_MS = 100L
-private const val KEYBOARD_FINE_NUDGE_MS = 100L
-private const val KEYBOARD_COARSE_NUDGE_MS = 1000L
-
 // Minimum zoom — low enough that a ~10-minute video fits on a phone screen. The old
 // 0.1f floor meant long videos could never fit the viewport, which combined with no
 // auto-fit-on-add made the timeline appear to only show a tiny portion of the media.
@@ -78,45 +73,6 @@ private const val MIN_TIMELINE_ZOOM = 0.01f
 private const val MAX_TIMELINE_ZOOM = 10f
 
 private enum class ClipGestureZone { TRIM_LEFT, TRIM_RIGHT, SLIDE, SLIP, NONE }
-
-internal enum class TimelineClipLongPressResult { OPENED_COMPOUND, TOGGLED_MULTI_SELECT }
-
-internal fun dispatchTimelineClipLongPress(
-    clipId: String,
-    isCompound: Boolean,
-    onOpenCompoundClip: (String) -> Boolean,
-    onToggleMultiSelect: (String) -> Unit,
-): TimelineClipLongPressResult {
-    if (isCompound && onOpenCompoundClip(clipId)) {
-        return TimelineClipLongPressResult.OPENED_COMPOUND
-    }
-    onToggleMultiSelect(clipId)
-    return TimelineClipLongPressResult.TOGGLED_MULTI_SELECT
-}
-
-private fun findSnapTarget(positionMs: Long, targets: List<Long>, thresholdMs: Long): Long? {
-    return targets.minByOrNull { abs(it - positionMs) }
-        ?.takeIf { abs(it - positionMs) <= thresholdMs }
-}
-
-private fun Clip.containsTimelinePosition(positionMs: Long): Boolean {
-    return positionMs >= timelineStartMs && positionMs < timelineEndMs
-}
-
-private fun Clip.accessibleSplitPointMs(playheadMs: Long): Long? {
-    val earliestSplitMs = timelineStartMs + MIN_TIMELINE_CLIP_DURATION_MS
-    val latestSplitMs = timelineEndMs - MIN_TIMELINE_CLIP_DURATION_MS
-    if (latestSplitMs < earliestSplitMs) return null
-    val preferredSplitMs = if (playheadMs in earliestSplitMs..latestSplitMs) {
-        playheadMs
-    } else {
-        timelineStartMs + durationMs / 2
-    }
-    return preferredSplitMs.coerceIn(earliestSplitMs, latestSplitMs)
-}
-
-private fun keyboardNudgeAmountMs(isShiftPressed: Boolean): Long =
-    if (isShiftPressed) KEYBOARD_COARSE_NUDGE_MS else KEYBOARD_FINE_NUDGE_MS
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -1799,107 +1755,6 @@ fun Timeline(
     }
 }
 
-/**
- * Full-duration mini-strip shown below the tracks area. Paints one rectangle per
- * clip scaled to the whole project timeline, plus a highlighted "viewport" window
- * showing what part of the timeline is currently visible. Tap or drag to scroll.
- *
- * Intentionally a single fixed-height row — the point is to make horizontal scrolling
- * *discoverable* and direct-manipulable, not to replicate the full tracks hierarchy.
- */
-@Composable
-private fun TimelineOverviewBar(
-    totalDurationMs: Long,
-    scrollOffsetMs: Long,
-    visibleDurationMs: Long,
-    playheadMs: Long,
-    tracks: List<Track>,
-    contentPadding: Dp,
-    onScrollTo: (Long) -> Unit
-) {
-    val density = LocalDensity.current
-    val overviewHeight = 22.dp
-    var widthPx by remember { mutableFloatStateOf(0f) }
-    val overviewContentDescription = stringResource(R.string.cd_timeline_overview)
-
-    val currentTotalDurationMs by rememberUpdatedState(totalDurationMs)
-    val currentVisibleDurationMs by rememberUpdatedState(visibleDurationMs)
-
-    fun tapXToScrollOffset(xPx: Float): Long {
-        if (widthPx <= 0f || currentTotalDurationMs <= 0L) return scrollOffsetMs
-        val fraction = (xPx / widthPx).coerceIn(0f, 1f)
-        val targetMs = (fraction * currentTotalDurationMs).toLong()
-        // Center the viewport on the tapped position so users don't have to aim at
-        // the window's leading edge — matches CapCut / KineMaster scrollbar feel.
-        return (targetMs - currentVisibleDurationMs / 2).coerceAtLeast(0L)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = contentPadding, vertical = 6.dp)
-            .height(overviewHeight)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Mocha.Crust.copy(alpha = 0.78f))
-            .border(1.dp, Mocha.CardStroke.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-            .onSizeChanged { widthPx = it.width.toFloat() }
-            .semantics { contentDescription = overviewContentDescription }
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    onScrollTo(tapXToScrollOffset(offset.x))
-                }
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures { change, _ ->
-                    onScrollTo(tapXToScrollOffset(change.position.x))
-                }
-            }
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            if (currentTotalDurationMs <= 0L) return@Canvas
-            val totalF = currentTotalDurationMs.toFloat()
-
-            // Clip footprints
-            tracks.forEach { track ->
-                val barColor = trackAccentColor(track.type).copy(alpha = 0.55f)
-                track.clips.forEach { clip ->
-                    val startF = clip.timelineStartMs.toFloat() / totalF
-                    val widthF = (clip.durationMs.toFloat() / totalF).coerceAtLeast(0.002f)
-                    drawRect(
-                        color = barColor,
-                        topLeft = Offset(startF * size.width, size.height * 0.22f),
-                        size = Size((widthF * size.width).coerceAtLeast(1f), size.height * 0.56f)
-                    )
-                }
-            }
-
-            // Viewport window
-            val vStartF = (scrollOffsetMs.toFloat() / totalF).coerceIn(0f, 1f)
-            val vWidthF = (currentVisibleDurationMs.toFloat() / totalF).coerceIn(0.01f, 1f)
-            drawRect(
-                color = Mocha.Sky.copy(alpha = 0.25f),
-                topLeft = Offset(vStartF * size.width, 0f),
-                size = Size(vWidthF * size.width, size.height)
-            )
-            drawRect(
-                color = Mocha.Sky,
-                topLeft = Offset(vStartF * size.width, 0f),
-                size = Size(vWidthF * size.width, size.height),
-                style = Stroke(width = 1.6f)
-            )
-
-            // Playhead
-            val phF = (playheadMs.toFloat() / totalF).coerceIn(0f, 1f)
-            drawLine(
-                color = Mocha.Rosewater,
-                start = Offset(phF * size.width, 0f),
-                end = Offset(phF * size.width, size.height),
-                strokeWidth = 1.4f
-            )
-        }
-    }
-}
-
 @Composable
 private fun TimelineToolbarButton(
     icon: ImageVector,
@@ -2044,14 +1899,6 @@ private fun TimelineClipBadge(
             )
         )
     }
-}
-
-private fun trackAccentColor(trackType: TrackType): Color = when (trackType) {
-    TrackType.VIDEO -> Mocha.Blue
-    TrackType.AUDIO -> Mocha.Green
-    TrackType.OVERLAY -> Mocha.Peach
-    TrackType.TEXT -> Mocha.Mauve
-    TrackType.ADJUSTMENT -> Mocha.Yellow
 }
 
 private fun trackIcon(trackType: TrackType): ImageVector = when (trackType) {
