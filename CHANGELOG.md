@@ -1,5 +1,28 @@
 # Changelog
 
+## v3.74.38 — 2026-06-04
+
+### Model activation gate honesty
+- Added delivery-mode, F-Droid posture, runtime-checksum behavior, and active
+  model-registry IDs to `AiToolRequirements`.
+- Kept only currently wired on-device model paths as downloadable/ready:
+  Whisper captions, MediaPipe background removal, LaMa object removal, and the
+  bundled DeepFilterNet dependency.
+- Changed planned but unpinned AnimeGAN/Fast NST, Real-ESRGAN, and SAM/MobileSAM
+  tools from download-required to dependency-missing so the UI does not present
+  inactive model paths as installable.
+- Refreshed `docs/models.md` with an AI tool activation gate matrix covering
+  source locator, SHA-256 posture, license posture, delivery mode, F-Droid
+  posture, and runtime checksum behavior for every registered AI tool.
+- Added JVM guards that require every `AiToolRequirements.Tool` to appear in the
+  docs matrix and require runnable/downloadable tools to point at active model
+  rows.
+- Bumped runtime metadata to `versionName 3.74.38` / `versionCode 175`.
+- Verification: focused `:app:testDebugUnitTest --tests
+  com.novacut.editor.engine.AiToolRequirementsTest --tests
+  com.novacut.editor.engine.ModelRegistryDocumentationTest` passed. APK assemble
+  was not run for this batch.
+
 ## v3.74.37 — 2026-06-04
 
 ### Timeline clip layout and gesture helper extraction
