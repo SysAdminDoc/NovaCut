@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 169`, `versionName = "3.74.32"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.32`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 170`, `versionName = "3.74.33"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.33`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -492,8 +492,29 @@ High-level modules and patterns:
   debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
   `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
   `:app:assembleDebugAndroidTest` passed.
-- Next roadmap item: P0 Android 15 `mediaProcessing` foreground-service timeout
-  handling from the Cycle 2 researcher queue.
+- Followed by the Cycle 2 P0 Android 15 `mediaProcessing` foreground-service
+  timeout handling in v3.74.33.
+
+2026-06-04 Android 15 media-processing timeout continuation:
+
+- Closed the Cycle 2 P0 foreground-service timeout item in v3.74.33 by adding
+  both `ExportService.onTimeout(...)` overrides and routing active
+  media-processing timeouts through `VideoEngine.failExportDueToForegroundServiceTimeout`.
+- Timeout cleanup records a distinct user-visible error, cancels the active
+  Transformer, deletes the active output file, resets progress, stops thermal
+  monitoring, removes foreground service state, and stops the service.
+- `startTransformerWithPolling` now calls the normal `onError` callback when an
+  external service timeout flips the engine to `ExportState.ERROR`, preventing
+  the editor export UI from staying in `EXPORTING`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
+  `:app:assembleDebugAndroidTest` passed.
+- Device QA follow-up: run the roadmap's Android 15+ shortened-timeout ADB
+  recipe on an emulator/device to prove OS-delivered timeout behavior.
+- Next roadmap item: P1 Android 13+ export notification permission path from
+  the Cycle 2 researcher queue.
 
 2026-05-17 autonomous continuation:
 

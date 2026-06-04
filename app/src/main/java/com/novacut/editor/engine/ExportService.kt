@@ -45,6 +45,14 @@ class ExportService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onTimeout(startId: Int) {
+        handleForegroundServiceTimeout(startId = startId, foregroundServiceType = null)
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        handleForegroundServiceTimeout(startId = startId, foregroundServiceType = fgsType)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_CANCEL) {
             Log.d(TAG, "Cancel requested")
@@ -75,6 +83,25 @@ class ExportService : Service() {
             stopSelf()
         }
         return START_NOT_STICKY
+    }
+
+    private fun handleForegroundServiceTimeout(startId: Int, foregroundServiceType: Int?) {
+        Log.w(TAG, "Foreground service timeout: startId=$startId type=$foregroundServiceType")
+        observeJob?.cancel()
+        observeJob = null
+        stopThermalMonitoring()
+
+        if (shouldFailExportForForegroundServiceTimeout(foregroundServiceType)) {
+            val message = getString(R.string.export_media_processing_timeout_error)
+            val failedActiveExport = videoEngine.failExportDueToForegroundServiceTimeout(message)
+            if (failedActiveExport) {
+                notifyError(message)
+                return
+            }
+        }
+
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
     }
 
     private fun startObservingExport() {

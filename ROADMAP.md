@@ -8,10 +8,10 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.32** (`versionCode` 169). Last consolidated:
+Current version: **v3.74.33** (`versionCode` 170). Last consolidated:
 2026-06-04.
 
-> Last researched: Cycle 2 - 2026-06-04.
+> Last researched: Cycle 3 - 2026-06-04.
 
 ## ▶ Implementer Instructions (for the build machine)
 
@@ -62,7 +62,9 @@ timeline refactor by extracting interaction/accessibility policy, the
 full-project overview scrollbar, shared timeline accent colors, and focused JVM
 coverage from `Timeline.kt`. v3.74.32 continued the timeline refactor by moving
 timeline chrome composables, compact label formatters, ruler/waveform drawing,
-and volume-keyframe filtering into focused files with JVM coverage.
+and volume-keyframe filtering into focused files with JVM coverage. v3.74.33
+closed the Cycle 2 P0 Android 15 media-processing timeout item by wiring
+`ExportService.onTimeout(...)` through a distinct `VideoEngine` error path.
 
 ## Current State
 
@@ -142,6 +144,10 @@ and volume-keyframe filtering into focused files with JVM coverage.
 - v3.74.32 continues the Timeline refactor by extracting toolbar/chip chrome,
   compact label formatters, ruler/waveform drawing helpers, and volume-keyframe
   filtering out of the main timeline renderer with focused JVM tests.
+- v3.74.33 handles Android 15 media-processing foreground-service timeout
+  callbacks by failing active exports through a distinct `VideoEngine` timeout
+  error, cancelling Transformer work, deleting the active output file, and
+  stopping foreground service state.
 
 ## Source Archives
 
@@ -444,7 +450,7 @@ slip-slide findings above.
 
 #### Platform Reliability
 
-- [ ] 🔬🤖 P0 — Handle Android 15 `mediaProcessing` foreground-service timeouts
+- [x] ✅🔬🤖 P0 — Handle Android 15 `mediaProcessing` foreground-service timeouts
   - Why: NovaCut targets SDK 36 and exports through a
     `mediaProcessing` foreground service. Android allows this service type a
     limited runtime budget and calls `Service.onTimeout(int, int)` when the
@@ -468,6 +474,11 @@ slip-slide findings above.
     `adb shell device_config put activity_manager media_processing_fgs_timeout_duration 10000`,
     start an export, confirm timeout cleanup and no ANR, then reset the device
     config.
+  - Implemented in v3.74.33: `ExportService` overrides both timeout callback
+    signatures, fails active media-processing exports through
+    `VideoEngine.failExportDueToForegroundServiceTimeout`, removes foreground
+    service state immediately, and covers timeout-type classification with JVM
+    tests. Emulator shortened-timeout validation remains the device QA follow-up.
   - Complexity: M
 
 - [ ] 🔬🤖 P1 — Add a contextual Android 13+ notification-permission path for exports
@@ -544,3 +555,46 @@ slip-slide findings above.
   https://developer.android.com/develop/ui/compose/notifications/notification-permission
 - Android Auto Backup and data-extraction rules:
   https://developer.android.com/identity/data/autobackup
+
+### Researcher Queue (Cycle 3 - 2026-06-04)
+
+Focus: performance verification that complements the existing smoke-test and
+release-artifact gates without duplicating the timeline decomposition lane.
+
+#### Performance & Release Quality
+
+- [ ] 🔬🤖 P2 — Add Baseline Profile and Macrobenchmark coverage for launch and editor entry
+  - Why: NovaCut has a Compose smoke harness and release APK verification, but
+    no repeatable cold-start or critical-user-journey performance gate. A
+    video editor's first-launch project gallery, blank-editor open, and timeline
+    scroll paths are exactly the hot code paths that should be ahead-of-time
+    optimized for new installs and updates.
+  - Evidence: grep for `BaselineProfile`, `macrobenchmark`, `profileinstaller`,
+    and `startup` finds no baseline-profile module, generated
+    `baseline-prof.txt`, Macrobenchmark dependency, or Gradle task wiring. Android
+    official guidance says Baseline Profiles let ART precompile specified startup
+    and interaction paths and recommends generating them with the Jetpack
+    Macrobenchmark library:
+    https://developer.android.com/topic/performance/baselineprofiles/overview and
+    https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile
+  - Touches: new `:benchmark` or `:baselineprofile` module, version catalog
+    entries for Benchmark/ProfileInstaller as needed, Gradle Managed Device or
+    CI runner wiring, project-gallery/editor/timeline CUJ tests, and release
+    artifact verification docs.
+  - Acceptance: a generated Baseline Profile ships with the release APK and covers
+    project gallery launch, blank-project editor open, export sheet open, and a
+    timeline scroll/scrub path; Macrobenchmark reports cold/warm startup and one
+    editor interaction metric so regressions are visible before release.
+  - Verify: run the profile generation task on a managed device/emulator, confirm
+    the release APK contains the generated profile, and compare Macrobenchmark
+    startup results with `CompilationMode.None` vs profile/default compilation.
+  - Complexity: M
+
+#### Appendix — Cycle 3 Sources
+
+- Android Baseline Profiles overview:
+  https://developer.android.com/topic/performance/baselineprofiles/overview
+- Android Baseline Profile creation with Macrobenchmark:
+  https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile
+- Android Macrobenchmark overview:
+  https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview

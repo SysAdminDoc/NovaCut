@@ -6,6 +6,20 @@ roadmaps are archived under [docs/archive/roadmap](docs/archive/roadmap/).
 
 Last refreshed: 2026-06-04.
 
+## 2026-06-04 Cycle 3 Performance Verification Refresh
+
+- [Verified] NovaCut has project-gallery/editor smoke coverage and release APK
+  verification, but grep found no Baseline Profile module, generated
+  `baseline-prof.txt`, `profileinstaller`, `benchmark-macro`, or macrobenchmark
+  task wiring. Android's Baseline Profile guidance says shipping profiles lets
+  ART ahead-of-time compile startup and common interaction paths for first launch
+  and app updates; the creation guide recommends Jetpack Macrobenchmark and
+  `BaselineProfileRule` for repeatable generation.
+- [Promoted] Added a P2 roadmap item for Baseline Profile and Macrobenchmark
+  coverage of launch, blank-editor open, export-sheet open, and timeline
+  scroll/scrub critical-user journeys. This complements, rather than duplicates,
+  the existing instrumentation-smoke and timeline-refactor lanes.
+
 ## 2026-06-04 Cycle 2 Platform Hardening Refresh
 
 - [Verified] NovaCut targets SDK 36 and declares `ExportService` as

@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.74.33 — 2026-06-04
+
+### Android 15 media-processing timeout handling
+- Added `ExportService.onTimeout(startId)` and
+  `ExportService.onTimeout(startId, fgsType)` handling for Android foreground
+  service budget exhaustion.
+- Added `VideoEngine.failExportDueToForegroundServiceTimeout` so timeout cleanup
+  marks the active export as `ERROR`, records a user-visible timeout message,
+  cancels the active Transformer, deletes the active output file, and resets
+  progress.
+- Ensured externally forced `ERROR` states in the Transformer polling loop call
+  the normal `onError` callback so editor export UI state leaves `EXPORTING`.
+- Added `ExportServiceTimeoutPolicy` and JVM tests for legacy, media-processing,
+  combined, and unrelated foreground-service timeout types.
+- Bumped runtime metadata to `versionName 3.74.33` / `versionCode 170`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
+  `:app:assembleDebugAndroidTest` passed.
+
 ## v3.74.32 — 2026-06-04
 
 ### Timeline chrome and drawing helper extraction

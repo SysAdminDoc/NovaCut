@@ -1436,6 +1436,13 @@ class VideoEngine @Inject constructor(
                 terminalReached = true
                 onError(Exception("Export timed out"))
             }
+            if (_exportState.value == ExportState.ERROR && !terminalReached) {
+                val message = _exportErrorMessage.value ?: "Export failed"
+                outputFile.delete()
+                activeExportOutputFile = null
+                terminalReached = true
+                onError(Exception(message))
+            }
             activeTransformer = null
             // Ensure the file-handle mirror is always nulled when the transformer
             // reference is cleared, regardless of which branch above set the
@@ -1465,6 +1472,21 @@ class VideoEngine @Inject constructor(
             activeExportOutputFile = null
         }
         _exportProgress.value = 0f
+    }
+
+    fun failExportDueToForegroundServiceTimeout(message: String): Boolean {
+        synchronized(this) {
+            if (_exportState.value != ExportState.EXPORTING) return false
+            Log.w(TAG, "Failing export after foreground service media-processing timeout")
+            _exportErrorMessage.value = message
+            _exportState.value = ExportState.ERROR
+            activeTransformer?.cancel()
+            activeTransformer = null
+            activeExportOutputFile?.delete()
+            activeExportOutputFile = null
+        }
+        _exportProgress.value = 0f
+        return true
     }
 
     // --- Preview effects & speed ---

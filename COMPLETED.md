@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.32 (`versionCode` 169).
+- Current version: v3.74.33 (`versionCode` 170).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -126,6 +126,10 @@ Last consolidated: 2026-06-04.
   chips/buttons, compact label formatters, ruler drawing, waveform drawing, and
   volume-keyframe filtering now live outside the main timeline renderer with
   focused JVM coverage for the pure helpers.
+- Android 15 media-processing timeout handling shipped in v3.74.33:
+  `ExportService` now handles both foreground-service timeout callbacks,
+  fails active exports through `VideoEngine` with a distinct timeout error,
+  removes foreground service state, and has focused JVM policy coverage.
 
 ## Preserved Historical Detail
 
