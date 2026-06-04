@@ -6,6 +6,32 @@ roadmaps are archived under [docs/archive/roadmap](docs/archive/roadmap/).
 
 Last refreshed: 2026-06-04.
 
+## 2026-06-04 Cycle 16 FileProvider Grant-Path Refresh
+
+- [Verified] The active Add Media camera action creates a pending MP4 in
+  `cacheDir/camera-captures` via `pendingCameraCaptureDir(context)` and calls
+  `FileProvider.getUriForFile(...)` before launching
+  `ActivityResultContracts.CaptureVideo()`. `res/xml/file_paths.xml` exposes a
+  cache path only for `frames/`, not `camera-captures/`, and the URI creation is
+  not wrapped in a user-facing error path. Record Video can therefore fail
+  before the external camera handoff ever opens.
+- [Verified] The manifest provider itself is scoped correctly with
+  `android:exported="false"` and `android:grantUriPermissions="true"`, but the
+  repository has several FileProvider producers for diagnostics, archives,
+  exports, direct publish, editor media, and TTS outputs. Existing tests cover
+  selected directories such as TTS output, not a complete contract that every
+  `getUriForFile(...)` producer maps to a narrow XML grant path. The fix should
+  add only the missing explicit roots, not a broad root or catch-all files path.
+- [Verified] AndroidX FileProvider documentation says available files must be
+  declared in a `res/xml` paths file and `getUriForFile(...)` throws
+  `IllegalArgumentException` when a requested file is outside the configured
+  roots. Android's secure file-sharing setup also frames content-URI sharing as
+  a temporary read grant to a recipient app rather than exposing file paths.
+- [Promoted] Added a P1 roadmap item for a FileProvider grant-path contract:
+  add a narrow `camera-captures/` cache root, cover all share/capture producers
+  with path tests, keep unrelated private files rejected, and show actionable
+  copy if URI generation fails.
+
 ## 2026-06-04 Cycle 15 Camera Capture Handoff Refresh
 
 - [Verified] The active Add Media panel uses

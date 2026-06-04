@@ -11,7 +11,7 @@ archived under [docs/archive](docs/archive/).
 Current version: **v3.74.44** (`versionCode` 181). Last consolidated:
 2026-06-04.
 
-> Last researched: Cycle 15 - 2026-06-04.
+> Last researched: Cycle 16 - 2026-06-04.
 
 ## ▶ Implementer Instructions (for the build machine)
 
@@ -1448,3 +1448,64 @@ and prepare a separate, permission-correct CameraX recorder lane.
   https://developer.android.com/guide/topics/manifest/uses-feature-element
 - CameraX VideoCapture:
   https://developer.android.com/media/camera/camerax/video-capture
+
+### Researcher Queue (Cycle 16 - 2026-06-04)
+
+Focus: make every FileProvider share and capture producer covered by a narrow
+XML grant path.
+
+#### File Sharing & URI Grants
+
+- [ ] 🔬🤖 P1 — Add FileProvider grant-path contract for camera capture and shared artifacts
+  - Why: Record Video currently creates its destination under
+    `cacheDir/camera-captures` and asks FileProvider for a content URI before
+    launching the camera intent. `file_paths.xml` does not expose that cache
+    directory, so URI generation can throw before the external camera app opens.
+    Because diagnostics, exports, archives, direct publish, editor media, and
+    generated audio also rely on FileProvider, NovaCut needs a repeatable
+    contract that every producer has a deliberately narrow grant path and no
+    private root is accidentally exposed.
+  - Evidence: `MediaPickerSheet.startCameraCapture()` creates
+    `File(pendingCameraCaptureDir(context), "novacut_<timestamp>.mp4")`, where
+    `pendingCameraCaptureDir(context)` is `File(context.cacheDir,
+    "camera-captures")`, then immediately calls
+    `FileProvider.getUriForFile(context, "${context.packageName}.fileprovider",
+    videoFile)`. `res/xml/file_paths.xml` contains
+    `<cache-path name="frame_capture" path="frames/" />` but no cache path for
+    `camera-captures/`. Grep finds additional `getUriForFile(...)` producers in
+    `SettingsScreen`, `ProjectListViewModel`, `ExportService`,
+    `DirectPublishEngine`, `MediaPicker`, `EditorViewModel`, and
+    `ExportDelegate`; current focused tests do not enumerate each producer's
+    expected XML path.
+  - Current-source check: AndroidX FileProvider docs say a provider can generate
+    content URIs only for files declared in the app's XML paths, and
+    `getUriForFile(...)` throws when the file is outside those configured roots:
+    https://developer.android.com/reference/androidx/core/content/FileProvider
+    Android's secure file-sharing setup documents declaring allowed roots in
+    `res/xml/file_paths.xml` and granting other apps temporary read access to
+    content URIs instead of exposing raw file paths:
+    https://developer.android.com/training/secure-file-sharing/setup-sharing
+  - Touches: `res/xml/file_paths.xml`, `MediaPickerSheet.startCameraCapture()`
+    error handling, pending camera capture cleanup, FileProvider producer
+    inventory, provider path contract tests, diagnostic/export/archive/direct
+    publish/share flows, and no-root-exposure regression tests.
+  - Acceptance: Record Video can create a content URI for
+    `cacheDir/camera-captures` without broadening access beyond that directory.
+    Every FileProvider producer maps to a named, narrow XML root; unrelated
+    internal files remain rejected; URI-generation failures surface actionable
+    UI copy instead of crashing; share intents grant only scoped read access; and
+    diagnostics redact local source paths.
+  - Verify: add a JVM/XML contract test that enumerates expected FileProvider
+    path names and paths, plus a source-table or focused test that every
+    `getUriForFile(...)` producer is represented. Add a Robolectric or
+    instrumentation test for the camera capture URI, representative tests for
+    diagnostics/export/archive/direct publish files, and a negative test proving
+    an unrelated private file cannot be shared.
+  - Complexity: M
+
+#### Appendix — Cycle 16 Sources
+
+- AndroidX FileProvider:
+  https://developer.android.com/reference/androidx/core/content/FileProvider
+- Android secure file sharing setup:
+  https://developer.android.com/training/secure-file-sharing/setup-sharing
