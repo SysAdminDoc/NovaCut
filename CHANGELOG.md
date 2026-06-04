@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.74.43 — 2026-06-04
+
+### Dependency maintenance train
+- Updated the safe freshness slice to Compose BOM 2026.05.01 after confirming
+  the editor-state compile baseline had been clean earlier in the session.
+- Held Room 2.8.4 and the Kotlin/KSP train out of the staged catalog because
+  KSP 2.3.9 requires an AGP API missing from AGP 8.7.3, and the compatible
+  Kotlin/KSP 2.1 maintenance-line compile was externally terminated before
+  Gradle could produce a complete result.
+- Reworked Dependabot's Gradle groups around toolchain, UI, AndroidX runtime,
+  media, ML/native, network/media adornments, and test-support risk lanes so
+  routine PRs are easier to review without mixing unrelated breakage profiles.
+- Documented the changelog-heading auto-tagging evaluation: dependency PRs keep
+  static labels and scoped commit messages, while `CHANGELOG.md` heading/tag
+  matching stays in release verification to avoid dependency PRs creating
+  accidental release tags.
+- Bumped runtime metadata to `versionName 3.74.43` / `versionCode 180`.
+- Verification: `git diff --check` passed. Gradle compile validation was
+  attempted, but the OpenJDK/Gradle process was killed before completion; APK
+  assemble was not run for this batch.
+
 ## v3.74.42 — 2026-06-04
 
 ### Diagnostic timeline-shape opt-in
