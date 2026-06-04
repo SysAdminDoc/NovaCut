@@ -168,6 +168,11 @@ class EffectsDelegate(
         saveUndoState("Change transition duration")
     }
 
+    fun endTransitionDurationChange() {
+        rebuildPlayerTimeline()
+        saveProject()
+    }
+
     fun setTransitionDuration(clipId: String, durationMs: Long) {
         stateFlow.update { state ->
             val tracks = state.tracks.map { track ->
@@ -181,8 +186,6 @@ class EffectsDelegate(
             }
             recalculateDuration(state.copy(tracks = tracks))
         }
-        rebuildPlayerTimeline()
-        saveProject()
     }
 
 }
