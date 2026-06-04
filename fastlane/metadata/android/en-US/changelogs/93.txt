@@ -1,0 +1,3 @@
+- Export / Encoder
+- GIF runaway-frame guard - gifFrameRate is now coerced into [1, 60] and frameIntervalMs is floored at 1L. Previously a stale or experimental >1000 fps value produced 1000 / fps == 0, which made frameCount = totalDurationMs / 0, triggering an infinite frame loop, OOM, and an export that never returned.
+- VolumeAudioProcessor channel guard - onConfigure now also rejects channelCount <= 0, not just sampleRate == 0. A malformed audio track previously slipped through and divid...

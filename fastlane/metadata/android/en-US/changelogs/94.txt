@@ -1,0 +1,3 @@
+- Design system foundations
+- ui/theme/Tokens.kt - New centralized design-token module exposing Spacing, Radius, Elevation, Motion, and TouchTarget scales. Replaces the ad-hoc 8.dp / tween(120) / RoundedCornerShape(14.dp) literals scattered across panels. Future panels should reach for tokens rather than inventing one-off values, so the editor's rhythm stays coherent.
+- PremiumSnackbarHost (PremiumSnackbar.kt) - Animated, severity-aware Mocha-styled snackbar replacing the bare Material 3 Sna...

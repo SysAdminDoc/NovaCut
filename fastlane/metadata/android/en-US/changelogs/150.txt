@@ -1,0 +1,3 @@
+- Recovery open path
+- Routed dynamic Resume/Open shortcuts directly into the editor with an expectRecovery navigation flag so stale resume shortcuts can surface a missing-recovery warning without warning on normal project opens.
+- Switched editor startup from the legacy nullable autosave loader to loadRecoveryDataWithOutcome, preserving the existing successful recovery restore/dialog behavior while distinguishing loaded, future-schema, corrupt, and not-found outcomes.

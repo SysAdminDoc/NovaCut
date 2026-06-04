@@ -1,0 +1,4 @@
+- Concurrency safety
+- Hoisted UUIDs out of _state.update {} closures - MutableStateFlow.update re-executes its lambda on each CAS-retry. Generating UUIDs inside the closure means a retry mints fresh IDs that don't match what any prior closure attempt observed. Fixed two real cases:
+- Paste-effects (EditorViewModel.kt:723) - pre-mints freshEffects from state.copiedEffects once, then the closure just inserts them.
+- Freeze-frame (EditorViewModel.kt:3300) - pre-mints freezeClipId and secondHal...

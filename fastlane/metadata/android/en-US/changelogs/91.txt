@@ -1,0 +1,5 @@
+- UI Improvements
+- Editor panels overhauled - 25 panel composables refined: improved layouts, consistent Catppuccin Mocha theming, better accessibility content descriptions, and expanded string resources (259 new i18n entries).
+- Launcher icon reverted - Restored halo + full letterform design.
+- KeyframeCurveEditor - Richer curve visualization with grid lines, property-colored dots, and improved hit detection.
+- SpeedCurveEditor - Enhanced canvas with reference line, higher-fidelity curve r...

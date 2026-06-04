@@ -1,0 +1,4 @@
+- Per-tool AI requirement adoption
+- Routed strict model/dependency-gated AI tool dispatch through AiModelRequirementSheet before aiProcessingTool is set, so model-gated tools no longer enter processing just to show requirements.
+- Added a post-preflight runAiToolAfterRequirement path and wired the sheet's Use now CTA to it, preventing accepted ready sheets from reopening their own preflight gate.
+- Kept ready and fallback tools on their existing immediate execution paths, while known model-...

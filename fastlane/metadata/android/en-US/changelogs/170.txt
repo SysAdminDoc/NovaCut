@@ -1,0 +1,4 @@
+- Android 15 media-processing timeout handling
+- Added ExportService.onTimeout(startId) and ExportService.onTimeout(startId, fgsType) handling for Android foreground service budget exhaustion.
+- Added VideoEngine.failExportDueToForegroundServiceTimeout so timeout cleanup marks the active export as ERROR, records a user-visible timeout message, cancels the active Transformer, deletes the active output file, and resets progress.
+- Ensured externally forced ERROR states in the Transformer polli...

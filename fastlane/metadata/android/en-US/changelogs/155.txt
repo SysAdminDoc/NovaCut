@@ -1,0 +1,5 @@
+- FillerRemovalPanel final deletion
+- Deleted the deprecated standalone FillerRemovalPanel bottom-sheet route now that the filler_removal tool action opens Cut Assistant Review.
+- Removed PanelId.FILLER_REMOVAL, the legacy editor state fields, and the old show/hide/analyze/apply ViewModel methods tied to the panel.
+- Removed the unused standalone AiFeatures.detectFillerAndSilence path plus the RemovalRegion / RemovalType model that only served that route.
+- Removed panel-only filler-removal...

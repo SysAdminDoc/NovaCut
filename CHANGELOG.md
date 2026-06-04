@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.74.44 — 2026-06-04
+
+### Fastlane changelog history
+- Added `scripts/sync_fastlane_changelogs.py`, a deterministic generator that
+  reads `CHANGELOG.md`, exports only release entries with explicit
+  `versionCode` evidence, skips verification/version-bump noise, and caps each
+  Play Store "What's new" file at the 500-character limit.
+- Populated `fastlane/metadata/android/en-US/changelogs/` for the recoverable
+  release history instead of leaving the channel with only the legacy
+  `67.txt` file.
+- Kept the existing `67.txt` changelog intact because its source release entry
+  does not carry enough explicit version-code evidence for regeneration.
+- Bumped runtime metadata to `versionName 3.74.44` / `versionCode 181`.
+- Verification: `python scripts/sync_fastlane_changelogs.py --check`,
+  generated changelog length scan, and `git diff --check` passed. APK assemble
+  was not run for this batch.
+
 ## v3.74.43 — 2026-06-04
 
 ### Dependency maintenance train

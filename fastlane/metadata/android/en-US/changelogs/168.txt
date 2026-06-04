@@ -1,0 +1,4 @@
+- Timeline interaction and overview extraction
+- Extracted timeline gesture/accessibility policy into TimelineInteractionPolicy, covering compound long-press dispatch, snap target selection, clip hit testing, accessible split points, and keyboard nudge step sizing.
+- Extracted the full-project overview scrollbar into TimelineOverviewBar and exposed its tap-to-scroll math as a focused pure helper.
+- Moved shared timeline track accent colors into TimelineStyle so the main renderer and overview...

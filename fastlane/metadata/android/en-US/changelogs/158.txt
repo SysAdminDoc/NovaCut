@@ -1,0 +1,4 @@
+- AI editor-state storage migration
+- Moved AI-related editor storage into EditorAiState, including requirement prompts, model requirement sheets, active processing tool, AI suggestions, usage ledger, Cut Assistant review, smart-reframe/auto-edit/TTS/noise flags, and noise analysis text.
+- Kept read-only EditorState compatibility accessors so existing UI and delegate reads remain stable while mutation call sites move to nested state.
+- Converted AiToolsDelegate and EditorViewModel AI mutatio...

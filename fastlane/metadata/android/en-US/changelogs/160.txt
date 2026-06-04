@@ -1,0 +1,4 @@
+- Media editor-state storage migration
+- Moved media/trust-report editor storage into EditorMediaState, including backup-import feedback, timeline-exchange feedback, and media relink reports.
+- Kept read-only EditorState compatibility accessors so existing Media Manager, backup import, and timeline-exchange UI reads remain stable.
+- Converted backup import, media relink probing, OTIO/FCPXML feedback, and feedback dismissal mutation paths to update state.media through copyMedia / nested media...

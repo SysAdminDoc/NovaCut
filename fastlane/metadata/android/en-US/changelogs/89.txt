@@ -1,0 +1,5 @@
+- Critical Fixes
+- StateFlowExt CAS loop - Removed 100-retry limit that caused IllegalStateException under high contention; loop now runs unbounded with periodic Thread.yield().
+- ProjectAutoSave release() deadlock - Replaced runBlocking + mutex with scope cancellation to prevent ANR when Activity destroys.
+- ProjectAutoSave atomic writes - Save uses temp file + rename + backup rollback pattern; interrupted saves no longer corrupt project files.
+- ProjectAutoSave .bak recovery - loadRecovery...

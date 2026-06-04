@@ -1,0 +1,4 @@
+- Caption editor-state storage migration
+- Moved caption translation editor storage into EditorCaptionState, including translation rows, source language, target language, pair quality, and model variant.
+- Kept read-only EditorState compatibility accessors so existing caption translation panel and editor UI reads remain stable.
+- Converted caption translation target, row update, edit, regenerate, and complete-regenerate mutation paths to update state.caption through copyCaption / nested capt...

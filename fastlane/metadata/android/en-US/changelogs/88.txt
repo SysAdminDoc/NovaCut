@@ -1,0 +1,3 @@
+- Engine / Core
+- Centralized file-name sanitization - New FileNaming.kt utility replaces 6+ scattered inline regex calls with a single function that handles Windows reserved names, control chars, and extension preservation. All export/archive/template file paths now use it.
+- ProjectArchive rewrite - Archives now include a media_manifest.json for reliable round-tripping of media URIs. Compound clips and image overlays are archived. Import rolls back created directories on failure and rewrit...

@@ -1,0 +1,4 @@
+- Caption translation panel call site
+- Embedded CaptionTranslationPanel inside the Captions editor panel and passed translation rows, source/target language state, target choices, edit callbacks, and regenerate callbacks from EditorScreen.
+- Added CaptionTranslationBridge so selected-clip captions become SherpaAsrEngine.TranscriptionSegment values for the existing CaptionTranslationEngine surface.
+- Added EditorViewModel.runCaptionTranslation(targetLang) to populate captionTranslationRows w...

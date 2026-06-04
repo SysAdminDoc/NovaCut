@@ -1,0 +1,5 @@
+- AI panel router host extraction
+- Added EditorAiPanelHost to own the AI tools sheet and Cut Assistant review sheet routes.
+- Moved AI tool dispatch, disabled-tool feedback, model download/remove callbacks, processing cancellation, and Cut Assistant proposal callbacks out of the main EditorScreen body.
+- Kept EditorScreen responsible for collecting the Whisper and segmentation model-state flows and passing their current values into the host.
+- Left clip-adjustment, utility, and overlay rout...
