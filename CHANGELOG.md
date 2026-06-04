@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.74.23 — 2026-06-04
+
+### Media editor-state storage migration
+- Moved media/trust-report editor storage into `EditorMediaState`, including
+  backup-import feedback, timeline-exchange feedback, and media relink reports.
+- Kept read-only `EditorState` compatibility accessors so existing Media
+  Manager, backup import, and timeline-exchange UI reads remain stable.
+- Converted backup import, media relink probing, OTIO/FCPXML feedback, and
+  feedback dismissal mutation paths to update `state.media` through `copyMedia`
+  / nested `media.copy(...)`.
+- Updated `EditorDomainStateTest` to construct and assert the stored media
+  slice directly.
+- Bumped runtime metadata to `versionName 3.74.23` / `versionCode 160`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:compileDebugKotlin :app:testDebugUnitTest --tests
+  com.novacut.editor.ui.editor.EditorDomainStateTest`, and
+  `:app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+  :app:assembleDebugAndroidTest` passed.
+
 ## v3.74.22 — 2026-06-04
 
 ### Export editor-state storage migration
