@@ -219,7 +219,7 @@ class AiToolsDelegate(
         // runs before we publish our new state — otherwise a trailing `aiProcessingTool = null`
         // from the cancelled job could race-overwrite our own update and hide the progress indicator.
         aiJob?.cancel()
-        stateFlow.update { it.copy(aiProcessingTool = toolId) }
+        stateFlow.update { it.copyAi { ai -> ai.copy(processingTool = toolId) } }
 
         lateinit var thisJob: kotlinx.coroutines.Job
         thisJob = scope.launch {
@@ -261,7 +261,7 @@ class AiToolsDelegate(
                 // Only clear progress state if we are still the active job — protects against
                 // a stale cancelled job overwriting the newly-launched one's progress indicator.
                 if (aiJob === thisJob) {
-                    stateFlow.update { it.copy(aiProcessingTool = null) }
+                    stateFlow.update { it.copyAi { ai -> ai.copy(processingTool = null) } }
                     aiJob = null
                 }
             }
@@ -819,10 +819,12 @@ class AiToolsDelegate(
 
     private fun showAiModelRequirement(requirement: AiToolRequirements.ToolRequirement) {
         stateFlow.update {
-            it.copy(
-                aiModelRequirement = requirement,
-                aiRequirementPrompt = null
-            )
+            it.copyAi { ai ->
+                ai.copy(
+                    modelRequirement = requirement,
+                    requirementPrompt = null
+                )
+            }
         }
     }
 
@@ -840,16 +842,18 @@ class AiToolsDelegate(
             return
         }
         stateFlow.update {
-            it.copy(
-                aiModelRequirement = null,
-                aiRequirementPrompt = AiRequirementPrompt(
+            it.copyAi { ai ->
+                ai.copy(
+                    modelRequirement = null,
+                    requirementPrompt = AiRequirementPrompt(
                     title = title,
                     body = body,
                     modelName = modelName,
                     estimatedSize = estimatedSize,
                     actionLabel = actionLabel
                 )
-            )
+                )
+            }
         }
     }
 

@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.20 (`versionCode` 157).
+- Current version: v3.74.21 (`versionCode` 158).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -83,6 +83,10 @@ Last consolidated: 2026-06-04.
   sealed `EditorDomainState` projection that groups panel, caption, compound,
   export, AI, and media state into tested slices before storage/copy call sites
   migrate onto those domains.
+- AI editor-state storage migration shipped in v3.74.21: AI requirement
+  prompts, processing state, suggestions, usage ledger, Cut Assistant review,
+  smart-reframe/auto-edit/TTS/noise flags, and noise analysis now live in
+  `EditorAiState`, with compatibility accessors preserving existing reads.
 
 ## Preserved Historical Detail
 

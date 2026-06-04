@@ -56,16 +56,18 @@ class EditorDomainStateTest {
             lastExportedFilePath = "C:/exports/final.mp4",
             exportErrorMessage = "blocked",
             exportStartTime = 1234L,
-            aiRequirementPrompt = prompt,
-            aiModelRequirement = requirement,
-            aiProcessingTool = "video_upscale",
-            aiSuggestion = suggestion,
-            isReframing = true,
-            isAutoEditing = true,
-            isSynthesizingTts = true,
-            isTtsAvailable = true,
-            isAnalyzingNoise = true,
-            noiseAnalysisResult = "Noise profile ready"
+            ai = EditorAiState(
+                requirementPrompt = prompt,
+                modelRequirement = requirement,
+                processingTool = "video_upscale",
+                suggestion = suggestion,
+                isReframing = true,
+                isAutoEditing = true,
+                isSynthesizingTts = true,
+                isTtsAvailable = true,
+                isAnalyzingNoise = true,
+                noiseAnalysisResult = "Noise profile ready"
+            )
         )
 
         val domains = state.domainStates

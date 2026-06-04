@@ -8,8 +8,16 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.20** (`versionCode` 157). Last consolidated:
+Current version: **v3.74.21** (`versionCode` 158). Last consolidated:
 2026-06-04.
+
+2026-06-04 research refresh: the v3.74.21 editor-state migration moved the AI
+storage slice into `EditorAiState`, leaving panel, caption, compound, export,
+and media storage as the remaining P1 migration lane. Maven metadata shows
+Media3 1.10.1 and WorkManager 2.11.2 current, with Compose BOM 2026.05.01, Room
+2.8.4, and Kotlin 2.4.0 available for deliberate review; AGP's newest observed
+metadata is 9.3.0-alpha09 and should stay out of routine bumps. Focused Gradle,
+full APK, release metadata, signature, zipalign, and 16 KB gates passed locally.
 
 ## Current State
 
@@ -56,6 +64,8 @@ Current version: **v3.74.20** (`versionCode` 157). Last consolidated:
 - v3.74.20 adds the first editor state decomposition layer: a sealed
   `EditorDomainState` projection for panel, caption, compound, export, AI, and
   media slices with JVM tests locking representative field ownership.
+- v3.74.21 moves AI-related editor state into `EditorAiState` storage while
+  keeping read-only compatibility accessors for UI/delegate reads.
 
 ## Source Archives
 
@@ -68,13 +78,13 @@ Current version: **v3.74.20** (`versionCode` 157). Last consolidated:
 
 | Priority | Work | Exit criteria |
 |---|---|---|
-| P1 | Editor state storage migration | Move `EditorState` constructor storage and `copy(...)` call sites onto the new panel, caption, compound, export, AI, and media domain slices without regressing existing editor surfaces. |
+| P1 | Editor state storage migration | Move remaining `EditorState` constructor storage and `copy(...)` call sites onto the panel, caption, compound, export, and media domain slices without regressing existing editor surfaces. |
 | P1 | EditorScreen panel router decomposition | Replace the large monolithic panel routing surface with smaller host components that own only their local state and callbacks. |
 | P1 | Timeline refactor | Reduce `Timeline.kt` risk by extracting gesture handling, clip layout, overlays, and accessibility actions into focused files with tests where practical. |
 | P1 | Model activation gates | For every active AI/model dependency, keep source locator, SHA-256, license posture, delivery mode, F-Droid posture, and runtime checksum behavior current in `docs/models.md`. |
 | P2 | Project color policy consumers | Wire `ProjectColorPolicy` into Settings/export confidence once the Room/autosave migration plan is ready. |
 | P2 | Diagnostic ZIP timeline-shape toggle | Expose the privacy-preserving timeline-shape summary as an explicit Settings export option. |
-| P2 | Dependabot grouping and auto-tag review | Group dependency updates by toolchain risk and evaluate auto-tagging from `CHANGELOG.md` headings. |
+| P2 | Dependabot grouping and dependency freshness review | Group dependency updates by toolchain risk, evaluate auto-tagging from `CHANGELOG.md` headings, and stage the current Compose BOM / Room / Kotlin freshness batch only after the editor-state migration has a clean compile baseline. |
 | P2 | Fastlane changelog history | Populate `fastlane/metadata/.../changelogs/` from release history or document why the channel is unused. |
 | P3 | Caption translation engine activation | Replace source-text echo behavior with a real local model path such as MADLAD-400 or Bergamot only after model gates are complete. |
 | P3 | Advanced engine activations | Activate Oboe resampling, adjustment layers, keyframe graph UI, and remaining AI engines only when dependencies, APK size, 16 KB compliance, and device QA are clear. |

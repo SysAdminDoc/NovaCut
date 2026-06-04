@@ -72,18 +72,18 @@ data class EditorExportDomainState(
 }
 
 data class EditorAiState(
-    val requirementPrompt: AiRequirementPrompt?,
-    val modelRequirement: AiToolRequirements.ToolRequirement?,
-    val processingTool: String?,
-    val suggestion: AiSuggestion?,
-    val usageLedger: List<AiUsageLedger.Entry>,
-    val cutAssistantReview: CutAssistantEngine.ReviewSet?,
-    val isReframing: Boolean,
-    val isAutoEditing: Boolean,
-    val isSynthesizingTts: Boolean,
-    val isTtsAvailable: Boolean,
-    val isAnalyzingNoise: Boolean,
-    val noiseAnalysisResult: String?
+    val requirementPrompt: AiRequirementPrompt? = null,
+    val modelRequirement: AiToolRequirements.ToolRequirement? = null,
+    val processingTool: String? = null,
+    val suggestion: AiSuggestion? = null,
+    val usageLedger: List<AiUsageLedger.Entry> = emptyList(),
+    val cutAssistantReview: CutAssistantEngine.ReviewSet? = null,
+    val isReframing: Boolean = false,
+    val isAutoEditing: Boolean = false,
+    val isSynthesizingTts: Boolean = false,
+    val isTtsAvailable: Boolean = false,
+    val isAnalyzingNoise: Boolean = false,
+    val noiseAnalysisResult: String? = null
 ) : EditorDomainState {
     override val kind: EditorDomainState.Kind = EditorDomainState.Kind.AI
 }
@@ -144,23 +144,13 @@ val EditorState.domainStates: EditorDomainStates
             batchQueue = batchExportQueue,
             savedConfig = savedExportConfig
         ),
-        ai = EditorAiState(
-            requirementPrompt = aiRequirementPrompt,
-            modelRequirement = aiModelRequirement,
-            processingTool = aiProcessingTool,
-            suggestion = aiSuggestion,
-            usageLedger = aiUsageLedger,
-            cutAssistantReview = cutAssistantReview,
-            isReframing = isReframing,
-            isAutoEditing = isAutoEditing,
-            isSynthesizingTts = isSynthesizingTts,
-            isTtsAvailable = isTtsAvailable,
-            isAnalyzingNoise = isAnalyzingNoise,
-            noiseAnalysisResult = noiseAnalysisResult
-        ),
+        ai = ai,
         media = EditorMediaState(
             backupImportFeedback = backupImportFeedback,
             timelineExchangeFeedback = timelineExchangeFeedback,
             relinkReports = mediaRelinkReports
         )
     )
+
+inline fun EditorState.copyAi(transform: (EditorAiState) -> EditorAiState): EditorState =
+    copy(ai = transform(ai))
