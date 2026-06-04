@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.18 (`versionCode` 155).
+- Current version: v3.74.19 (`versionCode` 156).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -74,6 +74,11 @@ Last consolidated: 2026-06-04.
   analyze/apply methods, filler-region state, obsolete `AiFeatures`
   detection path, or panel-only strings; the `filler_removal` tool action stays
   on Cut Assistant Review.
+- Per-tool AI requirement adoption shipped in v3.74.19: strict
+  model/dependency-gated AI tool launches now raise `AiModelRequirementSheet`
+  before processing starts, accepted ready sheets dispatch through a bypass
+  run path, and the legacy `aiRequirementPrompt` is reserved for tool IDs
+  without `AiToolRequirements` registry entries.
 
 ## Preserved Historical Detail
 

@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.74.19 — 2026-06-04
+
+### Per-tool AI requirement adoption
+- Routed strict model/dependency-gated AI tool dispatch through
+  `AiModelRequirementSheet` before `aiProcessingTool` is set, so model-gated
+  tools no longer enter processing just to show requirements.
+- Added a post-preflight `runAiToolAfterRequirement` path and wired the
+  sheet's `Use now` CTA to it, preventing accepted ready sheets from reopening
+  their own preflight gate.
+- Kept ready and fallback tools on their existing immediate execution paths,
+  while known model-gated call sites now resolve `AiToolRequirements` before
+  falling back to the old generic `aiRequirementPrompt`.
+- Aligned requirement registry IDs with live editor dispatch IDs for denoise,
+  Real-ESRGAN video upscale, and advanced style transfer, and locked the active
+  model-aware IDs in `AiToolRequirementsTest`.
+- Bumped runtime metadata to `versionName 3.74.19` / `versionCode 156`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:compileDebugKotlin :app:testDebugUnitTest --tests
+  com.novacut.editor.engine.AiToolRequirementsTest`, and
+  `:app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+  :app:assembleDebugAndroidTest` passed.
+
 ## v3.74.18 — 2026-06-04
 
 ### FillerRemovalPanel final deletion

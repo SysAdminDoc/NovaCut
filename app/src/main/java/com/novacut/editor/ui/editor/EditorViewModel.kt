@@ -204,10 +204,9 @@ data class EditorState(
     // banner is pending or after the user interacts with it.
     val bulkUndoPrompt: BulkUndoPrompt? = null,
     val aiRequirementPrompt: AiRequirementPrompt? = null,
-    // Next-generation pre-flight sheet (Highest-Value #10). Coexists with the
-    // legacy `aiRequirementPrompt` AlertDialog during the migration; tool
-    // dispatch paths flip over one at a time. When non-null the
-    // `AiModelRequirementSheet` composable renders in EditorScreen.
+    // Registry-backed pre-flight sheet for AI/model tools. The legacy
+    // `aiRequirementPrompt` AlertDialog is now only a fallback for tool IDs
+    // that do not have an AiToolRequirements entry.
     val aiModelRequirement: com.novacut.editor.engine.AiToolRequirements.ToolRequirement? = null,
     // R5.4a — caption-translation editor surface. Populated by
     // EditorViewModel.runCaptionTranslation(); the panel
@@ -4302,6 +4301,7 @@ class EditorViewModel @Inject constructor(
     fun deleteSegmentationModel() = aiToolsDelegate.deleteSegmentationModel()
 
     fun runAiTool(toolId: String) = aiToolsDelegate.runAiTool(toolId)
+    fun runAiToolAfterRequirement(toolId: String) = aiToolsDelegate.runAiToolAfterRequirement(toolId)
     fun cancelAiTool() = aiToolsDelegate.cancelAiTool()
     fun dismissAiRequirementPrompt() {
         val current = _state.value.aiRequirementPrompt ?: return
@@ -4315,17 +4315,11 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Show the next-generation AI requirement sheet (Highest-Value #10).
-     * Look up the [com.novacut.editor.engine.AiToolRequirements] entry for
-     * [toolId] and surface it through `state.aiModelRequirement`. The
-     * `AiModelRequirementSheet` Composable in EditorScreen renders the
-     * result. Silently no-ops when no registry entry exists — the legacy
-     * `aiRequirementPrompt` path remains the fallback during migration.
+     * Show the registry-backed AI requirement sheet. Silently no-ops when no
+     * registry entry exists — `aiRequirementPrompt` remains the generic
+     * fallback for those unknown IDs.
      */
-    fun showAiModelRequirement(toolId: String) {
-        val req = com.novacut.editor.engine.AiToolRequirements.requirementFor(toolId) ?: return
-        _state.update { it.copy(aiModelRequirement = req) }
-    }
+    fun showAiModelRequirement(toolId: String) = aiToolsDelegate.showAiModelRequirement(toolId)
 
     fun dismissAiModelRequirement() {
         _state.update { it.copy(aiModelRequirement = null) }

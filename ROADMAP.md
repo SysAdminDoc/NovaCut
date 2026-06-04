@@ -8,7 +8,7 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.18** (`versionCode` 155). Last consolidated:
+Current version: **v3.74.19** (`versionCode` 156). Last consolidated:
 2026-06-04.
 
 ## Current State
@@ -49,6 +49,10 @@ Current version: **v3.74.18** (`versionCode` 155). Last consolidated:
   `filler_removal` tool action moved to Cut Assistant Review, removing its
   panel slot, ViewModel state/methods, obsolete AiFeatures analysis path, and
   panel-only strings.
+- v3.74.19 migrates strict model/dependency-gated AI tool dispatch to
+  `AiModelRequirementSheet`, aligns registry IDs with live editor tool IDs,
+  and keeps the legacy requirement prompt only as a fallback for non-registry
+  tool IDs.
 
 ## Source Archives
 
@@ -61,7 +65,6 @@ Current version: **v3.74.18** (`versionCode` 155). Last consolidated:
 
 | Priority | Work | Exit criteria |
 |---|---|---|
-| P1 | Per-tool AI requirement adoption | Migrate each AI tool path from the legacy `aiRequirementPrompt` to `AiModelRequirementSheet`, keeping a fallback only for tools without registry entries. |
 | P1 | Editor state decomposition | Split `EditorState` into domain sealed substates so caption, compound, export, AI, media, and panel state can evolve independently. |
 | P1 | EditorScreen panel router decomposition | Replace the large monolithic panel routing surface with smaller host components that own only their local state and callbacks. |
 | P1 | Timeline refactor | Reduce `Timeline.kt` risk by extracting gesture handling, clip layout, overlays, and accessibility actions into focused files with tests where practical. |
