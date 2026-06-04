@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -28,10 +29,14 @@ import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.novacut.editor.engine.AppSettings
+import com.novacut.editor.engine.IncomingDocumentIntentParser
+import com.novacut.editor.engine.IncomingDocumentItem
+import com.novacut.editor.engine.IncomingDocumentMetadata
 import com.novacut.editor.engine.IncomingMediaIntentParser
 import com.novacut.editor.engine.IncomingMediaItem
 import com.novacut.editor.engine.ProjectShortcutPlanner
 import com.novacut.editor.engine.SettingsRepository
+import com.novacut.editor.engine.resolveMediaDisplayName
 import com.novacut.editor.ui.editor.EditorScreen
 import com.novacut.editor.ui.editor.LocalTabletopPosture
 import com.novacut.editor.ui.projects.ProjectListScreen
@@ -48,6 +53,7 @@ class MainActivity : ComponentActivity() {
     lateinit var settingsRepository: SettingsRepository
 
     private var pendingIncomingMedia by mutableStateOf<List<IncomingMediaItem>>(emptyList())
+    private var pendingIncomingDocuments by mutableStateOf<List<IncomingDocumentItem>>(emptyList())
     private var pendingEditorOpen by mutableStateOf<PendingEditorOpen?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,6 +102,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(pendingIncomingDocuments, currentRoute) {
+                    if (pendingIncomingDocuments.isNotEmpty() && currentRoute != null && currentRoute != "projects") {
+                        navController.navigate("projects") {
+                            launchSingleTop = true
+                            popUpTo("projects") { inclusive = false }
+                        }
+                    }
+                }
+
                 LaunchedEffect(pendingEditorOpen, currentRoute) {
                     val pending = pendingEditorOpen ?: return@LaunchedEffect
                     if (currentRoute == null) return@LaunchedEffect
@@ -120,7 +135,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSettings = { navController.navigate("settings") },
                                 pendingImportItems = pendingIncomingMedia,
-                                onPendingImportHandled = { pendingIncomingMedia = emptyList() }
+                                onPendingImportHandled = { pendingIncomingMedia = emptyList() },
+                                pendingDocumentItems = pendingIncomingDocuments,
+                                onPendingDocumentImportHandled = { pendingIncomingDocuments = emptyList() }
                             )
                         }
                         composable("settings") {
@@ -184,7 +201,10 @@ class MainActivity : ComponentActivity() {
         val parsed = IncomingMediaIntentParser.parse(intent) { uri ->
             runCatching { contentResolver.getType(uri) }.getOrNull()
         }
-        if (parsed.isEmpty()) return
+        if (parsed.isEmpty()) {
+            handleIncomingDocumentIntent(intent)
+            return
+        }
 
         val readableItems = parsed.filter { item ->
             runCatching {
@@ -196,6 +216,51 @@ class MainActivity : ComponentActivity() {
         if (readableItems.isNotEmpty()) {
             pendingIncomingMedia = readableItems
         }
+    }
+
+    private fun handleIncomingDocumentIntent(intent: Intent) {
+        val parsed = IncomingDocumentIntentParser.parse(intent) { uri ->
+            incomingDocumentMetadata(uri, intent.type)
+        }
+        if (parsed.isEmpty()) return
+
+        val readableItems = parsed.filter { item ->
+            runCatching {
+                contentResolver.openAssetFileDescriptor(item.uri, "r")?.use { descriptor ->
+                    descriptor.length != 0L
+                } ?: false
+            }.getOrDefault(false)
+        }
+        if (readableItems.isNotEmpty()) {
+            pendingIncomingDocuments = readableItems
+        }
+    }
+
+    private fun incomingDocumentMetadata(uri: Uri, intentMimeType: String?): IncomingDocumentMetadata {
+        return IncomingDocumentMetadata(
+            displayName = resolveMediaDisplayName(this, uri),
+            mimeType = runCatching { contentResolver.getType(uri) }.getOrNull() ?: intentMimeType,
+            sizeBytes = queryOpenableSize(uri)
+        )
+    }
+
+    private fun queryOpenableSize(uri: Uri): Long? {
+        return runCatching {
+            contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.SIZE),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else null
+                } else {
+                    null
+                }
+            }
+        }.getOrNull()
     }
 
     companion object {

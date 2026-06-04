@@ -8,7 +8,7 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.48** (`versionCode` 185). Last consolidated:
+Current version: **v3.74.49** (`versionCode` 186). Last consolidated:
 2026-06-04.
 
 > Last researched: Cycle 22 - 2026-06-04.
@@ -101,6 +101,11 @@ v3.74.48 closed the Cycle 7 appearance gate by adding persisted
 System/Dark/High Contrast Dark selection, high-contrast shared chrome tokens,
 Compose accessibility smoke hooks, contrast policy tests, and a documented
 dark-only System rationale until a light canvas has full visual QA.
+v3.74.49 closed the Cycle 8 document-import gate by adding content-only
+non-media document intent parsing, bounded JSON/XML/text/ZIP/octet-stream
+manifest filters, existing-engine validation for templates, effect packs, LUTs,
+OpenFX descriptors, archives, and timeline import status, plus a Projects
+preview/report dialog before any mutation.
 
 ## Current State
 
@@ -244,6 +249,10 @@ dark-only System rationale until a light canvas has full visual QA.
   shared chrome consumes high-contrast semantic tokens, Compose smoke tests run
   accessibility checks from root, and `NovaCutAppearancePolicyTest` locks text,
   non-text, chip, and low-emphasis-token contrast floors.
+- v3.74.49 adds non-media document import routing: supported plugin, LUT,
+  archive, and timeline-interchange files flow through a content-only parser,
+  bounded manifest filters, existing loader validation, and a Projects
+  preview/report dialog before any template import mutation.
 
 ## Source Archives
 
@@ -267,6 +276,7 @@ dark-only System rationale until a light canvas has full visual QA.
 | ✅ P2 | Memory trim policy | Implemented in v3.74.46: `NovaCutApp.onTrimMemory` dispatches OS memory-pressure levels through a tested policy, active media engines register cache trim callbacks, proxy trimming skips in-flight renders, and diagnostic ZIPs include bounded redacted memory-trim breadcrumbs when present. |
 | ✅ P2 | Play listing release gate | Implemented in v3.74.47: Fastlane metadata now includes deterministic Play icon, feature graphic, phone/tablet screenshots, SVG sources, alt-text inventory, privacy policy URL, Data safety worksheet, and a CI validator for listing/disclosure readiness. |
 | ✅ P2 | Appearance and contrast gates | Implemented in v3.74.48: persisted System/Dark/High Contrast Dark selection, high-contrast shared chrome tokens, Compose accessibility smoke checks, `docs/appearance-policy.md`, and JVM contrast guardrails for text, non-text, chips, and low-emphasis token misuse. |
+| ✅ P2 | Non-media document import router | Implemented in v3.74.49: content-only plugin/LUT/archive/timeline documents now classify through `IncomingDocumentIntentParser`, manifest filters stay specific without `*/*`, Projects shows a preview/report, and loaders validate templates, effect packs, LUTs, OpenFX descriptors, archives, and timeline-import stub status before mutation. |
 | P3 | Caption translation engine activation | Replace source-text echo behavior with a real local model path such as MADLAD-400 or Bergamot only after model gates are complete. |
 | P3 | Advanced engine activations | Activate Oboe resampling, adjustment layers, keyframe graph UI, and remaining AI engines only when dependencies, APK size, 16 KB compliance, and device QA are clear. |
 
@@ -988,7 +998,7 @@ unsafe catch-all receiver.
 
 #### Import & Interop
 
-- [ ] 🔬🤖 P2 — Add non-media document import router for plugins and interchange files
+- [x] ✅🔬🤖 P2 — Add non-media document import router for plugins and interchange files
   - Why: NovaCut already documents shareable plugin/LUT files, project archive
     export, and OTIO/FCPXML/EDL interchange, but Android only lists an app for
     implicit opens/shares when the action, category, and data type/scheme match
@@ -1897,6 +1907,12 @@ local-first privacy posture or duplicating the completed Baseline Profile gate.
     upload when consent is false. Add an instrumentation or fake-network guard
     that exercises app startup and Settings without telemetry traffic.
   - Complexity: M
+  - Status: implemented in v3.74.49. Added `IncomingDocumentIntentParser`,
+    `IncomingDocumentImportRouter`, bounded document manifest filters, Projects
+    preview/report UI, parser/manifest JVM tests, and docs in
+    `docs/incoming-document-imports.md`. The first pass validates templates,
+    effect packs, LUTs, OpenFX descriptors, archives, and timeline import status
+    before mutation; only template save is enabled directly from the preview.
 
 #### Appendix - Cycle 20 Sources
 

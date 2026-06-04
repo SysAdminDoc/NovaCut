@@ -1,0 +1,4 @@
+- Non-media document import router
+- Added IncomingDocumentIntentParser for content-only plugin, LUT, project archive, and timeline-interchange opens/shares with extension, MIME, read grant, duplicate, empty-file, and per-kind size checks.
+- Added explicit document ACTION_VIEW, ACTION_SEND, and ACTION_SEND_MULTIPLE manifest filters for JSON, XML, text, ZIP, and octet-stream payloads without registering an unrestricted */* receiver.
+- Added IncomingDocumentImportRouter and a Projects review d...

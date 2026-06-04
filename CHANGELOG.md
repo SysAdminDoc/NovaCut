@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.74.49 — 2026-06-04
+
+### Non-media document import router
+- Added `IncomingDocumentIntentParser` for content-only plugin, LUT, project
+  archive, and timeline-interchange opens/shares with extension, MIME, read
+  grant, duplicate, empty-file, and per-kind size checks.
+- Added explicit document `ACTION_VIEW`, `ACTION_SEND`, and
+  `ACTION_SEND_MULTIPLE` manifest filters for JSON, XML, text, ZIP, and
+  octet-stream payloads without registering an unrestricted `*/*` receiver.
+- Added `IncomingDocumentImportRouter` and a Projects review dialog that names
+  file kind, target action, parser/fidelity status, warnings, and whether a
+  mutation is available before changing app state.
+- Routed implemented validation through existing loaders for templates,
+  `.ncfx` effect packs, `.cube` / `.3dl` LUTs, `.ncfxd` OpenFX descriptors,
+  NovaCut archives, and timeline import status; timeline/style-pack imports
+  report blocked/stub status instead of claiming success.
+- Bumped runtime metadata to `versionName 3.74.49` / `versionCode 186`.
+- Verification: focused JVM parser/manifest tests, full `:app:testDebugUnitTest`
+  plus debug/release/androidTest APK packaging, release artifact verification,
+  Play listing validation, Fastlane changelog sync, and `git diff --check`
+  passed.
+
 ## v3.74.48 — 2026-06-04
 
 ### Appearance and contrast regression gates

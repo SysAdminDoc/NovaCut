@@ -23,8 +23,8 @@ android {
         applicationId = "com.novacut.editor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 185
-        versionName = "3.74.48"
+        versionCode = 186
+        versionName = "3.74.49"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
