@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.48 (`versionCode` 185).
+- Current version: v3.74.49 (`versionCode` 186).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -62,6 +62,11 @@ Last consolidated: 2026-06-04.
   selected appearance, shared chrome uses high-contrast semantic tokens,
   Compose smoke tests enable accessibility checks, and JVM contrast tests lock
   text and non-text floors.
+- Non-media document import routing shipped in v3.74.49: content-only plugin,
+  LUT, archive, and timeline-interchange opens/shares now classify through a
+  pure parser, manifest filters stay bounded to specific document MIME
+  families, and Projects shows a preview/report before any template import
+  mutation.
 - UI test harness bootstrap shipped in v3.74.11: shared Compose test tags,
   androidTest dependencies, and a smoke test covering project list,
   blank-project editor open, media picker, export sheet, Settings, and privacy

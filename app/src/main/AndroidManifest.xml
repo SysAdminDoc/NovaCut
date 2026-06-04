@@ -63,6 +63,53 @@
                 <data android:mimeType="image/*" />
                 <data android:mimeType="audio/*" />
             </intent-filter>
+            <!-- Non-media document receiver for NovaCut-owned plugin,
+                 template, LUT, archive, and timeline-interchange files.
+                 Kept to explicit MIME families plus content:// VIEW grants;
+                 MainActivity still validates extension, size, and parser
+                 status before showing a preview/report. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/octet-stream" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/json" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/zip" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/xml" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="text/xml" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="text/xml" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="text/xml" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
             <!-- Image share target: bring a sticker / overlay candidate in
                  from another app. `content://` only so a malicious third
                  party can't hand us a `file://` path outside our sandbox. -->

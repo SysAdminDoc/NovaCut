@@ -16,6 +16,33 @@ class IncomingMediaManifestTest {
         assertSendFilter(filters, "android.intent.action.SEND_MULTIPLE")
     }
 
+    @Test
+    fun mainActivityDeclaresSpecificDocumentImportFiltersWithoutCatchAll() {
+        val filters = mainActivityIntentFilters()
+        val expected = setOf(
+            "application/octet-stream",
+            "application/json",
+            "application/zip",
+            "application/xml",
+            "text/xml",
+            "text/plain"
+        )
+
+        val viewFilter = filters.firstOrNull { element ->
+            element.childElements("action").any { it.androidName == "android.intent.action.VIEW" } &&
+                element.mimeTypes().containsAll(expected)
+        } ?: error("Missing document ACTION_VIEW filter")
+        assertEquals(expected, viewFilter.mimeTypes())
+        assertEquals(setOf("content"), viewFilter.dataSchemes().toSet())
+
+        assertDocumentSendFilter(filters, "android.intent.action.SEND", expected)
+        assertDocumentSendFilter(filters, "android.intent.action.SEND_MULTIPLE", expected)
+
+        val allMimeTypes = filters.flatMap { it.childElements("data") }
+            .mapNotNull { it.getAttributeNS(ANDROID_NS, "mimeType").takeIf(String::isNotBlank) }
+        assertTrue("Document imports must not register an unrestricted */* filter", "*/*" !in allMimeTypes)
+    }
+
     private fun assertSendFilter(filters: List<Element>, action: String) {
         val filter = filters.firstOrNull { element ->
             element.childElements("action").any { it.androidName == action }
@@ -29,6 +56,26 @@ class IncomingMediaManifestTest {
 
         assertEquals(setOf("video/*", "image/*", "audio/*"), mimeTypes)
         assertTrue("$action Sharesheet filter must not require a data scheme", dataSchemes.isEmpty())
+    }
+
+    private fun assertDocumentSendFilter(filters: List<Element>, action: String, expected: Set<String>) {
+        val filter = filters.firstOrNull { element ->
+            element.childElements("action").any { it.androidName == action } &&
+                element.mimeTypes().containsAll(expected)
+        } ?: error("Missing document $action filter")
+        assertEquals(expected, filter.mimeTypes())
+        assertTrue("$action document Sharesheet filter must not require a data scheme", filter.dataSchemes().isEmpty())
+    }
+
+    private fun Element.mimeTypes(): Set<String> {
+        return childElements("data")
+            .mapNotNull { it.getAttributeNS(ANDROID_NS, "mimeType").takeIf(String::isNotBlank) }
+            .toSet()
+    }
+
+    private fun Element.dataSchemes(): List<String> {
+        return childElements("data")
+            .mapNotNull { it.getAttributeNS(ANDROID_NS, "scheme").takeIf(String::isNotBlank) }
     }
 
     private fun mainActivityIntentFilters(): List<Element> {

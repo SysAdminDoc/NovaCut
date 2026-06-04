@@ -42,6 +42,9 @@ import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import com.novacut.editor.R
+import com.novacut.editor.engine.IncomingDocumentImportPreview
+import com.novacut.editor.engine.IncomingDocumentImportStatus
+import com.novacut.editor.engine.IncomingDocumentItem
 import com.novacut.editor.engine.IncomingMediaItem
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.ProjectFilterMode
@@ -73,6 +76,8 @@ fun ProjectListScreen(
     onSettings: () -> Unit = {},
     pendingImportItems: List<IncomingMediaItem> = emptyList(),
     onPendingImportHandled: () -> Unit = {},
+    pendingDocumentItems: List<IncomingDocumentItem> = emptyList(),
+    onPendingDocumentImportHandled: () -> Unit = {},
     viewModel: ProjectListViewModel = hiltViewModel()
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
@@ -83,6 +88,7 @@ fun ProjectListScreen(
     val userTemplates by viewModel.userTemplates.collectAsStateWithLifecycle()
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
     val operationState by viewModel.operationState.collectAsStateWithLifecycle()
+    val documentImportPreview by viewModel.documentImportPreview.collectAsStateWithLifecycle()
     val actionsEnabled = operationState == null
     val hasAnyProjects = projectTotalCount > 0
     var showTemplateSheet by remember { mutableStateOf(false) }
@@ -101,6 +107,14 @@ fun ProjectListScreen(
             viewModel.createProjectFromImports(items) { projectId ->
                 onProjectSelected(projectId)
             }
+        }
+    }
+
+    LaunchedEffect(pendingDocumentItems) {
+        if (pendingDocumentItems.isNotEmpty()) {
+            val items = pendingDocumentItems
+            onPendingDocumentImportHandled()
+            viewModel.previewIncomingDocuments(items)
         }
     }
 
@@ -257,12 +271,110 @@ fun ProjectListScreen(
             )
         }
 
+        documentImportPreview?.let { preview ->
+            IncomingDocumentImportDialog(
+                preview = preview,
+                onConfirm = viewModel::importPreviewedDocument,
+                onDismiss = viewModel::dismissDocumentImportPreview
+            )
+        }
+
         PremiumSnackbarHost(
             message = toastMessage,
             severity = toastMessage?.let(::inferSeverity) ?: ToastSeverity.Info,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(start = 16.dp, end = 16.dp, bottom = 20.dp)
+        )
+    }
+}
+
+@Composable
+private fun IncomingDocumentImportDialog(
+    preview: IncomingDocumentImportPreview,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val accent = when (preview.status) {
+        IncomingDocumentImportStatus.READY,
+        IncomingDocumentImportStatus.IMPORTED -> Mocha.Green
+        IncomingDocumentImportStatus.BLOCKED -> Mocha.Yellow
+        IncomingDocumentImportStatus.INVALID -> Mocha.Red
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            NovaCutDialogIcon(
+                icon = when (preview.status) {
+                    IncomingDocumentImportStatus.READY -> Icons.Default.Description
+                    IncomingDocumentImportStatus.IMPORTED -> Icons.Default.TaskAlt
+                    IncomingDocumentImportStatus.BLOCKED -> Icons.Default.PendingActions
+                    IncomingDocumentImportStatus.INVALID -> Icons.Default.ReportProblem
+                },
+                accent = accent
+            )
+        },
+        title = {
+            Text(
+                text = preview.title,
+                color = Mocha.Text,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = preview.body,
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                preview.details.forEach { detail ->
+                    DocumentReportLine(text = detail, color = Mocha.Text)
+                }
+                preview.warnings.forEach { warning ->
+                    DocumentReportLine(text = warning, color = Mocha.Yellow)
+                }
+            }
+        },
+        confirmButton = {
+            if (preview.canImportNow) {
+                TextButton(onClick = onConfirm) {
+                    Text(stringResource(R.string.project_document_import_confirm))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        },
+        containerColor = Mocha.PanelHighest,
+        titleContentColor = Mocha.Text,
+        textContentColor = Mocha.Subtext0
+    )
+}
+
+@Composable
+private fun DocumentReportLine(
+    text: String,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Circle,
+            contentDescription = null,
+            tint = color.copy(alpha = 0.84f),
+            modifier = Modifier
+                .padding(top = 7.dp)
+                .size(6.dp)
+        )
+        Text(
+            text = text,
+            color = color,
+            style = MaterialTheme.typography.bodySmall
         )
     }
 }

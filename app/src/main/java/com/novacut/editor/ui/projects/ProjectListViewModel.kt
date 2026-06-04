@@ -15,6 +15,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.novacut.editor.R
 import com.novacut.editor.engine.AutoSaveState
+import com.novacut.editor.engine.IncomingDocumentImportPreview
+import com.novacut.editor.engine.IncomingDocumentImportRouter
+import com.novacut.editor.engine.IncomingDocumentItem
 import com.novacut.editor.engine.IncomingMediaItem
 import com.novacut.editor.engine.IncomingMediaKind
 import com.novacut.editor.engine.ProjectAutoSave
@@ -71,6 +74,7 @@ class ProjectListViewModel @Inject constructor(
     private val templateManager: TemplateManager,
     private val videoEngine: VideoEngine,
     private val mediaImportEngine: MediaImportEngine,
+    private val incomingDocumentImportRouter: IncomingDocumentImportRouter,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
     private companion object {
@@ -95,6 +99,9 @@ class ProjectListViewModel @Inject constructor(
 
     private val _operationState = MutableStateFlow<ProjectListOperationState?>(null)
     val operationState: StateFlow<ProjectListOperationState?> = _operationState.asStateFlow()
+
+    private val _documentImportPreview = MutableStateFlow<IncomingDocumentImportPreview?>(null)
+    val documentImportPreview: StateFlow<IncomingDocumentImportPreview?> = _documentImportPreview.asStateFlow()
 
     private var toastDismissJob: Job? = null
 
@@ -347,6 +354,63 @@ class ProjectListViewModel @Inject constructor(
                 endOperation(operation)
             }
         }
+    }
+
+    fun previewIncomingDocuments(items: List<IncomingDocumentItem>) {
+        val documents = items.ifEmpty { return }
+        viewModelScope.launch {
+            val operation = beginOperation(
+                title = appContext.getString(R.string.projects_operation_document_import_title),
+                description = appContext.getString(R.string.projects_operation_document_import_body)
+            )
+            try {
+                val preview = withContext(Dispatchers.IO) {
+                    incomingDocumentImportRouter.preview(documents.first())
+                }.let { result ->
+                    if (documents.size > 1) {
+                        result.copy(
+                            warnings = result.warnings +
+                                "Only the first recognized document was previewed; open the remaining files one at a time."
+                        )
+                    } else {
+                        result
+                    }
+                }
+                _documentImportPreview.value = preview
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Document import preview failed", e)
+                showToast(appContext.getString(R.string.project_document_import_failed))
+            } finally {
+                endOperation(operation)
+            }
+        }
+    }
+
+    fun importPreviewedDocument() {
+        val preview = _documentImportPreview.value ?: return
+        viewModelScope.launch {
+            val operation = beginOperation(
+                title = appContext.getString(R.string.projects_operation_document_import_title),
+                description = appContext.getString(R.string.projects_operation_document_import_body)
+            )
+            try {
+                val imported = withContext(Dispatchers.IO) {
+                    incomingDocumentImportRouter.importTemplate(preview.item)
+                }
+                _documentImportPreview.value = imported
+                loadUserTemplates()
+                showToast(imported.title)
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Document import failed", e)
+                showToast(appContext.getString(R.string.project_document_import_failed))
+            } finally {
+                endOperation(operation)
+            }
+        }
+    }
+
+    fun dismissDocumentImportPreview() {
+        _documentImportPreview.value = null
     }
 
     private fun templateImportFailureMessage(result: TemplateImportResult): String {

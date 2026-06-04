@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 185`, `versionName = "3.74.48"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.48`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 186`, `versionName = "3.74.49"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.49`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -27,6 +27,7 @@ Use these files first:
 - [docs/archive](docs/archive/): historical detailed roadmaps and research plans.
 - [docs/models.md](docs/models.md): model registry, licensing, privacy, Play Asset Delivery, F-Droid, and activation gates.
 - [docs/templates.md](docs/templates.md): template/plugin format and animation compatibility matrix.
+- [docs/incoming-document-imports.md](docs/incoming-document-imports.md): non-media document import safety contract and supported file families.
 - [app/build.gradle.kts](app/build.gradle.kts) and [gradle/libs.versions.toml](gradle/libs.versions.toml): build and dependency truth.
 
 Tool-specific instruction files:
@@ -149,6 +150,14 @@ High-level modules and patterns:
      high-contrast semantic tokens, `docs/appearance-policy.md` documents the
      dark-only System rationale, and Compose smoke tests enable root
      accessibility checks.
+
+11. Non-media document import router.
+   - Completed in v3.74.49. `IncomingDocumentIntentParser` accepts only
+     `content://` plugin, LUT, archive, and timeline-interchange documents
+     with supported extensions, specific document MIME families, and per-kind
+     size bounds. `IncomingDocumentImportRouter` validates recognized files
+     through existing loaders and Projects shows a preview/report before any
+     template import mutation.
 
 ## Recent Implementation Notes
 
@@ -653,8 +662,8 @@ High-level modules and patterns:
   `:app:assembleDebugAndroidTest` passed.
 - Device QA follow-up: run an emulator/device `bmgr` backup/restore or direct
   transfer smoke with a project containing an imported local clip.
-- Next roadmap item: Cycle 8 P2 non-media document import router for plugins
-  and interchange files.
+- Next roadmap item: Cycle 9 P2 ApplicationExitInfo process-death capture for
+  diagnostic ZIP exports.
 
 2026-05-17 autonomous continuation:
 
