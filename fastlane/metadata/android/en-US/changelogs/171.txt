@@ -1,0 +1,5 @@
+- Android 13 export notification permission path
+- Added ExportNotificationPermissionPolicy and JVM coverage for Android 13+ notification-permission export decisions.
+- Added a contextual export notification permission dialog before the first Android 13+ background export when POST_NOTIFICATIONS is not granted.
+- Remembered handled prompt state in editor-scoped shared preferences so denied or dismissed prompts do not reappear on every export attempt.
+- Kept export available when notification...

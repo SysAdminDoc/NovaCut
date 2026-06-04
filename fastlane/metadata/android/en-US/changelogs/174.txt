@@ -1,0 +1,4 @@
+- Timeline clip layout and gesture helper extraction
+- Added TimelineClipLayout helpers for visible clip pixel bounds, clip-content badge thresholds, unified drag-zone selection, drag-action resolution, slide snap targets, and slide snap haptic policy.
+- Updated Timeline.kt to delegate collapsed/expanded clip layout and trim, slip, slide, and snap gesture decisions to the focused helper layer while keeping Compose callback wiring in the renderer.
+- Guarded edge-trim gesture actions against i...

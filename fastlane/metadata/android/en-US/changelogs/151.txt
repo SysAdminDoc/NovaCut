@@ -1,0 +1,4 @@
+- Media relink editor integration
+- Added EditorState.mediaRelinkReports and wired MediaRelinkProbe into EditorViewModel so project-open recovery restores run a source-media scan before the user edits or exports.
+- Missing and unverified source reports now auto-open Media Manager on project open and show a focused warning that counts missing/unverified media sources.
+- Media Manager consumes probe reports for each asset, distinguishes Online, Missing, and Unverified states, and reuses the ex...

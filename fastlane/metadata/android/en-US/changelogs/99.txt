@@ -1,0 +1,2 @@
+- Format / parser correctness
+- FCPXML XML escaping ([TimelineExchangeEngine.kt](app/src/main/java/com/novacut/editor/engine/TimelineExchangeEngine.kt)) - Project name and clip names were interpolated directly into FCPXML attributes via Kotlin string templates with no escaping. A clip named M&M's <draft> produced malformed FCPXML that DaVinci Resolve / Final Cut imports refused. Added xmlEscape helper covering &, <, >, ", ' and applied to every name/uri interpolation.

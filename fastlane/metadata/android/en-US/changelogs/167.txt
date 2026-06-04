@@ -1,0 +1,3 @@
+- Utility panel and overlay router host extraction
+- Added EditorUtilityPanelHost to own scratchpad, chapter, recovery, AI requirement, import/export feedback, media manager, render preview, batch export, beat sync, style, speed, smart reframe, undo history, marker, TTS, auto edit, noise reduction, effect library, sticker, drawing, multicam, feature hub, project backup, and text-template routes.
+- Added EditorOverlayHost to own drawing canvas, export progress, first-run tutorial, auto-save i...

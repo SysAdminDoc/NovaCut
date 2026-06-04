@@ -1,0 +1,4 @@
+- Fastlane changelog history
+- Added scripts/sync_fastlane_changelogs.py, a deterministic generator that reads CHANGELOG.md, exports only release entries with explicit versionCode evidence, skips verification/version-bump noise, and caps each Play Store "What's new" file at the 500-character limit.
+- Populated fastlane/metadata/android/en-US/changelogs/ for the recoverable release history instead of leaving the channel with only the legacy 67.txt file.
+- Kept the existing 67.txt changelog in...

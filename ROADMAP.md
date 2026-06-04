@@ -8,7 +8,7 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.43** (`versionCode` 180). Last consolidated:
+Current version: **v3.74.44** (`versionCode` 181). Last consolidated:
 2026-06-04.
 
 > Last researched: Cycle 12 - 2026-06-04.
@@ -207,6 +207,10 @@ Actions emulator job that runs `NovaCutSmokeTest` through
   for Room/Kotlin/KSP; Room 2.8.4 and newer Kotlin/KSP trains stay queued for a
   dedicated toolchain pass because local JVM validation was killed before a
   complete compile result.
+- v3.74.44 adds a deterministic Fastlane changelog sync script and populates
+  `fastlane/metadata/android/en-US/changelogs/` from explicit `versionCode`
+  entries in `CHANGELOG.md`, so Play/F-Droid metadata no longer has a one-file
+  changelog history.
 
 ## Source Archives
 
@@ -225,7 +229,7 @@ Actions emulator job that runs `NovaCutSmokeTest` through
 | ✅ P2 | Diagnostic ZIP timeline-shape toggle | Implemented in v3.74.42: Settings has an opt-in "Include timeline shape" switch; diagnostic export includes counts-only `timeline-shape.json` from the latest saved project autosave when available, and still exports without project data when unavailable. |
 | ✅ P2 | Dependabot grouping and dependency freshness review | Implemented in v3.74.43: Gradle dependency updates are grouped by toolchain, UI, AndroidX runtime, media, ML/native, and small-library risk lanes; Compose BOM 2026.05.01 is staged; Room/Kotlin/KSP freshness is documented and held for a dedicated toolchain validation pass; changelog-heading auto-tagging is documented as a release-verification path rather than a Dependabot path. |
 | P2 | Room/Kotlin toolchain migration pass | Revisit Room 2.8.4 and Kotlin/KSP 2.1.21+ or 2.3+/2.4+ on a clean build graph with enough JVM headroom; exit only after `:app:compileDebugKotlin` and Room/KSP schema generation complete without daemon termination. |
-| P2 | Fastlane changelog history | Populate `fastlane/metadata/.../changelogs/` from release history or document why the channel is unused. |
+| ✅ P2 | Fastlane changelog history | Implemented in v3.74.44: `scripts/sync_fastlane_changelogs.py` derives 500-character Play changelog files from `CHANGELOG.md` entries with explicit `versionCode` evidence, and `fastlane/metadata/android/en-US/changelogs/` is populated for the recoverable release history. |
 | P3 | Caption translation engine activation | Replace source-text echo behavior with a real local model path such as MADLAD-400 or Bergamot only after model gates are complete. |
 | P3 | Advanced engine activations | Activate Oboe resampling, adjustment layers, keyframe graph UI, and remaining AI engines only when dependencies, APK size, 16 KB compliance, and device QA are clear. |
 

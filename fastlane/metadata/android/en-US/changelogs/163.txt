@@ -1,0 +1,4 @@
+- Panel editor-state storage migration
+- Moved panel visibility, selected effect, and text-overlay editing target storage into EditorPanelState.
+- Kept read-only EditorState compatibility accessors so existing editor UI, delegates, and panel router reads remain stable.
+- Converted ViewModel and delegate panel mutation paths to update state.panel through copyPanel / nested panel.copy(...), including export, text editor, tutorial, undo history, TTS, drawing, Cut Assistant, media relink, scopes...

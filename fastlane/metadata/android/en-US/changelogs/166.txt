@@ -1,0 +1,4 @@
+- Clip adjustment panel router host extraction
+- Added EditorClipAdjustmentPanelHost to own transform, crop, effect adjustment, color grading, audio mixer, keyframe, speed curve, mask, blend mode, PiP preset, chroma key, and caption editor routes.
+- Moved transform and mask preview overlays into the same clip-adjustment host so the panel cluster keeps its local preview affordances together.
+- Reduced the main EditorScreen body to a host call for this route cluster, while preserving shared in...

@@ -1,0 +1,5 @@
+- Compound editor-state storage migration
+- Moved compound navigation editor storage into EditorCompoundState, including navigation depth and breadcrumb text.
+- Kept read-only EditorState compatibility accessors so existing predictive back, breadcrumb, and editor UI reads remain stable.
+- Converted the compound navigation publisher to update state.compound through nested compound.copy(...).
+- Updated EditorDomainStateTest to construct the stored compound slice directly.

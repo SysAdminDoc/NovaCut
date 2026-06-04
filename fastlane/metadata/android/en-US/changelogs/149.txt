@@ -1,0 +1,3 @@
+- Release pipeline reactivation
+- Extended the GitHub Actions APK workflow to package the instrumentation APK, verify release metadata, locate Android build tools, validate APK signatures, check APK ZIP alignment, and upload the androidTest artifact alongside debug and release APKs.
+- Added scripts/verify_release_artifacts.py so CI fails when Gradle version metadata, app display version, roadmap/completed/changelog headings, gitignored signing inputs, tag names, or generated APK metadata dri...

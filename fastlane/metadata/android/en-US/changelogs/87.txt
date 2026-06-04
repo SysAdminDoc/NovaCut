@@ -1,0 +1,3 @@
+- Crash Fixes
+- WhisperEngine ONNX results.first() - runEncoder and runDecoder called .first() on the ONNX Runtime results map, which throws NoSuchElementException if the model returns an empty result map. Replaced with firstOrNull()?.value and added explicit close of results + idTensor on the null path in runDecoder to avoid leaking tensors on the break path.
+- InpaintingEngine session + sessionOptions leak - OrtSession was created before Bitmap.createScaledBitmap; if the bitmap allocation...

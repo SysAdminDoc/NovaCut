@@ -1,0 +1,4 @@
+- Backup and device-transfer policy split
+- Split Android 12+ data extraction policy so cloud backup keeps bulky managed imports out of quota while device-to-device transfer includes filesDir/media/imports.
+- Added disableIfNoEncryptionCapabilities="true" to cloud backup because autosave, generated voiceover, TTS, cleaned, and stabilized media can be sensitive.
+- Kept legacy full-backup-content excluding managed imports because that format cannot separate cloud backup from device transfer.

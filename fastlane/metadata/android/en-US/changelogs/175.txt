@@ -1,0 +1,4 @@
+- Model activation gate honesty
+- Added delivery-mode, F-Droid posture, runtime-checksum behavior, and active model-registry IDs to AiToolRequirements.
+- Kept only currently wired on-device model paths as downloadable/ready: Whisper captions, MediaPipe background removal, LaMa object removal, and the bundled DeepFilterNet dependency.
+- Changed planned but unpinned AnimeGAN/Fast NST, Real-ESRGAN, and SAM/MobileSAM tools from download-required to dependency-missing so the UI does not present i...

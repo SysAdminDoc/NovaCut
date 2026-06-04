@@ -1,0 +1,3 @@
+- Data Loss Fixes (CRITICAL)
+- ColorGrade.curves not serialized - ColorGrade.curves (master/red/green/blue channel curves with per-point bezier handles) was completely missing from ProjectAutoSave. Users lost all RGB curve adjustments on project recovery / app restart. Now fully serialized via new serializeColorCurves / deserializeColorCurves helpers with bounds-coerced curve points.
+- ColorGrade.colorMatchRef not serialized - Reference clip ID for "match color to reference" workflow was los...

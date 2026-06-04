@@ -1,0 +1,4 @@
+- Sharesheet incoming media routing
+- Added ACTION_SEND and ACTION_SEND_MULTIPLE manifest targets for shared video, image, and audio content.
+- Added a centralized incoming-media parser that accepts ACTION_VIEW, single shares, and multi-item shares, keeps only content:// URIs, preserves sender order, drops duplicate stream/clipData entries, and requires read grants for Sharesheet send actions.
+- Replaced the single pending video URI handoff with ordered pending media items and broadened proj...

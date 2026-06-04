@@ -1,0 +1,5 @@
+- Editor domain-state projection
+- Added a sealed EditorDomainState projection layer with dedicated panel, caption, compound, export, AI, and media slices.
+- Added EditorState.domainStates so hosts can adopt typed domain slices while existing constructor storage and copy(...) call sites migrate incrementally.
+- Added EditorDomainStateTest to lock the six-domain enumeration and verify representative field ownership across the projection.
+- Narrowed the active roadmap item to the next storage...

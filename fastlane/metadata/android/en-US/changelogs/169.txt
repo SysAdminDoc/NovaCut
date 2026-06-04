@@ -1,0 +1,4 @@
+- Timeline chrome and drawing helper extraction
+- Extracted timeline toolbar buttons, info chips, text action chips, mini icon buttons, clip badges, track icons, and compact timeline label formatters into TimelineChrome.
+- Extracted time-ruler drawing, timeline waveform drawing, deterministic waveform placeholder drawing, and sorted volume-keyframe selection into TimelineDrawing.
+- Renamed the extracted waveform helpers to timeline-specific names to avoid colliding with the audio panel's loc...

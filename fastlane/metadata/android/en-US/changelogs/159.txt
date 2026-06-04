@@ -1,0 +1,4 @@
+- Export editor-state storage migration
+- Moved export-related editor storage into EditorExportDomainState, including export config, progress, state, last exported file path, error text, start time, smart-render preview data, batch export queue, and saved preview config.
+- Kept read-only EditorState compatibility accessors so existing export UI, sharing, gallery, and v3.69 surfaces continue to read the same properties.
+- Converted EditorViewModel and ExportDelegate export mutation paths to u...

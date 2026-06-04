@@ -1,0 +1,4 @@
+- Mixed-render export orchestrator
+- Added MixedRenderExportPlanner to keep mixed rendering behind conservative export-shape gates and to expose tested run slicing for Android execution.
+- Added VideoEngine.exportMixed(plan) so eligible mixed plans write pass-through runs through StreamCopyExportEngine, render modified runs through the existing Media3 Transformer composition path, and stitch run outputs with FFmpegEngine.concat.
+- Updated Transformer polling so per-run renders can complete w...

@@ -1,0 +1,4 @@
+- Primary panel router host extraction
+- Added EditorPrimaryPanelHost to own the primary bottom-sheet cluster: media picker, effects, speed, transition, text editor, export, audio, and voiceover recorder surfaces.
+- Moved export smart-render/HDR summary calculation, media-picker selection, text-editor save routing, effect insertion, and voiceover start permission callback wiring out of the main EditorScreen body.
+- Kept adaptive embedded-export behavior intact by passing the export pane layo...
