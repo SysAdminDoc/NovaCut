@@ -6,6 +6,35 @@ roadmaps are archived under [docs/archive/roadmap](docs/archive/roadmap/).
 
 Last refreshed: 2026-06-04.
 
+## 2026-06-04 Cycle 13 C2PA Export Provenance Refresh
+
+- [Verified] NovaCut already tells users the export sheet will declare AI use in
+  a "provenance sidecar" and `ExportDelegate.writeAiDisclosureSidecars(...)`
+  writes both `.ai-use.json` and `.c2pa-manifest.json` drafts when the
+  `AiUsageLedger` has disclosure entries. That path never calls
+  `C2paExportEngine.signAndEmbed(...)`, so the exported MP4 itself remains
+  unchanged.
+- [Verified] `C2paExportEngine` is explicitly a manifest-construction stub:
+  grep finds no `contentauth`, `c2pa-android`, or `simple-c2pa` dependency in
+  Gradle, `isAvailable_returnsFalseWhenNoC2paLibraryOnClasspath` locks the
+  absent-library state, and `signAndEmbed_returnsUnavailableWhenLibraryAbsent`
+  asserts that signing returns `UNAVAILABLE`. The current JSON sidecar is
+  therefore unsigned, detached, and not cryptographically bound to the media.
+- [Verified] Current C2PA 2.4 says a claim gathers asset assertions, is hashed
+  and signed, and a standard manifest contains exactly one hard binding to the
+  asset. For BMFF/MP4 assets, C2PA embeds provenance through a `uuid` box in the
+  media file. The official c2pa-android library now documents an AAR with Kotlin
+  APIs for manifest creation/validation and Android Keystore, StrongBox, direct,
+  callback, and web-service signing modes. CAWG Training and Data Mining 1.1
+  separately defines the current training/mining assertion label as
+  `cawg.training-mining` with `cawg.*` entries, while NovaCut still emits the
+  older `c2pa.training-mining` / `c2pa.*` names.
+- [Promoted] Added a P1 roadmap item to wire a real signed-and-embedded C2PA
+  export path: add the Android C2PA dependency or a proven equivalent, sign and
+  embed manifests into MP4 output, migrate the training/mining assertion labels
+  to current CAWG names, gate user copy on actual availability, keep sidecars as
+  diagnostic drafts only, and verify output with a C2PA reader plus tamper tests.
+
 ## 2026-06-04 Cycle 12 Local-Network Permission Refresh
 
 - [Verified] `OutputStreamingEngine` is still a live-streaming stub, but it

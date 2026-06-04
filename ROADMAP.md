@@ -11,7 +11,7 @@ archived under [docs/archive](docs/archive/).
 Current version: **v3.74.44** (`versionCode` 181). Last consolidated:
 2026-06-04.
 
-> Last researched: Cycle 12 - 2026-06-04.
+> Last researched: Cycle 13 - 2026-06-04.
 
 ## ▶ Implementer Instructions (for the build machine)
 
@@ -1227,3 +1227,75 @@ Focus: prepare NovaCut's future live-streaming/LAN destination path for Android
   https://developer.android.com/privacy-and-security/local-network-permission
 - Android 16 behavior changes:
   https://developer.android.com/about/versions/16/behavior-changes-16
+
+### Researcher Queue (Cycle 13 - 2026-06-04)
+
+Focus: turn NovaCut's AI provenance output from an unsigned detached draft into
+a verifiable C2PA Content Credentials export path.
+
+#### Export Provenance & AI Disclosure
+
+- [ ] 🔬🤖 P1 — Wire signed/embedded C2PA export manifests and current CAWG training labels
+  - Why: the export sheet tells users AI-assisted edits will be declared in a
+    provenance sidecar, and `ExportDelegate` can write a C2PA-shaped JSON draft,
+    but the exported MP4 is not signed, does not contain a C2PA manifest store,
+    and cannot be verified by a C2PA consumer. This is a trust gap for any
+    "Content Credentials" or machine-readable AI disclosure copy, especially
+    because the local engine already models Android Keystore, StrongBox, user
+    PEM, and web-service signing modes.
+  - Evidence: grep finds no `contentauth`, `c2pa-android`, or `simple-c2pa`
+    Gradle dependency. `C2paExportEngine.isAvailable()` probes for
+    `org.contentauth.c2pa.Builder` / `org.proofmode.simplec2pa.Manifest` and
+    the JVM tests assert it is false on the current classpath.
+    `signAndEmbed(...)` currently returns `SignResult.Unavailable`, while
+    `ExportDelegate.writeC2paManifestSidecar(...)` only writes
+    `<export>.c2pa-manifest.json` and never embeds it into the MP4. C2PA 2.4
+    says a claim is cryptographically hashed and signed, a standard manifest
+    must contain exactly one hard binding to the asset, and BMFF/MP4 assets use
+    embedded `uuid` C2PA boxes:
+    https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html
+  - Current-source check: official c2pa-android documentation now describes an
+    Android AAR with Kotlin APIs for manifest reading, validation, creation, and
+    signing, including Android Keystore, StrongBox, direct, callback, and
+    web-service signers:
+    https://opensource.contentauthenticity.org/docs/c2pa-android/
+    The current CAWG Training and Data Mining assertion uses
+    `cawg.training-mining` and `cawg.*` entries, while NovaCut emits the older
+    `c2pa.training-mining` and
+    `c2pa.*` names:
+    https://cawg.io/training-and-data-mining/1.1/
+  - Touches: Gradle dependency/repository review for a pinned C2PA Android AAR
+    or vetted equivalent, `C2paExportEngine.signAndEmbed`, Android
+    Keystore/StrongBox key and certificate enrollment policy, optional remote
+    signer consent, CAWG training/mining assertion label migration, export-sheet
+    availability/copy, `AiUsageLedger` manifest mapping, diagnostic sidecar
+    behavior, privacy-dashboard provenance copy, release 16 KB native-library
+    gates, and focused JVM/instrumentation tests.
+  - Acceptance: when C2PA export is available and enabled, the final MP4
+    contains a signed C2PA manifest store with one valid hard binding to the
+    output media, current `c2pa.actions` entries derived from the AI ledger,
+    current `cawg.training-mining` opt-out entries, NovaCut claim-generator
+    metadata, and no leaked clip names or source URIs unless the user opts into
+    title disclosure. When the library, signer, certificate enrollment, or
+    remote signer is unavailable, the UI says Content Credentials are
+    unavailable and may still write a clearly named local draft sidecar, but it
+    does not imply the MP4 is verifiable. Any remote signer path requires an
+    explicit per-export consent sheet before media or hashes leave the device.
+  - Verify: add manifest-construction tests for C2PA 2.4 claim-generator fields,
+    CAWG training/mining labels, redacted titles, and AI ledger action mapping.
+    Add signed-export tests that run a C2PA reader against the generated MP4,
+    assert a valid claim signature and BMFF hard binding, and prove byte
+    tampering fails validation. Add StrongBox/TEE fallback tests, remote-signer
+    denial tests, export-sheet availability tests, and release APK checks
+    confirming the C2PA native libraries still pass zipalign and 16 KB page-size
+    gates.
+  - Complexity: L
+
+#### Appendix — Cycle 13 Sources
+
+- Official c2pa-android library:
+  https://opensource.contentauthenticity.org/docs/c2pa-android/
+- C2PA Technical Specification 2.4:
+  https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html
+- CAWG Training and Data Mining Assertion 1.1:
+  https://cawg.io/training-and-data-mining/1.1/
