@@ -51,17 +51,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Brush
-import com.novacut.editor.engine.ExportColorConfidenceEngine
 import com.novacut.editor.engine.ExportState
-import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.TimelineExchangeValidator
 import com.novacut.editor.model.*
 import com.novacut.editor.model.ClipLabel
 import androidx.compose.ui.graphics.Color
 import com.novacut.editor.ui.export.BatchExportPanel
-import com.novacut.editor.ui.export.ExportSheet
-import com.novacut.editor.ui.export.ExportSheetPresentation
-import com.novacut.editor.ui.mediapicker.MediaPickerSheet
 import com.novacut.editor.ui.NovaCutTestTags
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.NovaCutDialogIcon
@@ -77,7 +72,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import com.novacut.editor.R
-import java.io.File
 
 @Composable
 private fun AiRequirementInfoChip(
@@ -1220,263 +1214,26 @@ fun EditorScreen(
         }
 
         // Bottom sheets / overlays
-        BottomSheetSlot(
-            visible = state.panels.isOpen(PanelId.MEDIA_PICKER),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            MediaPickerSheet(
-                onMediaSelected = { uri, mediaType ->
-                    val trackType = when (mediaType) {
-                        "audio" -> TrackType.AUDIO
-                        else -> TrackType.VIDEO
-                    }
-                    viewModel.addClipToTrack(uri, trackType)
-                },
-                onClose = viewModel::hideMediaPicker,
-                modifier = Modifier.testTag(NovaCutTestTags.MEDIA_PICKER_SHEET)
-            )
-        }
-
-        BottomSheetSlot(
-            visible = state.panels.isOpen(PanelId.EFFECTS),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Column {
-                MiniPlayerBar(
-                    isPlaying = state.isPlaying, playheadMs = playheadMs,
-                    totalDurationMs = state.totalDurationMs,
-                    onTogglePlayback = viewModel::togglePlayback, onSeek = viewModel::seekTo
-                )
-                EffectsPanel(
-                    selectedClip = selectedClip,
-                    trackedObjects = state.trackedObjects,
-                    onAddEffect = { effectType ->
-                        val clipId = state.selectedClipId ?: return@EffectsPanel
-                        val effect = Effect(type = effectType, params = EffectType.defaultParams(effectType))
-                        viewModel.addEffect(clipId, effect)
-                        viewModel.selectEffect(effect.id)
-                        viewModel.hideEffectsPanel()
-                    },
-                    onAddTrackedMosaic = { trackedObject ->
-                        viewModel.applyTrackedMosaicToObject(trackedObject.id)
-                        viewModel.hideEffectsPanel()
-                    },
-                    onClose = viewModel::hideEffectsPanel
-                )
-            }
-        }
-
-        // Speed panel
-        BottomSheetSlot(
-            visible = state.currentTool == EditorTool.SPEED && state.selectedClipId != null,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Column {
-                MiniPlayerBar(
-                    isPlaying = state.isPlaying, playheadMs = playheadMs,
-                    totalDurationMs = state.totalDurationMs,
-                    onTogglePlayback = viewModel::togglePlayback, onSeek = viewModel::seekTo
-                )
-                val clip = selectedClip
-                if (clip != null) {
-                    SpeedPanel(
-                        currentSpeed = clip.speed,
-                        isReversed = clip.isReversed,
-                        onSpeedDragStarted = viewModel::beginSpeedChange,
-                        onSpeedDragEnded = viewModel::endSpeedChange,
-                        onSpeedChanged = { viewModel.setClipSpeed(clip.id, it) },
-                        onReversedChanged = { viewModel.setClipReversed(clip.id, it) },
-                        onClose = { viewModel.setTool(EditorTool.NONE) }
-                    )
+        EditorPrimaryPanelHost(
+            state = state,
+            viewModel = viewModel,
+            selectedClip = selectedClip,
+            playheadMs = playheadMs,
+            useEmbeddedExportPane = useEmbeddedExportPane,
+            embeddedExportPaneWidth = embeddedExportPaneWidth,
+            context = context,
+            onStartVoiceoverRecording = {
+                if (ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    viewModel.startVoiceover()
+                } else {
+                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
             }
-        }
-
-        // Transition picker
-        BottomSheetSlot(
-            visible = state.panels.isOpen(PanelId.TRANSITION_PICKER),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Column {
-                MiniPlayerBar(
-                    isPlaying = state.isPlaying, playheadMs = playheadMs,
-                    totalDurationMs = state.totalDurationMs,
-                    onTogglePlayback = viewModel::togglePlayback, onSeek = viewModel::seekTo
-                )
-                val clip = selectedClip
-                TransitionPicker(
-                    onTransitionSelected = { type ->
-                        val clipId = state.selectedClipId ?: return@TransitionPicker
-                        viewModel.setTransition(clipId, Transition(type = type))
-                    },
-                    onRemoveTransition = {
-                        val clipId = state.selectedClipId ?: return@TransitionPicker
-                        viewModel.setTransition(clipId, null)
-                    },
-                    onDurationChanged = { durationMs ->
-                        val clipId = state.selectedClipId ?: return@TransitionPicker
-                        viewModel.setTransitionDuration(clipId, durationMs)
-                    },
-                    onDurationDragStarted = viewModel::beginTransitionDurationChange,
-                    onClose = viewModel::hideTransitionPicker,
-                    currentTransition = clip?.transition
-                )
-            }
-        }
-
-        // Text editor
-        BottomSheetSlot(
-            visible = state.panels.isOpen(PanelId.TEXT_EDITOR),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            val editingOverlay = state.editingTextOverlayId?.let { id ->
-                state.textOverlays.firstOrNull { it.id == id }
-            }
-            TextEditorSheet(
-                existingOverlay = editingOverlay,
-                playheadMs = playheadMs,
-                onSave = { overlay ->
-                    if (editingOverlay != null) {
-                        viewModel.updateTextOverlay(overlay)
-                    } else {
-                        viewModel.addTextOverlay(overlay)
-                    }
-                    viewModel.hideTextEditor()
-                },
-                onClose = viewModel::hideTextEditor
-            )
-        }
-
-        // Export sheet
-        val exportPanelContent: @Composable () -> Unit = {
-            val exportSmartRenderSummary = remember(state.tracks, state.exportConfig, state.textOverlays) {
-                SmartRenderEngine.getSummary(
-                    SmartRenderEngine.analyzeTimeline(
-                        tracks = state.tracks,
-                        config = state.exportConfig,
-                        textOverlays = state.textOverlays
-                    )
-                ).takeIf { it.totalSegments > 0 }
-            }
-            val sourceHdrSummary = remember(state.tracks) {
-                ExportColorConfidenceEngine.summarizeSources(state.tracks)
-            }
-            ExportSheet(
-                config = state.exportConfig,
-                exportState = state.exportState,
-                exportProgress = state.exportProgress,
-                aspectRatio = state.project.aspectRatio,
-                errorMessage = state.exportErrorMessage,
-                exportStartTime = state.exportStartTime,
-                totalDurationMs = state.totalDurationMs,
-                smartRenderSummary = exportSmartRenderSummary,
-                sourceHdrSummary = sourceHdrSummary,
-                aiUsageLedger = state.aiUsageLedger,
-                presentation = if (useEmbeddedExportPane) {
-                    ExportSheetPresentation.EMBEDDED_PANE
-                } else {
-                    ExportSheetPresentation.BOTTOM_SHEET
-                },
-                onConfigChanged = viewModel::updateExportConfig,
-                onStartExport = {
-                    // Use app-private external dir — works on all Android versions including 11+
-                    val moviesDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
-                    val outputDir = File(moviesDir ?: context.filesDir, "NovaCut").apply { mkdirs() }
-                    viewModel.startExport(outputDir)
-                },
-                onShare = {
-                    viewModel.getShareIntent()?.let { intent ->
-                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.editor_share_video)))
-                    }
-                },
-                onSaveToGallery = viewModel::saveToGallery,
-                onCancel = { viewModel.engine.cancelExport() },
-                onExportOtio = viewModel::exportToOtio,
-                onExportFcpxml = viewModel::exportToFcpxml,
-                onCaptureFrame = viewModel::captureFrame,
-                onExportSubtitles = { format -> viewModel.exportSubtitles(format) },
-                onClearAiUsageLedger = viewModel::clearAiUsageLedger,
-                onClose = viewModel::hideExportSheet
-            )
-        }
-        if (useEmbeddedExportPane) {
-            SidePanelSlot(
-                visible = state.panels.isOpen(PanelId.EXPORT_SHEET),
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .width(embeddedExportPaneWidth)
-                    .zIndex(8f)
-            ) {
-                exportPanelContent()
-            }
-        } else {
-            BottomSheetSlot(
-                visible = state.panels.isOpen(PanelId.EXPORT_SHEET),
-                modifier = Modifier.align(Alignment.BottomCenter)
-            ) {
-                exportPanelContent()
-            }
-        }
-
-        // Audio panel
-        BottomSheetSlot(
-            visible = state.panels.isOpen(PanelId.AUDIO),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Column {
-                MiniPlayerBar(
-                    isPlaying = state.isPlaying,
-                    playheadMs = playheadMs,
-                    totalDurationMs = state.totalDurationMs,
-                    onTogglePlayback = viewModel::togglePlayback,
-                    onSeek = viewModel::seekTo
-                )
-                val clip = selectedClip
-                AudioPanel(
-                    clip = clip,
-                    waveform = clip?.let { state.waveforms[it.id] },
-                    onVolumeChanged = { volume ->
-                        val clipId = state.selectedClipId ?: return@AudioPanel
-                        viewModel.setClipVolume(clipId, volume)
-                    },
-                    onVolumeDragStarted = viewModel::beginVolumeChange,
-                    onVolumeDragEnded = viewModel::endVolumeChange,
-                    onFadeInChanged = { fadeMs ->
-                        val clipId = state.selectedClipId ?: return@AudioPanel
-                        viewModel.setClipFadeIn(clipId, fadeMs)
-                    },
-                    onFadeOutChanged = { fadeMs ->
-                        val clipId = state.selectedClipId ?: return@AudioPanel
-                        viewModel.setClipFadeOut(clipId, fadeMs)
-                    },
-                    onFadeDragEnded = viewModel::endFadeAdjust,
-                    onFadeDragStarted = viewModel::beginFadeAdjust,
-                    onStartVoiceover = viewModel::showVoiceoverPanel,
-                    onClose = viewModel::hideAudioPanel
-                )
-            }
-        }
-
-        // Voiceover recorder
-        BottomSheetSlot(
-            visible = state.panels.isOpen(PanelId.VOICEOVER_RECORDER),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            VoiceoverRecorder(
-                isRecording = state.isRecordingVoiceover,
-                recordingDurationMs = state.voiceoverDurationMs,
-                onStartRecording = {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                        viewModel.startVoiceover()
-                    } else {
-                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                },
-                onStopRecording = viewModel::stopVoiceover,
-                onClose = viewModel::hideVoiceoverPanel
-            )
-        }
+        )
 
         // Transform panel
         BottomSheetSlot(

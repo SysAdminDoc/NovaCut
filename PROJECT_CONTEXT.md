@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 163`, `versionName = "3.74.26"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.26`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 164`, `versionName = "3.74.27"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.27`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -398,6 +398,22 @@ High-level modules and patterns:
   APK/release APK/androidTest Gradle matrix, release metadata, signature,
   zipalign, and APK-based 16 KB gates passed.
 - Next roadmap item: P1 EditorScreen panel router decomposition.
+
+2026-06-04 primary panel router host extraction continuation:
+
+- Completed the first P1 EditorScreen panel router decomposition batch in
+  v3.74.27 by extracting media picker, effects, speed, transition, text editor,
+  export, audio, and voiceover recorder routes into `EditorPrimaryPanelHost`.
+- The extracted host owns primary bottom-sheet callbacks for media selection,
+  effect insertion, text-editor save routing, export start/share/cancel actions,
+  and voiceover start permission dispatch.
+- `EditorScreen` now delegates that primary cluster through a single host call
+  while retaining adaptive embedded-export pane decisions.
+- Verification: `:app:compileDebugKotlin`, full debug-unit/debug APK/release
+  APK/androidTest Gradle matrix, release metadata, signature, zipalign, and
+  APK-based 16 KB gates passed.
+- Next roadmap item: continue P1 EditorScreen panel router decomposition for
+  the remaining specialized and utility panel routes.
 
 2026-05-17 autonomous continuation:
 
