@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.74.32 — 2026-06-04
+
+### Timeline chrome and drawing helper extraction
+- Extracted timeline toolbar buttons, info chips, text action chips, mini icon
+  buttons, clip badges, track icons, and compact timeline label formatters into
+  `TimelineChrome`.
+- Extracted time-ruler drawing, timeline waveform drawing, deterministic
+  waveform placeholder drawing, and sorted volume-keyframe selection into
+  `TimelineDrawing`.
+- Renamed the extracted waveform helpers to timeline-specific names to avoid
+  colliding with the audio panel's local waveform renderer.
+- Expanded `TimelineEditingTest` coverage for clip-name cleanup, time/duration
+  labels, speed labels, and volume-keyframe filtering/sorting.
+- Bumped runtime metadata to `versionName 3.74.32` / `versionCode 169`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
+  `:app:assembleDebugAndroidTest` passed.
+
 ## v3.74.31 — 2026-06-04
 
 ### Timeline interaction and overview extraction

@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.31 (`versionCode` 168).
+- Current version: v3.74.32 (`versionCode` 169).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -122,6 +122,10 @@ Last consolidated: 2026-06-04.
   long-press dispatch, snap targeting, clip hit testing, accessible split
   points, keyboard nudge step sizing, and the full-project overview scrollbar
   now live outside `Timeline.kt` with focused JVM coverage.
+- Timeline chrome and drawing helper extraction shipped in v3.74.32: toolbar
+  chips/buttons, compact label formatters, ruler drawing, waveform drawing, and
+  volume-keyframe filtering now live outside the main timeline renderer with
+  focused JVM coverage for the pure helpers.
 
 ## Preserved Historical Detail
 

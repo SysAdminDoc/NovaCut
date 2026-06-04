@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -50,7 +49,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
@@ -58,10 +56,8 @@ import com.novacut.editor.R
 import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 private const val BASE_SCALE = 0.15f // pixels per ms at zoom 1.0
 // Minimum zoom — low enough that a ~10-minute video fits on a phone screen. The old
@@ -1353,9 +1349,9 @@ fun Timeline(
                                             Canvas(modifier = Modifier.fillMaxSize()) {
                                                 if (track.showWaveform) {
                                                     if (waveform != null && waveform.isNotEmpty()) {
-                                                        drawWaveform(waveform, clipColor)
+                                                        drawTimelineWaveform(waveform, clipColor)
                                                     } else {
-                                                        drawWaveformPlaceholder(clipColor)
+                                                        drawTimelineWaveformPlaceholder(clipColor)
                                                     }
                                                 }
                                                 if (volumeKfs.size >= 2 && clip.durationMs > 0) {
@@ -1752,307 +1748,5 @@ fun Timeline(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun TimelineToolbarButton(
-    icon: ImageVector,
-    contentDescription: String,
-    compact: Boolean = false,
-    highlight: Boolean = false,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    val backgroundColor = when {
-        !enabled -> Mocha.PanelHighest.copy(alpha = 0.35f)
-        highlight -> Mocha.Peach.copy(alpha = 0.22f)
-        else -> Mocha.PanelHighest
-    }
-    val borderColor = when {
-        !enabled -> Mocha.CardStroke.copy(alpha = 0.35f)
-        highlight -> Mocha.Peach.copy(alpha = 0.7f)
-        else -> Mocha.CardStroke
-    }
-    val iconTint = when {
-        !enabled -> Mocha.Text.copy(alpha = 0.4f)
-        highlight -> Mocha.Peach
-        else -> Mocha.Text
-    }
-    Surface(
-        color = backgroundColor,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, borderColor)
-    ) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.size(if (compact) 34.dp else 38.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = iconTint,
-                modifier = Modifier.size(if (compact) 16.dp else 18.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun TimelineInfoChip(
-    text: String,
-    accent: Color,
-    compact: Boolean = false
-) {
-    Surface(
-        color = accent.copy(alpha = 0.13f),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
-    ) {
-        Text(
-            text = text,
-            color = accent,
-            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(
-                horizontal = if (compact) 8.dp else 10.dp,
-                vertical = if (compact) 5.dp else 6.dp
-            )
-        )
-    }
-}
-
-@Composable
-private fun TimelineTextActionChip(
-    text: String,
-    compact: Boolean = false,
-    onClick: () -> Unit
-) {
-    Surface(
-        color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, Mocha.CardStroke)
-    ) {
-        Text(
-            text = text,
-            color = Mocha.Text,
-            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-            modifier = Modifier
-                .clickable(onClick = onClick)
-                .padding(
-                    horizontal = if (compact) 10.dp else 12.dp,
-                    vertical = if (compact) 5.dp else 6.dp
-                )
-        )
-    }
-}
-
-@Composable
-private fun TimelineMiniIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    active: Boolean,
-    accent: Color,
-    compact: Boolean = false,
-    onClick: () -> Unit
-) {
-    Surface(
-        color = if (active) accent.copy(alpha = 0.14f) else Mocha.Surface0.copy(alpha = 0.8f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(
-            1.dp,
-            if (active) accent.copy(alpha = 0.26f) else Mocha.CardStroke.copy(alpha = 0.5f)
-        )
-    ) {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier.size(if (compact) 24.dp else 28.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (active) accent else Mocha.Subtext0,
-                modifier = Modifier.size(if (compact) 12.dp else 14.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun TimelineClipBadge(
-    text: String,
-    accent: Color,
-    compact: Boolean = false
-) {
-    Surface(
-        color = accent.copy(alpha = 0.18f),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.24f))
-    ) {
-        Text(
-            text = text,
-            color = Mocha.Text,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(
-                horizontal = if (compact) 6.dp else 8.dp,
-                vertical = if (compact) 3.dp else 4.dp
-            )
-        )
-    }
-}
-
-private fun trackIcon(trackType: TrackType): ImageVector = when (trackType) {
-    TrackType.VIDEO -> Icons.Default.Videocam
-    TrackType.AUDIO -> Icons.Default.MusicNote
-    TrackType.OVERLAY -> Icons.Default.Layers
-    TrackType.TEXT -> Icons.Default.Title
-    TrackType.ADJUSTMENT -> Icons.Default.Tune
-}
-
-private fun formatTimelineClipName(
-    rawName: String?,
-    fallback: String
-): String {
-    val cleaned = rawName
-        ?.substringAfterLast('/')
-        ?.substringBeforeLast('.')
-        ?.replace("%20", " ")
-        ?.replace(Regex("[_-]+"), " ")
-        ?.replace(Regex("\\s+"), " ")
-        ?.trim()
-        ?.takeIf { it.isNotBlank() }
-        ?: return fallback
-
-    val looksGenerated = !cleaned.any { it.isLetter() } ||
-        Regex("^(img|vid|pxl|mvimg|screenshot|image|video)\\s*\\d[\\w\\s-]*$", RegexOption.IGNORE_CASE)
-            .matches(cleaned)
-
-    return if (looksGenerated) fallback else cleaned
-}
-
-private fun formatTimelineTime(ms: Long): String {
-    val totalSeconds = (ms.coerceAtLeast(0L) / 1000L).toInt()
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%d:%02d".format(minutes, seconds)
-    }
-}
-
-private fun formatTimelineDurationLabel(ms: Long): String {
-    return if (ms in 1L until 1_000L) {
-        "%.1fs".format(Locale.US, (ms / 1000f).coerceAtLeast(0.1f))
-    } else {
-        formatTimelineTime(ms)
-    }
-}
-
-private fun formatSpeedLabel(speed: Float): String {
-    val rounded = if (abs(speed - speed.roundToInt()) < 0.05f) {
-        speed.roundToInt().toString()
-    } else {
-        "%.1f".format(speed)
-    }
-    return "${rounded}x"
-}
-
-private fun DrawScope.drawTimeRuler(
-    scrollOffsetMs: Long,
-    pixelsPerMs: Float,
-    width: Float,
-    height: Float,
-    textMeasurer: TextMeasurer
-) {
-    val intervalMs = when {
-        pixelsPerMs > 0.5f -> 1000L
-        pixelsPerMs > 0.1f -> 5000L
-        pixelsPerMs > 0.02f -> 10000L
-        else -> 30000L
-    }
-
-    val startMs = (scrollOffsetMs / intervalMs) * intervalMs
-    var currentMs = startMs
-    val labelStyle = TextStyle(
-        color = Color(0xFFA6ADC8), // Mocha.Subtext0
-        fontSize = 9.sp
-    )
-
-    while (true) {
-        val x = (currentMs - scrollOffsetMs) * pixelsPerMs
-        if (x > width) break
-
-        if (x >= 0) {
-            val isMajor = currentMs % (intervalMs * 5) == 0L
-            val tickHeight = if (isMajor) height * 0.4f else height * 0.25f
-
-            drawLine(
-                color = if (isMajor) Color(0xFF7F849C) else Color(0xFF45475A),
-                start = Offset(x, height - tickHeight),
-                end = Offset(x, height),
-                strokeWidth = if (isMajor) 1.5f else 0.5f
-            )
-
-            // Time labels at major ticks
-            if (isMajor) {
-                val totalSeconds = (currentMs / 1000).toInt()
-                val min = totalSeconds / 60
-                val sec = totalSeconds % 60
-                val label = if (min > 0) "$min:${"%02d".format(sec)}" else "${sec}s"
-                val measured = textMeasurer.measure(label, labelStyle)
-                drawText(
-                    textLayoutResult = measured,
-                    topLeft = Offset(x - measured.size.width / 2f, 1f)
-                )
-            }
-        }
-        currentMs += intervalMs
-    }
-}
-
-private fun DrawScope.drawWaveform(samples: List<Float>, color: Color) {
-    if (samples.isEmpty()) return
-    val steps = (size.width / 3f).toInt().coerceAtLeast(1)
-    val samplesPerStep = samples.size.toFloat() / steps
-    val centerY = size.height / 2f
-    val maxAmp = size.height * 0.45f
-
-    for (i in 0 until steps) {
-        val sampleIndex = (i * samplesPerStep).toInt().coerceIn(0, samples.size - 1)
-        val amplitude = samples[sampleIndex].coerceIn(0f, 1f)
-        val barH = (amplitude * maxAmp).coerceAtLeast(1f)
-        val x = i * 3f
-
-        drawLine(
-            color = color.copy(alpha = 0.7f),
-            start = Offset(x, centerY - barH),
-            end = Offset(x, centerY + barH),
-            strokeWidth = 2f
-        )
-    }
-}
-
-/** Extract volume keyframes sorted by time — top-level to avoid deeply nested lambda class names (Windows MAX_PATH). */
-private fun volumeKeyframesSorted(clip: com.novacut.editor.model.Clip): List<com.novacut.editor.model.Keyframe> =
-    clip.keyframes
-        .filter { it.property == KeyframeProperty.VOLUME }
-        .sortedBy { it.timeOffsetMs }
-
-private fun DrawScope.drawWaveformPlaceholder(color: Color) {
-    // Deterministic pattern to avoid 30fps flicker from Math.random()
-    val steps = (size.width / 4f).toInt().coerceAtLeast(1)
-    val centerY = size.height / 2f
-    for (i in 0 until steps) {
-        val x = i * 4f
-        val amplitude = (kotlin.math.sin(i * 0.7) * 0.3 + 0.4).toFloat()
-        val barH = (amplitude * size.height * 0.45f).coerceAtLeast(1f)
-        drawLine(
-            color = color.copy(alpha = 0.4f),
-            start = Offset(x, centerY - barH),
-            end = Offset(x, centerY + barH),
-            strokeWidth = 2f
-        )
     }
 }

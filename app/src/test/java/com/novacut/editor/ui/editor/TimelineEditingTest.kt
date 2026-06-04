@@ -2,6 +2,8 @@ package com.novacut.editor.ui.editor
 
 import android.net.FakeUri
 import com.novacut.editor.model.Clip
+import com.novacut.editor.model.Keyframe
+import com.novacut.editor.model.KeyframeProperty
 import com.novacut.editor.model.SpeedCurve
 import com.novacut.editor.model.Track
 import com.novacut.editor.model.TrackType
@@ -136,6 +138,44 @@ class TimelineEditingTest {
                 currentScrollOffsetMs = 250L
             )
         )
+    }
+
+    @Test
+    fun `timeline clip names clean file-like source labels and keep fallbacks for generated names`() {
+        assertEquals("Vacation opening take", formatTimelineClipName("Vacation_opening%20take.mov", fallback = "Video"))
+        assertEquals("Video", formatTimelineClipName("IMG_20240604_120000.mp4", fallback = "Video"))
+        assertEquals("Video", formatTimelineClipName("20240604120000.mp4", fallback = "Video"))
+        assertEquals("Video", formatTimelineClipName(null, fallback = "Video"))
+    }
+
+    @Test
+    fun `timeline formatters keep compact editor labels stable`() {
+        assertEquals("0:00", formatTimelineTime(-1_000L))
+        assertEquals("1:01", formatTimelineTime(61_000L))
+        assertEquals("1:01:01", formatTimelineTime(3_661_000L))
+        assertEquals("0.5s", formatTimelineDurationLabel(500L))
+        assertEquals("1:01", formatTimelineDurationLabel(61_000L))
+        assertEquals("2x", formatSpeedLabel(2.04f))
+        assertEquals("1.3x", formatSpeedLabel(1.25f))
+    }
+
+    @Test
+    fun `volume keyframes are filtered and sorted for envelope rendering`() {
+        val sourceClip = clip(
+            id = "audio",
+            timelineStartMs = 0L,
+            trimStartMs = 0L,
+            trimEndMs = 1_000L,
+            sourceDurationMs = 1_000L
+        ).copy(
+            keyframes = listOf(
+                Keyframe(timeOffsetMs = 300L, property = KeyframeProperty.VOLUME, value = 0.9f),
+                Keyframe(timeOffsetMs = 10L, property = KeyframeProperty.OPACITY, value = 0.5f),
+                Keyframe(timeOffsetMs = 100L, property = KeyframeProperty.VOLUME, value = 0.4f)
+            )
+        )
+
+        assertEquals(listOf(100L, 300L), volumeKeyframesSorted(sourceClip).map { it.timeOffsetMs })
     }
 
     @Test
