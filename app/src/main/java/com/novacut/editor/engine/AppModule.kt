@@ -29,4 +29,12 @@ object AppModule {
 
     @Provides
     fun provideProjectDao(db: ProjectDatabase): ProjectDao = db.projectDao()
+
+    @Provides
+    @Singleton
+    fun provideMemoryTrimBreadcrumbStore(
+        @ApplicationContext context: Context,
+    ): MemoryTrimBreadcrumbStore {
+        return MemoryTrimBreadcrumbStore.forContextFilesDir(context.filesDir)
+    }
 }

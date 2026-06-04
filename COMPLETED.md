@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.45 (`versionCode` 182).
+- Current version: v3.74.46 (`versionCode` 183).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -49,6 +49,10 @@ Last consolidated: 2026-06-04.
   APKs include generated startup/editor/export/timeline profile rules, and the
   managed Pixel 6 API 36 benchmark reports default/profiled cold startup,
   profiled warm startup, and blank-editor timeline scrub frame timing.
+- App-level memory trim policy shipped in v3.74.46: `NovaCutApp.onTrimMemory`
+  routes OS memory-pressure levels through a tested dispatcher, active media
+  engines register thumbnail/waveform/proxy cache trim callbacks, and redacted
+  memory-trim breadcrumbs are included in diagnostic ZIPs when present.
 - UI test harness bootstrap shipped in v3.74.11: shared Compose test tags,
   androidTest dependencies, and a smoke test covering project list,
   blank-project editor open, media picker, export sheet, Settings, and privacy

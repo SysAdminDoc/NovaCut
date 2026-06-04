@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.74.46 — 2026-06-04
+
+### App-level memory trim policy
+- Added `NovaCutApp.onTrimMemory(...)` dispatch through a tested
+  `MemoryTrimPolicy`, mapping UI-hidden, running-low, running-critical,
+  background, moderate, and complete trim levels into explicit editor-cache
+  actions.
+- Added a lightweight `MemoryTrimRegistry` so `VideoEngine`, `AudioEngine`, and
+  `ProxyEngine` register cache-trim callbacks only after those engines exist,
+  avoiding eager media-engine construction from the application object.
+- Wired thumbnail, waveform, and proxy scratch cache eviction. Proxy trimming
+  skips in-flight proxy renders so a memory event cannot delete a file while
+  Media3 Transformer is writing it.
+- Added bounded, redacted memory-trim JSONL breadcrumbs under the diagnostics
+  directory and included them in user-triggered diagnostic ZIP exports when
+  present.
+- Bumped runtime metadata to `versionName 3.74.46` / `versionCode 183`.
+- Verification: focused JVM coverage for
+  `MemoryTrimPolicyTest`, `MemoryTrimRegistryTest`,
+  `MemoryTrimBreadcrumbStoreTest`, and `MemoryTrimDispatcherTest` passed.
+
 ## v3.74.45 — 2026-06-04
 
 ### Baseline Profile and macrobenchmark coverage

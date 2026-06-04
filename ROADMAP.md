@@ -8,7 +8,7 @@ Active roadmap for forward-looking work. Shipped work is summarized in
 [RESEARCH_REPORT.md](RESEARCH_REPORT.md), and detailed historical plans are
 archived under [docs/archive](docs/archive/).
 
-Current version: **v3.74.45** (`versionCode` 182). Last consolidated:
+Current version: **v3.74.46** (`versionCode` 183). Last consolidated:
 2026-06-04.
 
 > Last researched: Cycle 22 - 2026-06-04.
@@ -89,6 +89,10 @@ v3.74.45 closed the Cycle 3 performance gate by adding the `:baselineprofile`
 module, generated release Baseline Profile, ProfileInstaller wiring, and
 managed-device Macrobenchmark coverage for default/profiled cold startup,
 profiled warm startup, and blank-editor timeline scrub frame timing.
+v3.74.46 closed the Cycle 4 memory-pressure gate by adding app-level
+`onTrimMemory` dispatch, tested trim-level policy, registered thumbnail,
+waveform, and proxy scratch cache eviction, and redacted diagnostic
+breadcrumbs.
 
 ## Current State
 
@@ -218,6 +222,11 @@ profiled warm startup, and blank-editor timeline scrub frame timing.
 - v3.74.45 adds a generated Baseline Profile that ships in release APKs and a
   managed Pixel 6 API 36 Macrobenchmark suite covering default cold startup,
   profile-required cold/warm startup, and blank-editor timeline scrub frames.
+- v3.74.46 adds app-level memory-pressure handling for editor caches: active
+  media engines register thumbnail/waveform/proxy trim callbacks, visible
+  editing keeps proxy scratch on low-memory callbacks, background/critical
+  callbacks evict scratch caches, and diagnostic ZIPs can include redacted
+  memory-trim breadcrumbs.
 
 ## Source Archives
 
@@ -238,6 +247,7 @@ profiled warm startup, and blank-editor timeline scrub frame timing.
 | P2 | Room/Kotlin toolchain migration pass | Revisit Room 2.8.4 and Kotlin/KSP 2.1.21+ or 2.3+/2.4+ on a clean build graph with enough JVM headroom; exit only after `:app:compileDebugKotlin` and Room/KSP schema generation complete without daemon termination. |
 | ✅ P2 | Fastlane changelog history | Implemented in v3.74.44: `scripts/sync_fastlane_changelogs.py` derives 500-character Play changelog files from `CHANGELOG.md` entries with explicit `versionCode` evidence, and `fastlane/metadata/android/en-US/changelogs/` is populated for the recoverable release history. |
 | ✅ P2 | Baseline Profile and macrobenchmarks | Implemented in v3.74.45: `:baselineprofile` generates the release Baseline Profile, ProfileInstaller ships it in the APK, and managed Pixel 6 API 36 macrobenchmarks report default/profiled cold startup, profiled warm startup, and blank-editor timeline scrub frame timing. |
+| ✅ P2 | Memory trim policy | Implemented in v3.74.46: `NovaCutApp.onTrimMemory` dispatches OS memory-pressure levels through a tested policy, active media engines register cache trim callbacks, proxy trimming skips in-flight renders, and diagnostic ZIPs include bounded redacted memory-trim breadcrumbs when present. |
 | P3 | Caption translation engine activation | Replace source-text echo behavior with a real local model path such as MADLAD-400 or Bergamot only after model gates are complete. |
 | P3 | Advanced engine activations | Activate Oboe resampling, adjustment layers, keyframe graph UI, and remaining AI engines only when dependencies, APK size, 16 KB compliance, and device QA are clear. |
 
@@ -714,7 +724,7 @@ projects.
 
 #### Reliability & Performance
 
-- [ ] 🔬🤖 P2 — Add app-level memory trim policy for editor caches
+- [x] ✅ 🔬🤖 P2 — Add app-level memory trim policy for editor caches
   - Why: NovaCut opts into `android:largeHeap`, keeps a bitmap thumbnail LRU sized
     from `Runtime.maxMemory() / 8`, keeps waveform and generated-media caches, and
     exposes a user-facing thumbnail-cache size setting. Existing OOM cleanup fixes
@@ -742,6 +752,14 @@ projects.
     com.novacut.editor MODERATE` / `CRITICAL` on a debug build, confirm caches
     evict without crashing or cancelling active export, and repeat while returning
     from background to a project with thumbnails/waveforms.
+  - Status: implemented in v3.74.46. `NovaCutApp.onTrimMemory` now routes trim
+    levels through `MemoryTrimDispatcher`; `MemoryTrimPolicy` maps UI-hidden,
+    running-low, running-critical, background, moderate, and complete levels to
+    explicit thumbnail/waveform/proxy cache actions; active `VideoEngine`,
+    `AudioEngine`, and `ProxyEngine` instances register trim callbacks through a
+    lightweight registry; proxy trimming skips in-flight renders; and
+    diagnostics include bounded redacted `memory-trim.jsonl` breadcrumbs when
+    present.
   - Complexity: M
 
 #### Appendix — Cycle 4 Sources

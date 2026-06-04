@@ -32,6 +32,8 @@ import javax.inject.Singleton
  *                           with [ModelDownloadManager] (no file contents)
  *  - `crash-records.json` — optional bounded fatal-crash records captured by
  *                           [CrashRecordStore], when any exist
+ *  - `memory-trim.jsonl`   — optional bounded, redacted memory-pressure
+ *                           breadcrumbs captured by [MemoryTrimBreadcrumbStore]
  *  - `logcat-tail.txt`    — last 200 logcat lines from the current process,
  *                           with PII / URI patterns redacted before write
  *  - `manifest.txt`       — ordered file list with sizes
@@ -61,6 +63,7 @@ import javax.inject.Singleton
 class DiagnosticExportEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val crashRecordStore: CrashRecordStore,
+    private val memoryTrimBreadcrumbStore: MemoryTrimBreadcrumbStore,
 ) {
 
     /** Snapshot summary of a single model from [ModelDownloadManager]. */
@@ -202,6 +205,9 @@ class DiagnosticExportEngine @Inject constructor(
         }
         crashRecordStore.buildDiagnosticJson()?.let { crashRecordsJson ->
             entries[CrashRecordStore.CRASH_BUNDLE_ENTRY] = crashRecordsJson.toByteArray(Charsets.UTF_8)
+        }
+        memoryTrimBreadcrumbStore.buildDiagnosticText()?.let { memoryTrimJsonl ->
+            entries[MemoryTrimBreadcrumbStore.BUNDLE_ENTRY] = memoryTrimJsonl.toByteArray(Charsets.UTF_8)
         }
         entries["logcat-tail.txt"] = buildLogcatTail().toByteArray(Charsets.UTF_8)
         entries["manifest.txt"] = buildManifest(entries).toByteArray(Charsets.UTF_8)

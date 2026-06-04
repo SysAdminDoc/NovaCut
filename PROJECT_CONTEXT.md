@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 182`, `versionName = "3.74.45"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.45`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 183`, `versionName = "3.74.46"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.46`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -130,10 +130,11 @@ High-level modules and patterns:
    - Future diagnostics work should focus on emulator/UI validation and any additional redaction tests discovered from real support bundles.
 
 8. Memory trim policy.
-   - Cycle 4 is the next open researcher queue item after the v3.74.45
-     performance gate. Implement app-level `onTrimMemory` / editor-cache
-     trimming for bitmap thumbnails, waveform/generated-media caches, and any
-     large editor preview state without weakening configurable cache limits.
+   - Completed in v3.74.46. `NovaCutApp.onTrimMemory` dispatches through a
+     tested policy and lightweight cache-trim registry. Active media engines
+     trim thumbnail, waveform, and proxy scratch caches without forcing eager
+     engine construction at app startup, and diagnostic ZIPs include bounded
+     redacted memory-trim breadcrumbs when present.
 
 ## Recent Implementation Notes
 
@@ -184,6 +185,21 @@ High-level modules and patterns:
   emulator runner after the first successful macrobenchmark, so the committed
   comparison uses default installed compilation versus profile-required
   compilation.
+
+2026-06-04 memory-trim continuation:
+
+- Completed the Cycle 4 app-level memory trim policy in v3.74.46. Added
+  `NovaCutApp.onTrimMemory`, `MemoryTrimPolicy`, `MemoryTrimDispatcher`, a
+  lightweight `MemoryTrimRegistry`, and redacted `memory-trim.jsonl`
+  diagnostics inclusion.
+- `VideoEngine`, `AudioEngine`, and `ProxyEngine` register cache trim callbacks
+  for thumbnails, waveforms, and proxy scratch only after the engines exist.
+  Proxy trimming skips in-flight proxy renders.
+- Verification passed: `:app:testDebugUnitTest --tests
+  com.novacut.editor.engine.MemoryTrimPolicyTest --tests
+  com.novacut.editor.engine.MemoryTrimRegistryTest --tests
+  com.novacut.editor.engine.MemoryTrimBreadcrumbStoreTest --tests
+  com.novacut.editor.engine.MemoryTrimDispatcherTest`.
 
 2026-06-04 recovery-open continuation:
 
@@ -593,7 +609,8 @@ High-level modules and patterns:
   `:app:assembleDebugAndroidTest` passed.
 - Device QA follow-up: run an emulator/device `bmgr` backup/restore or direct
   transfer smoke with a project containing an imported local clip.
-- Next roadmap item: Cycle 4 P2 app-level memory trim policy for editor caches.
+- Next roadmap item: Cycle 5 P2 Play listing asset and privacy-disclosure
+  release gate.
 
 2026-05-17 autonomous continuation:
 

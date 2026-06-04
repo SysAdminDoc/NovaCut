@@ -7,6 +7,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.novacut.editor.BuildConfig
 import com.novacut.editor.engine.CrashRecordStore
+import com.novacut.editor.engine.MemoryTrimDispatcher
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -15,6 +16,9 @@ class NovaCutApp : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var memoryTrimDispatcher: MemoryTrimDispatcher
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -33,6 +37,11 @@ class NovaCutApp : Application(), Configuration.Provider {
         super.onCreate()
         CrashRecordStore(this).installGlobalHandler(VERSION)
         createNotificationChannels()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        memoryTrimDispatcher.onTrimMemory(level)
+        super.onTrimMemory(level)
     }
 
     private fun createNotificationChannels() {

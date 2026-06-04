@@ -29,10 +29,12 @@ import kotlin.coroutines.resume
  */
 @Singleton
 class ProxyEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    memoryTrimRegistry: MemoryTrimRegistry,
 ) {
     private val proxyDir = File(context.cacheDir, "proxies").also { it.mkdirs() }
     private val proxyMap = ConcurrentHashMap<String, Uri>()
+    private val activeProxyKeys = ConcurrentHashMap.newKeySet<String>()
 
     // Per-source-key mutexes serialise concurrent `generateProxy(sameUri)`
     // calls. Without this, two near-simultaneous invocations both pass the
@@ -43,6 +45,15 @@ class ProxyEngine @Inject constructor(
     private val perKeyMutex = ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
     private fun mutexFor(key: String): kotlinx.coroutines.sync.Mutex =
         perKeyMutex.computeIfAbsent(key) { kotlinx.coroutines.sync.Mutex() }
+
+    init {
+        memoryTrimRegistry.register(
+            MemoryTrimAction.CLEAR_PROXY_SCRATCH,
+            "proxy.generatedMediaCache",
+        ) {
+            clearProxies()
+        }
+    }
 
     private fun keyFor(sourceUri: Uri): String {
         val bytes = sourceUri.toString().toByteArray()
@@ -115,6 +126,7 @@ class ProxyEngine @Inject constructor(
             throw t
         }
 
+        activeProxyKeys.add(key)
         try {
             suspendCancellableCoroutine { cont ->
                 val mediaItem = MediaItem.fromUri(sourceUri)
@@ -173,6 +185,7 @@ class ProxyEngine @Inject constructor(
             proxyMap.remove(key)
             null
         } finally {
+            activeProxyKeys.remove(key)
             // Always release the per-key mutex so the next caller (or a
             // retry after a failure) can try again. Using runCatching so a
             // stray mutex-state mismatch can't mask the real exception
@@ -182,10 +195,16 @@ class ProxyEngine @Inject constructor(
     }
 
     fun clearProxies() {
+        val activeKeys = activeProxyKeys.toSet()
         proxyDir.listFiles()?.forEach { file ->
-            canonicalManagedProxyFile(file)?.takeIf { it.isFile }?.delete()
+            val managedFile = canonicalManagedProxyFile(file)?.takeIf { it.isFile } ?: return@forEach
+            val key = managedFile.name.removePrefix("proxy_").removeSuffix(".mp4")
+            if (key !in activeKeys) {
+                managedFile.delete()
+                proxyMap.remove(key)
+            }
         }
-        proxyMap.clear()
+        proxyMap.keys.removeIf { it !in activeKeys }
     }
 
     suspend fun getCacheSize(): Long = withContext(Dispatchers.IO) {
