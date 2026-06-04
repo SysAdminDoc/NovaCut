@@ -24,7 +24,8 @@ private const val TAG = "AudioEngine"
  */
 @Singleton
 class AudioEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    memoryTrimRegistry: MemoryTrimRegistry,
 ) {
     /**
      * LRU cache for extracted waveforms keyed by "uri|sampleCount".
@@ -32,6 +33,15 @@ class AudioEngine @Inject constructor(
      * Max 64 entries (~50KB total for 200-sample waveforms).
      */
     private val waveformCache = LruCache<String, FloatArray>(64)
+
+    init {
+        memoryTrimRegistry.register(
+            MemoryTrimAction.CLEAR_WAVEFORMS,
+            "audio.waveformCache",
+        ) {
+            clearWaveformCache()
+        }
+    }
 
     /**
      * Clear the waveform cache (e.g., when project changes).

@@ -42,7 +42,8 @@ class VideoEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val segmentationEngine: SegmentationEngine,
     private val streamCopyEngine: StreamCopyExportEngine,
-    private val ffmpegEngine: FFmpegEngine
+    private val ffmpegEngine: FFmpegEngine,
+    memoryTrimRegistry: MemoryTrimRegistry,
 ) {
     private data class MediaCharacteristics(
         val isStillImage: Boolean,
@@ -102,6 +103,15 @@ class VideoEngine @Inject constructor(
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
             // Don't recycle — may still be referenced by Compose
             // Bitmap will be GC'd when no longer referenced
+        }
+    }
+
+    init {
+        memoryTrimRegistry.register(
+            MemoryTrimAction.CLEAR_THUMBNAILS,
+            "video.thumbnailCache",
+        ) {
+            clearThumbnailCache()
         }
     }
 
