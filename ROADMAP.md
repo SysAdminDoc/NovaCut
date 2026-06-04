@@ -11,7 +11,7 @@ archived under [docs/archive](docs/archive/).
 Current version: **v3.74.35** (`versionCode` 172). Last consolidated:
 2026-06-04.
 
-> Last researched: Cycle 7 - 2026-06-04.
+> Last researched: Cycle 8 - 2026-06-04.
 
 ## ▶ Implementer Instructions (for the build machine)
 
@@ -835,3 +835,73 @@ an executable appearance and accessibility regression gate for the Compose app.
   https://developer.android.com/develop/ui/views/theming/darktheme
 - WCAG 2.2 contrast and mobile accessibility criteria:
   https://www.w3.org/TR/WCAG22/
+
+### Researcher Queue (Cycle 8 - 2026-06-04)
+
+Focus: external document handoff for NovaCut-owned plugin, LUT, project archive,
+and timeline-interchange files without broadening the media importer into an
+unsafe catch-all receiver.
+
+#### Import & Interop
+
+- [ ] 🔬🤖 P2 — Add non-media document import router for plugins and interchange files
+  - Why: NovaCut already documents shareable plugin/LUT files, project archive
+    export, and OTIO/FCPXML/EDL interchange, but Android only lists an app for
+    implicit opens/shares when the action, category, and data type/scheme match
+    its intent filters. Today NovaCut registers only media `ACTION_VIEW` filters
+    and `MainActivity` only keeps video/image/audio MIME prefixes, so opening
+    `.cube`, `.3dl`, `.ncfx`, `.ncstyle`, `.novacut-template`, `.ncfxd`,
+    `.otio`, `.fcpxml`, `.edl`, or a project archive ZIP from Files or another
+    app can either omit NovaCut from the resolver or silently ignore the URI.
+  - Evidence: `docs/templates.md` lists the plugin family and validation path
+    for `.novacut-template`, `.ncfx`, `.ncstyle`, `.cube`, `.3dl`, and
+    `.ncfxd`; `README.md` advertises LUT import, `.ncfx` import/export,
+    project archive ZIP export, and OTIO/FCPXML/EDL interchange. The manifest
+    has `content://` `ACTION_VIEW` filters only for `video/*`, `image/*`, and
+    `audio/*`; grep found no document MIME filters for plugin/interchange
+    files. `MainActivity.handleIncomingIntent()` handles only `ACTION_VIEW`,
+    reads `intent.data`, requires `contentResolver.getType(uri)` to start with
+    `video/`, `image/`, or `audio/`, then stores the URI in the historical
+    `pendingVideoUri`. `PluginRegistry` already classifies the plugin file
+    extensions, `ProjectArchive.importArchiveWithReport(...)` already provides
+    structured ZIP import diagnostics, and `TimelineImportEngine` detects
+    FCPXML/OTIO/EDL but currently returns an honest "not yet implemented" report.
+    Android's receiving guide warns to register specific MIME types, avoid
+    broad `*/*` receivers unless the app can handle anything, validate incoming
+    MIME/size, and process binary data off the UI thread:
+    https://developer.android.com/training/sharing/receive
+  - Touches: a pure `IncomingDocumentIntentParser` or document branch beside
+    the incoming media parser, manifest filters for specific lower-case
+    `content://` document MIME types/routes, `MainActivity` pending import
+    state, `PluginRegistry`, `TemplateManager`, `EffectShareEngine`,
+    `LutEngine`, `OpenFxDescriptor`, `ProjectArchive.importArchiveWithReport`,
+    `TimelineImportEngine`, import-preview/report UI, strings, and focused
+    parser/manifest/device tests.
+  - Acceptance: NovaCut appears in Android's resolver for the supported plugin,
+    LUT, archive, and interchange document types without registering an
+    unrestricted `*/*` catch-all; every accepted URI remains `content://`,
+    is size/type/extension checked, and opens a preview/report that names the
+    file kind, target action, fidelity or unsupported-parser status, and
+    warnings before mutating project state. Implemented loaders route to their
+    existing engines; pending loaders such as timeline import surface clear
+    blocked/stub status instead of claiming success.
+  - Verify: add JVM tests for classifier behavior across `ACTION_VIEW`,
+    `ACTION_SEND`, malformed type, missing display name, uppercase extension,
+    oversized input, and unknown extension; add a manifest/intent-resolution
+    test for text/plain, application/json, application/octet-stream, zip, and
+    XML-like payloads; then run emulator or device opens from Files/adb for
+    `.cube`, `.ncfx`, `.novacut-template`, `.ncfxd`, `.otio`, `.fcpxml`, `.edl`,
+    and archive ZIP to confirm resolver visibility, preview copy, and no silent
+    project mutation on malformed files.
+  - Complexity: M
+
+#### Appendix — Cycle 8 Sources
+
+- Android receiving simple data from other apps:
+  https://developer.android.com/training/sharing/receive
+- Android `IntentFilter` matching rules:
+  https://developer.android.com/reference/android/content/IntentFilter
+- OpenTimelineIO architecture and timeline model:
+  https://otio-core-documentation.readthedocs.io/en/latest/tutorials/architecture.html
+- Apple Final Cut Pro XML transfer guide:
+  https://support.apple.com/guide/final-cut-pro/use-xml-to-transfer-projects-verdbd66ae/mac
