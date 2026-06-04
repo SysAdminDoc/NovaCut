@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.74.31 — 2026-06-04
+
+### Timeline interaction and overview extraction
+- Extracted timeline gesture/accessibility policy into
+  `TimelineInteractionPolicy`, covering compound long-press dispatch, snap
+  target selection, clip hit testing, accessible split points, and keyboard
+  nudge step sizing.
+- Extracted the full-project overview scrollbar into `TimelineOverviewBar` and
+  exposed its tap-to-scroll math as a focused pure helper.
+- Moved shared timeline track accent colors into `TimelineStyle` so the main
+  renderer and overview strip use one palette source.
+- Expanded `TimelineEditingTest` coverage for snap thresholds, clip hit
+  boundaries, accessibility split fallback/null behavior, keyboard nudge steps,
+  and overview tap centering.
+- Bumped runtime metadata to `versionName 3.74.31` / `versionCode 168`.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
+  `:app:assembleDebugAndroidTest` passed.
+
 ## v3.74.30 — 2026-06-04
 
 ### Utility panel and overlay router host extraction

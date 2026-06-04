@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 167`, `versionName = "3.74.30"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.30`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 168`, `versionName = "3.74.31"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.31`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -458,7 +458,25 @@ High-level modules and patterns:
   `:app:compileDebugKotlin --rerun-tasks`, `:app:testDebugUnitTest`,
   `:app:assembleDebug`, `:app:assembleRelease`, and
   `:app:assembleDebugAndroidTest` passed.
-- Next roadmap item: P1 Timeline refactor.
+- Followed by the P1 Timeline refactor start in v3.74.31.
+
+2026-06-04 timeline interaction and overview extraction continuation:
+
+- Started the P1 Timeline refactor in v3.74.31 by extracting
+  `TimelineInteractionPolicy` for compound long-press dispatch, snap targeting,
+  clip hit testing, accessible split points, and keyboard nudge step sizing.
+- Extracted `TimelineOverviewBar` from `Timeline.kt` and pinned its tap-to-scroll
+  behavior through the pure `timelineOverviewScrollOffsetForTap` helper.
+- Moved shared track accent colors into `TimelineStyle` so the main timeline
+  renderer and overview strip stay visually aligned without duplicating palette
+  decisions.
+- Verification: `git diff --check`, `scripts/verify_release_artifacts.py`,
+  APK-based 16 KB checks for debug/release, `apksigner verify` for
+  debug/release, `zipalign -c -P 16 -v 4` for debug/release/androidTest,
+  `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease`, and
+  `:app:assembleDebugAndroidTest` passed.
+- Next roadmap item: continue P1 Timeline refactor with clip layout, overlay
+  drawing, and remaining gesture-body extractions.
 
 2026-05-17 autonomous continuation:
 
