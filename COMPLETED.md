@@ -7,7 +7,7 @@ Last consolidated: 2026-06-04.
 
 ## Current Delivered Baseline
 
-- Current version: v3.74.15 (`versionCode` 152).
+- Current version: v3.74.16 (`versionCode` 153).
 - Multi-track Android NLE with project gallery, editor, timeline, preview,
   effects, transitions, text, captions, audio, export, settings, templates,
   project archive/import, and diagnostic bundle surfaces.
@@ -60,6 +60,10 @@ Last consolidated: 2026-06-04.
   compound radial menu includes an Open action, the breadcrumb chip is rendered
   from `EditorState`, and compound entry clears selection so predictive back
   exits the nested level first.
+- Caption translation panel call site shipped in v3.74.16: the Captions panel
+  now hosts `CaptionTranslationPanel`, selected-clip captions are converted into
+  translation rows when a target language is selected, and edit/regenerate
+  actions dispatch through the ViewModel translation surface.
 
 ## Preserved Historical Detail
 

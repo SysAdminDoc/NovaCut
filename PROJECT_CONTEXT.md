@@ -10,8 +10,8 @@ NovaCut is an Android video editor under package `com.novacut.editor`. The repo 
 
 Current live version evidence:
 
-- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 152`, `versionName = "3.74.15"`.
-- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.15`.
+- [app/build.gradle.kts](app/build.gradle.kts): `compileSdk = 36`, `targetSdk = 36`, `versionCode = 153`, `versionName = "3.74.16"`.
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml): `app_version` is `v3.74.16`.
 - [README.md](README.md) and [ROADMAP.md](ROADMAP.md) both describe the v3.74.x line.
 - The 2026-05-17 continuation pushes each completed roadmap batch back to `origin/master`; verify `git status --short --branch` before assuming branch sync.
 
@@ -74,6 +74,9 @@ High-level modules and patterns:
   long-press opens compound clips through `EditorViewModel.openCompoundClip`,
   selected compound clips expose an Open radial action, and the breadcrumb chip
   renders from `EditorState` while predictive back pops the compound level.
+- Caption translation is now reachable from the Captions panel: selecting a
+  target language builds translation rows from the selected clip's captions,
+  and row edits/regeneration route through `EditorViewModel`.
 - The privacy posture is coherent: local-first by default, opt-in cloud paths, explicit model downloads, and F-Droid awareness.
 - Cross-editor interoperability is already a first-class goal through FCPXML/OTIO/EDL-style planning.
 
@@ -186,7 +189,24 @@ High-level modules and patterns:
   above the timeline, and `openCompoundClip` clears clip selection, multi-select,
   and the active tool before publishing depth so the existing BackHandler's
   compound gate exits the nested level first.
-- Next roadmap item: P0 Caption translation panel call site.
+- Next roadmap item after this batch was P0 Caption translation panel call site.
+
+2026-06-04 caption-translation continuation:
+
+- Completed the P0 Caption translation panel call site in v3.74.16.
+  `CaptionEditorPanel` now hosts `CaptionTranslationPanel` inside the Captions
+  bottom sheet and receives rows, language state, target choices, edit callbacks,
+  and regenerate callbacks from `EditorScreen`.
+- Added `CaptionTranslationBridge` to convert selected-clip `Caption` rows into
+  `SherpaAsrEngine.TranscriptionSegment` values and to rebuild source segments
+  for per-row regeneration. `EditorViewModel.runCaptionTranslation(target)`
+  now uses that bridge plus the existing stub translation engine to populate
+  `captionTranslationRows`.
+- `regenerateCaptionTranslation(rowIndex)` now marks the row pending and
+  self-completes through the same stub engine, so the panel's regenerate action
+  does not leave rows permanently pending while real model activation is still
+  gated.
+- Next roadmap item: P0 Mixed-render export orchestrator.
 
 2026-05-17 autonomous continuation:
 
