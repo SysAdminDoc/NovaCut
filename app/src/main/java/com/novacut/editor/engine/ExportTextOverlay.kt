@@ -10,6 +10,8 @@ import android.text.style.AlignmentSpan
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.text.TextPaint
+import android.text.style.MetricAffectingSpan
 import android.text.style.TypefaceSpan
 import androidx.media3.common.util.UnstableApi
 import com.novacut.editor.model.TextAlignment
@@ -24,7 +26,8 @@ import com.novacut.editor.model.TextOverlay
 internal class ExportTextOverlay(
     private val overlay: TextOverlay,
     private val relStartMs: Long,
-    private val relEndMs: Long
+    private val relEndMs: Long,
+    private val fontRegistry: FontRegistry? = null
 ) : androidx.media3.effect.TextOverlay() {
 
     private val animDurationMs = 500L
@@ -78,10 +81,18 @@ internal class ExportTextOverlay(
             if (style != Typeface.NORMAL) {
                 text.setSpan(StyleSpan(style), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            text.setSpan(
-                TypefaceSpan(overlay.fontFamily),
-                0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
+            val customTypeface = fontRegistry?.resolveTypeface(overlay.fontFamily)
+            if (customTypeface != null) {
+                text.setSpan(
+                    CustomTypefaceSpan(customTypeface),
+                    0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            } else {
+                text.setSpan(
+                    TypefaceSpan(overlay.fontFamily),
+                    0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
             if (overlay.backgroundColor.toInt() and 0xFF000000.toInt() != 0) {
                 val bgAlpha = (currentAlpha * ((overlay.backgroundColor.toInt() ushr 24) and 0xFF)).toInt().coerceIn(0, 255)
                 val bgColor = (overlay.backgroundColor.toInt() and 0x00FFFFFF) or (bgAlpha shl 24)
@@ -222,5 +233,14 @@ internal class ExportTextOverlay(
             t < 0.9091f -> 7.5625f * (t - 0.8182f) * (t - 0.8182f) + 0.9375f
             else -> 7.5625f * (t - 0.9545f) * (t - 0.9545f) + 0.984375f
         }
+    }
+}
+
+private class CustomTypefaceSpan(private val typeface: Typeface) : MetricAffectingSpan() {
+    override fun updateDrawState(tp: TextPaint) {
+        tp.typeface = Typeface.create(typeface, tp.typeface?.style ?: Typeface.NORMAL)
+    }
+    override fun updateMeasureState(tp: TextPaint) {
+        tp.typeface = Typeface.create(typeface, tp.typeface?.style ?: Typeface.NORMAL)
     }
 }

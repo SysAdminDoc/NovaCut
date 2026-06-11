@@ -43,6 +43,7 @@ class VideoEngine @Inject constructor(
     private val segmentationEngine: SegmentationEngine,
     private val streamCopyEngine: StreamCopyExportEngine,
     private val ffmpegEngine: FFmpegEngine,
+    private val fontRegistry: FontRegistry,
     memoryTrimRegistry: MemoryTrimRegistry,
 ) {
     private data class MediaCharacteristics(
@@ -1024,7 +1025,7 @@ class VideoEngine @Inject constructor(
                     if (overlay.strokeWidth > 0f) {
                         add(StrokedTextBitmapOverlay(overlay, relStart, relEnd))
                     } else {
-                        add(ExportTextOverlay(overlay, relStart, relEnd))
+                        add(ExportTextOverlay(overlay, relStart, relEnd, fontRegistry))
                     }
                 }
                 overlappingImages.forEach { overlay ->

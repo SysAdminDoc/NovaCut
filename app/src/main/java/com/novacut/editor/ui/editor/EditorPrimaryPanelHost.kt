@@ -2,6 +2,7 @@ package com.novacut.editor.ui.editor
 
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -159,6 +160,9 @@ fun BoxScope.EditorPrimaryPanelHost(
         val editingOverlay = state.editingTextOverlayId?.let { id ->
             state.textOverlays.firstOrNull { it.id == id }
         }
+        val fontImportLauncher = rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+        ) { uri -> if (uri != null) viewModel.importFont(uri) }
         TextEditorSheet(
             existingOverlay = editingOverlay,
             playheadMs = playheadMs,
@@ -170,7 +174,9 @@ fun BoxScope.EditorPrimaryPanelHost(
                 }
                 viewModel.hideTextEditor()
             },
-            onClose = viewModel::hideTextEditor
+            onClose = viewModel::hideTextEditor,
+            importedFonts = viewModel.getImportedFonts(),
+            onImportFont = { fontImportLauncher.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-opentype", "application/octet-stream")) }
         )
     }
 

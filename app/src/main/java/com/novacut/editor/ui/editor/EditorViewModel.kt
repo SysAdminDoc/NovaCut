@@ -16,6 +16,7 @@ import com.novacut.editor.engine.AppSettings
 import com.novacut.editor.engine.AudioEngine
 import com.novacut.editor.engine.AutoSaveState
 import com.novacut.editor.engine.ExportState
+import com.novacut.editor.engine.FontRegistry
 import com.novacut.editor.engine.ProjectAutoSave
 import com.novacut.editor.engine.ProjectArchive
 import com.novacut.editor.engine.ProxyEngine
@@ -447,6 +448,7 @@ class EditorViewModel @Inject constructor(
     private val audioDescriptionEngine: AudioDescriptionEngine,
     private val stylusMidiEngine: StylusMidiEngine,
     private val captionTranslationEngine: com.novacut.editor.engine.CaptionTranslationEngine,
+    private val fontRegistry: FontRegistry,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -1126,6 +1128,21 @@ class EditorViewModel @Inject constructor(
     fun beginTransitionDurationChange() = effectsDelegate.beginTransitionDurationChange()
     fun setTransitionDuration(clipId: String, durationMs: Long) = effectsDelegate.setTransitionDuration(clipId, durationMs)
     fun setTransitionEasing(clipId: String, easing: TransitionEasing) = effectsDelegate.setTransitionEasing(clipId, easing)
+
+    // --- Fonts ---
+    fun getImportedFonts(): List<Pair<String, String>> =
+        fontRegistry.listImportedFonts().map { fontRegistry.fontFamilyKey(it.fileName) to it.displayName }
+
+    fun importFont(uri: android.net.Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = fontRegistry.importFont(uri)
+            if (result != null) {
+                showToast("Imported \"${result.displayName}\"")
+            } else {
+                showToast("Invalid font file")
+            }
+        }
+    }
 
     // --- Overlays & Markers (delegated) ---
     fun addTextOverlay(text: TextOverlay) = overlayDelegate.addTextOverlay(text)
