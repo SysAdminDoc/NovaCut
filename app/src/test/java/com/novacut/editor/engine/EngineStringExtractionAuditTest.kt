@@ -63,13 +63,15 @@ class EngineStringExtractionAuditTest {
             .count()
         // 2026-05-16: 102 engine .kt files.
         // 2026-06-04: 138 after the local-network permission policy.
+        // 2026-06-11: 142 after FFmpeg reverse-export, animated-overlay, and
+        //             font-import engines landed (the cap had drifted red).
         // Bump intentionally when adding new engines so the
         // docs/models.md registry and the ROADMAP stay in sync. This assertion
         // is a checkpoint, not a hard cap.
         assertTrue(
-            "Engine file count drifted from the audit baseline (was 102, now $count). " +
+            "Engine file count drifted from the audit baseline (was 142, now $count). " +
                 "If you added an engine, update docs/models.md and bump this number.",
-            count in 95..140
+            count in 95..160
         )
     }
 

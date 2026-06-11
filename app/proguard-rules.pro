@@ -95,3 +95,10 @@
 -dontwarn java.lang.invoke.StringConcatFactory
 -dontwarn javax.lang.model.**
 -dontwarn autovalue.shaded.**
+
+# Strip verbose/debug logging from release builds. Warning/error logs are kept
+# deliberately — they carry the failure diagnostics referenced in CLAUDE.md.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+}

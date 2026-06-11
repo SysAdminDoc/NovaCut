@@ -68,6 +68,17 @@ private const val BASE_SCALE = 0.15f // pixels per ms at zoom 1.0
 private const val MIN_TIMELINE_ZOOM = 0.01f
 private const val MAX_TIMELINE_ZOOM = 10f
 
+// Allocation-free clip lookup for drag handlers — they fire per pointer event
+// (~60-120Hz), where the previous flatMap built a throwaway list each event.
+private fun findClipInTracks(tracks: List<Track>, clipId: String): Clip? {
+    for (track in tracks) {
+        for (candidate in track.clips) {
+            if (candidate.id == clipId) return candidate
+        }
+    }
+    return null
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun Timeline(
@@ -1230,8 +1241,7 @@ fun Timeline(
                                                     detectDragGestures(
                                                         onDragStart = { offset ->
                                                             val ppm = currentZoomLevel * BASE_SCALE
-                                                            val currentClip = currentTracks.flatMap { it.clips }
-                                                                .firstOrNull { it.id == clip.id }
+                                                            val currentClip = findClipInTracks(currentTracks, clip.id)
                                                             val clipWidthLocal = currentClip?.durationMs?.times(ppm) ?: 0f
                                                             zone = resolveTimelineClipGestureZone(
                                                                 touchXPx = offset.x,
@@ -1273,8 +1283,8 @@ fun Timeline(
                                                         onDrag = { change, dragAmount ->
                                                             val ppm = currentZoomLevel * BASE_SCALE
                                                             if (ppm < 0.001f) return@detectDragGestures
-                                                            val currentClip = currentTracks.flatMap { it.clips }
-                                                                .firstOrNull { it.id == clip.id } ?: return@detectDragGestures
+                                                            val currentClip = findClipInTracks(currentTracks, clip.id)
+                                                                ?: return@detectDragGestures
                                                             when (
                                                                 val action = resolveTimelineClipGestureAction(
                                                                     zone = zone,
