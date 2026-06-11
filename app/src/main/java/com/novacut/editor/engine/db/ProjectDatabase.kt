@@ -9,13 +9,12 @@ import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Resolution
 import kotlinx.coroutines.flow.Flow
 
-@Database(entities = [Project::class], version = 6, exportSchema = true)
+@Database(entities = [Project::class], version = 7, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class ProjectDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
 
     companion object {
-        // v1→v2: Added templateId and proxyEnabled columns
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE projects ADD COLUMN templateId TEXT DEFAULT NULL")
@@ -23,50 +22,48 @@ abstract class ProjectDatabase : RoomDatabase() {
             }
         }
 
-        // v2→v3: Added version column for project snapshots
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE projects ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
             }
         }
 
-        // v3→v4: Schema freeze — establish proper migration baseline
         val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // No schema changes — version bump to establish migration chain
-            }
+            override fun migrate(db: SupportSQLiteDatabase) {}
         }
 
-        // v4→v5: Add index on updatedAt for project list sort performance
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_projects_updatedAt ON projects (updatedAt)")
             }
         }
 
-        // v5→v6: Add scratchpad notes column
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE projects ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE projects ADD COLUMN deletedAtEpochMs INTEGER DEFAULT NULL")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
     }
 }
 
 @Dao
 interface ProjectDao {
-    @Query("SELECT * FROM projects ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM projects WHERE deletedAtEpochMs IS NULL ORDER BY updatedAt DESC")
     fun getAllProjects(): Flow<List<Project>>
 
-    /**
-     * One-shot snapshot used when callers need a freshly-read list (e.g.
-     * uniqueness checks during duplicate-project naming) rather than the
-     * debounced StateFlow snapshot the UI observes.
-     */
-    @Query("SELECT * FROM projects ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM projects WHERE deletedAtEpochMs IS NULL ORDER BY updatedAt DESC")
     suspend fun getAllProjectsSnapshot(): List<Project>
+
+    @Query("SELECT * FROM projects WHERE deletedAtEpochMs IS NOT NULL ORDER BY deletedAtEpochMs DESC")
+    fun getTrashedProjects(): Flow<List<Project>>
 
     @Query("SELECT * FROM projects WHERE id = :id")
     suspend fun getProject(id: String): Project?
@@ -82,6 +79,15 @@ interface ProjectDao {
 
     @Query("DELETE FROM projects WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("UPDATE projects SET deletedAtEpochMs = :epochMs WHERE id = :id")
+    suspend fun softDelete(id: String, epochMs: Long)
+
+    @Query("UPDATE projects SET deletedAtEpochMs = NULL WHERE id = :id")
+    suspend fun restoreProject(id: String)
+
+    @Query("DELETE FROM projects WHERE deletedAtEpochMs IS NOT NULL AND deletedAtEpochMs < :cutoffEpochMs")
+    suspend fun purgeTrashedOlderThan(cutoffEpochMs: Long): Int
 }
 
 class Converters {

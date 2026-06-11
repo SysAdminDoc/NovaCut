@@ -222,6 +222,9 @@ fun ProjectListScreen(
                     }
                 )
 
+                val trashed by viewModel.trashedProjects.collectAsStateWithLifecycle()
+                var showTrash by remember { mutableStateOf(false) }
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -237,6 +240,62 @@ fun ProjectListScreen(
                             onDelete = { viewModel.deleteProject(project) },
                             onDuplicate = { viewModel.duplicateProject(project) }
                         )
+                    }
+
+                    if (trashed.isNotEmpty()) {
+                        item(key = "__trash_header") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showTrash = !showTrash }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = Mocha.Subtext0,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Trash (${trashed.size})",
+                                        color = Mocha.Subtext0,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                }
+                                Row {
+                                    if (showTrash) {
+                                        Text(
+                                            text = "Empty",
+                                            color = Mocha.Red,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier
+                                                .clickable { viewModel.emptyTrash() }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = if (showTrash) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = if (showTrash) "Collapse" else "Expand",
+                                        tint = Mocha.Subtext0,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (showTrash) {
+                            items(trashed, key = { "trash_${it.id}" }) { project ->
+                                TrashedProjectCard(
+                                    project = project,
+                                    onRestore = { viewModel.restoreProject(project) },
+                                    onDeleteForever = { viewModel.deleteProjectForever(project) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1299,6 +1358,59 @@ private fun formatDate(timestamp: Long): String {
         else -> {
             val sdf = java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault())
             sdf.format(java.util.Date(timestamp))
+        }
+    }
+}
+
+@Composable
+private fun TrashedProjectCard(
+    project: Project,
+    onRestore: () -> Unit,
+    onDeleteForever: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Mocha.Surface0.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = project.name,
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                project.deletedAtEpochMs?.let { deletedAt ->
+                    val daysAgo = ((System.currentTimeMillis() - deletedAt) / 86_400_000).toInt()
+                    val daysLeft = (30 - daysAgo).coerceAtLeast(0)
+                    Text(
+                        text = "Auto-deletes in $daysLeft days",
+                        color = Mocha.Overlay1,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            IconButton(onClick = onRestore) {
+                Icon(
+                    imageVector = Icons.Default.RestoreFromTrash,
+                    contentDescription = "Restore",
+                    tint = Mocha.Green
+                )
+            }
+            IconButton(onClick = onDeleteForever) {
+                Icon(
+                    imageVector = Icons.Default.DeleteForever,
+                    contentDescription = "Delete forever",
+                    tint = Mocha.Red
+                )
+            }
         }
     }
 }
