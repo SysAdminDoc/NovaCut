@@ -397,9 +397,12 @@ class VideoEngine @Inject constructor(
         _exportProgress.value = 0f
         _exportErrorMessage.value = null
 
+        val reversedTempFiles = mutableListOf<File>()
         try {
+            val processedTracks = preRenderReversedClips(tracks, reversedTempFiles, onProgress)
+
             val transformerPlan = buildTransformerExportPlan(
-                tracks = tracks,
+                tracks = processedTracks,
                 config = config,
                 textOverlays = textOverlays,
                 imageOverlays = imageOverlays,
@@ -413,11 +416,18 @@ class VideoEngine @Inject constructor(
                 config = config,
                 outputFile = outputFile,
                 onProgress = onProgress,
-                onComplete = onComplete,
-                onError = onError
+                onComplete = {
+                    reversedTempFiles.forEach { it.delete() }
+                    onComplete()
+                },
+                onError = { e ->
+                    reversedTempFiles.forEach { it.delete() }
+                    onError(e)
+                }
             )
         } catch (e: Exception) {
             Log.e(TAG, "Export setup failed", e)
+            reversedTempFiles.forEach { it.delete() }
             _exportErrorMessage.value = e.message ?: "Export setup failed"
             _exportState.value = ExportState.ERROR
             _exportProgress.value = 0f
@@ -425,6 +435,69 @@ class VideoEngine @Inject constructor(
             activeExportOutputFile = null
             outputFile.delete()
             onError(e)
+        }
+    }
+
+    private suspend fun preRenderReversedClips(
+        tracks: List<Track>,
+        tempFiles: MutableList<File>,
+        onProgress: (Float) -> Unit
+    ): List<Track> {
+        if (!ffmpegEngine.isAvailable()) return tracks
+
+        val reversedClips = tracks.flatMap { track ->
+            track.clips.filter { it.isReversed }.map { track to it }
+        }
+        if (reversedClips.isEmpty()) return tracks
+
+        val maxReverseDurationMs = 5L * 60 * 1000
+        val clipReplacements = mutableMapOf<String, Clip>()
+
+        for ((index, pair) in reversedClips.withIndex()) {
+            val (_, clip) = pair
+            val clipDurationMs = clip.trimEndMs - clip.trimStartMs
+            if (clipDurationMs > maxReverseDurationMs) {
+                Log.w(TAG, "Reversed clip ${clip.id} exceeds ${maxReverseDurationMs / 1000}s limit, exporting forward")
+                continue
+            }
+
+            val tempFile = File(context.cacheDir, "reverse_${clip.id}_${System.nanoTime()}.mp4")
+            val success = ffmpegEngine.reverseClipToFile(
+                inputUri = clip.sourceUri,
+                outputFile = tempFile,
+                trimStartMs = clip.trimStartMs,
+                trimEndMs = clip.trimEndMs,
+                onProgress = { p ->
+                    val base = index.toFloat() / reversedClips.size
+                    val weight = 1f / reversedClips.size
+                    onProgress((base + p * weight) * 0.1f)
+                }
+            )
+
+            if (success && tempFile.exists() && tempFile.length() > 0) {
+                tempFiles.add(tempFile)
+                val reversedDurationMs = getVideoDuration(android.net.Uri.fromFile(tempFile))
+                    .takeIf { it > 0 } ?: clipDurationMs
+                clipReplacements[clip.id] = clip.copy(
+                    sourceUri = android.net.Uri.fromFile(tempFile),
+                    trimStartMs = 0L,
+                    trimEndMs = reversedDurationMs,
+                    sourceDurationMs = reversedDurationMs,
+                    isReversed = false
+                )
+                Log.d(TAG, "Pre-rendered reversed clip ${clip.id} → ${tempFile.name}")
+            } else {
+                tempFile.delete()
+                Log.w(TAG, "Failed to pre-render reversed clip ${clip.id}, exporting forward")
+            }
+        }
+
+        if (clipReplacements.isEmpty()) return tracks
+
+        return tracks.map { track ->
+            track.copy(clips = track.clips.map { clip ->
+                clipReplacements[clip.id] ?: clip
+            })
         }
     }
 
@@ -677,7 +750,7 @@ class VideoEngine @Inject constructor(
         )
         val reversedCount = visibleVideoTracks.sumOf { track -> track.clips.count { it.isReversed } }
         if (reversedCount > 0) {
-            Log.w(TAG, "Export: $reversedCount reversed clip(s) will render forward (Transformer limitation)")
+            Log.w(TAG, "Export: $reversedCount reversed clip(s) not pre-rendered (FFmpeg unavailable or over limit)")
         }
         val visualTrackSequences = buildVideoSequences(
             visibleVideoTracks = visibleVideoTracks,

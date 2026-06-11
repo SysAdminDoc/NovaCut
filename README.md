@@ -425,7 +425,7 @@ Media access uses the system Photo Picker (`ActivityResultContracts.PickVisualMe
 
 ## Known Limitations
 - Multi-sequence export now honors track opacity through Media3 compositor settings, and all 18 fallback blend modes render distinctly; true source-over-destination blend math still needs a custom programmable compositor because Media3's public settings only expose alpha/transform
-- `clip.isReversed` works in preview but not in export (Media3 Transformer has no reverse playback support)
+- Reversed clip export pre-renders through FFmpeg (clips over 5 minutes export forward; FFmpeg unavailable falls back to forward playback)
 - SmartRenderEngine analysis results not used for actual export bypass
 - 11 AI/ML engine stubs awaiting dependency integration (see ROADMAP.md)
 

@@ -105,6 +105,35 @@ class FFmpegEngine @Inject constructor(
         ) == 0
     }
 
+    suspend fun reverseClipToFile(
+        inputUri: Uri,
+        outputFile: File,
+        trimStartMs: Long = 0L,
+        trimEndMs: Long = Long.MAX_VALUE,
+        onProgress: (Float) -> Unit = {}
+    ): Boolean = withContext(Dispatchers.IO) {
+        val args = buildList {
+            add("-y")
+            if (trimStartMs > 0L) {
+                add("-ss"); add(String.format(java.util.Locale.US, "%.3f", trimStartMs / 1000.0))
+            }
+            if (trimEndMs < Long.MAX_VALUE) {
+                add("-to"); add(String.format(java.util.Locale.US, "%.3f", trimEndMs / 1000.0))
+            }
+            add("-i"); add(ffmpegInput(inputUri))
+            add("-filter_complex"); add("[0:v]reverse[v];[0:a]areverse[a]")
+            add("-map"); add("[v]")
+            add("-map"); add("[a]")
+            add("-c:v"); add("libx264")
+            add("-preset"); add("fast")
+            add("-crf"); add("18")
+            add("-c:a"); add("aac")
+            add("-b:a"); add("192k")
+            add(outputFile.absolutePath)
+        }
+        executeArguments(args, onProgress = onProgress) == 0
+    }
+
     /**
      * Extract audio from an Android Uri to raw signed 16-bit little-endian PCM.
      */
