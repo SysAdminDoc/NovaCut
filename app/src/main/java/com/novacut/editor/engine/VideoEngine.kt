@@ -1370,7 +1370,7 @@ class VideoEngine @Inject constructor(
                 clip = clip,
                 timelineStartMs = clip.timelineStartMs,
                 durationMs = clip.durationMs,
-                mediaUri = clip.proxyUri ?: clip.sourceUri
+                mediaUri = resolvePreviewMediaUri(clip)
             )
             cursorMs = clip.timelineEndMs
         }
@@ -1386,6 +1386,30 @@ class VideoEngine @Inject constructor(
         }
 
         return segments.filter { it.durationMs > 0L }
+    }
+
+    private fun resolvePreviewMediaUri(clip: Clip): Uri {
+        val proxyUri = clip.proxyUri ?: return clip.sourceUri
+        if (isReadableMediaUri(proxyUri)) {
+            return proxyUri
+        }
+        Log.w(TAG, "Ignoring unreadable proxy for clip ${clip.id}: $proxyUri")
+        return clip.sourceUri
+    }
+
+    private fun isReadableMediaUri(uri: Uri): Boolean {
+        if (uri.scheme == "file") {
+            val file = uri.path?.let(::File) ?: return false
+            return file.isFile && file.length() > 0L
+        }
+
+        return try {
+            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
+                descriptor.length != 0L
+            } == true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun getPreviewGapUri(): Uri {
