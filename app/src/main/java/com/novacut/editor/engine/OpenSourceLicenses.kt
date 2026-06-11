@@ -71,7 +71,7 @@ object OpenSourceLicenses {
             artifact = "com.google.mediapipe:tasks-vision",
             licenseName = "The Apache Software License, Version 2.0",
             licenseText = APACHE_2_TEXT,
-            licenseUrl = "http://www.apache.org/licenses/LICENSE-2.0.txt",
+            licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0.txt",
             projectUrl = "https://mediapipe.dev/",
         ),
         OpenSourceLicenseNotice(
@@ -98,7 +98,7 @@ object OpenSourceLicenses {
             artifact = "androidx.media3",
             licenseName = "The Apache Software License, Version 2.0",
             licenseText = APACHE_2_TEXT,
-            licenseUrl = "http://www.apache.org/licenses/LICENSE-2.0.txt",
+            licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0.txt",
             projectUrl = "https://github.com/androidx/media",
         ),
         OpenSourceLicenseNotice(
