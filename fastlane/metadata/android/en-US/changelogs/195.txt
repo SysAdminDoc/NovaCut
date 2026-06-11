@@ -1,0 +1,3 @@
+- Network security hardening
+- Added an app-wide networkSecurityConfig and explicit usesCleartextTraffic=false manifest policy so platform HTTP stacks reject cleartext traffic by default.
+- Added JVM coverage that checks the manifest and network security XML stay wired together.
