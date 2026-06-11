@@ -449,6 +449,10 @@ fun Timeline(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    // When the track stack outgrows the card's external height
+                    // cap, the tracks scroll vertically instead of clipping
+                    // behind the tool rail.
+                    .verticalScroll(rememberScrollState())
                     .padding(start = contentPadding, end = contentPadding, top = contentPadding, bottom = contentPadding)
             ) {
                 Column(
