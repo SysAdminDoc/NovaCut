@@ -233,7 +233,7 @@ def privacy_phone() -> str:
                     *rows,
                     rect(86, 1212, 908, 256, "panel", 24),
                     text(126, 1280, "Model downloads are optional", 32, "text", 700),
-                    text(126, 1328, "Editing works offline. Network use is explicit.", 23, "muted", 500),
+                    text(126, 1328, "Core editing stays local. Optional network prompts.", 23, "muted", 500),
                 ]
             ),
         ),
@@ -364,7 +364,7 @@ def tablet_export() -> str:
                     rect(694, 690, 900, 90, "panel2", 18),
                     text(734, 502, "No missing media references", 25, "text", 600),
                     text(734, 624, "Loudness and bitrate fit target platform", 25, "text", 600),
-                    text(734, 746, "Disclosure metadata ready for share targets", 25, "text", 600),
+                    text(734, 746, "AI disclosure sidecar and manual platform reminders", 25, "text", 600),
                 ]
             ),
         ),

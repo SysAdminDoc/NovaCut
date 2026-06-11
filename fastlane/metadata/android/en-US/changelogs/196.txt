@@ -1,0 +1,4 @@
+- Public release claim gate
+- Added a deterministic public-claim validator with fixture self-tests and CI wiring alongside Play listing validation.
+- Corrected README and Play metadata so current AI tools, planned/gated tools, offline editing, and optional network paths stay distinct.
+- Updated Play screenshot source copy from structured share-target disclosure readiness to AI disclosure sidecar/manual platform reminder wording.

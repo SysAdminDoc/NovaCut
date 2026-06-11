@@ -25,5 +25,5 @@
 <text x="208" y="1018" fill="#a9b2c3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="500">Export - delete - local controls</text>
 <rect x="86" y="1212" width="908" height="256" rx="24" fill="#1f2430"/>
 <text x="126" y="1280" fill="#f4f7fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="32" font-weight="700">Model downloads are optional</text>
-<text x="126" y="1328" fill="#a9b2c3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="23" font-weight="500">Editing works offline. Network use is explicit.</text>
+<text x="126" y="1328" fill="#a9b2c3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="23" font-weight="500">Core editing stays local. Optional network prompts.</text>
 </svg>
