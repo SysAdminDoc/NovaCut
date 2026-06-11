@@ -229,39 +229,41 @@ fun EditorScreen(
     }
     val screenHeightDp = configuration.screenHeightDp
     val isCompactEditorHeight = adaptiveLayoutDecision.compactTimeline || screenHeightDp < 820
-    val isTrimInteractionActive = state.currentTool == EditorTool.TRIM || isTimelineTrimGestureActive
-    val isBottomToolPanelExpanded = isToolPanelExpanded && !isTrimInteractionActive
-    val selectedPreviewHeight = when {
-        !isClipMode -> 0.dp
-        adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TABLETOP_SPLIT -> 360.dp
-        adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.THREE_PANE -> 300.dp
-        adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TWO_PANE -> 280.dp
-        isTrimInteractionActive && isCompactEditorHeight -> 240.dp
-        isTrimInteractionActive -> 260.dp
-        isBottomToolPanelExpanded -> 184.dp
-        isCompactEditorHeight -> 268.dp
-        else -> 292.dp
-    }
+    // Pane sizing reacts only to the deliberate TRIM tool, never to the live
+    // edge-drag gesture — resizing panes mid-gesture moves the trim handle
+    // under the user's finger and opens dead space around the tool rail.
+    val isTrimToolActive = state.currentTool == EditorTool.TRIM
+    val isTrimInteractionActive = isTrimToolActive || isTimelineTrimGestureActive
+    val isBottomToolPanelExpanded = isToolPanelExpanded && !isTrimToolActive
+    // Height available to the timeline after reserving the top bar (~64dp), a
+    // usable preview (~180dp), and the tool rail (96dp compact / 244dp with a
+    // sub-menu open) — keeps a tall track stack from starving the preview and
+    // keeps the fixed minimums below from overflowing short screens.
+    val timelineHeightBudget = (
+        screenHeightDp.dp - 64.dp - 180.dp -
+            (if (isBottomToolPanelExpanded) 244.dp else 96.dp)
+        ).coerceAtLeast(160.dp)
     val timelineMinHeight = when {
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TABLETOP_SPLIT -> 280.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.THREE_PANE -> 280.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TWO_PANE -> 252.dp
-        isClipMode && isTrimInteractionActive -> 300.dp
+        isClipMode && isTrimToolActive -> 300.dp
         isClipMode && isBottomToolPanelExpanded -> 220.dp
         isClipMode && isCompactEditorHeight -> 260.dp
         isClipMode -> 280.dp
         else -> 240.dp
-    }
+    }.coerceAtMost(timelineHeightBudget)
     val timelineMaxHeight = when {
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TABLETOP_SPLIT -> 380.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.THREE_PANE -> 420.dp
         adaptiveLayoutDecision.paneMode == AdaptiveEditorLayoutPolicy.PaneMode.TWO_PANE -> 360.dp
-        isClipMode && isTrimInteractionActive -> 430.dp
+        isClipMode && isTrimToolActive && isCompactEditorHeight -> 340.dp
+        isClipMode && isTrimToolActive -> 430.dp
         isClipMode && isBottomToolPanelExpanded -> 260.dp
         isClipMode && isCompactEditorHeight -> 360.dp
         isClipMode -> 390.dp
         else -> 330.dp
-    }
+    }.coerceIn(timelineMinHeight, timelineHeightBudget)
     val useEmbeddedExportPane = state.panels.isOpen(PanelId.EXPORT_SHEET) &&
         adaptiveLayoutDecision.preferEmbeddedExportPane
     val embeddedExportPaneWidth = when {
@@ -599,13 +601,13 @@ fun EditorScreen(
                 }
             }
 
-            // Preview panel with long-press radial menu
+            // Preview panel with long-press radial menu. The preview is the
+            // ONLY flexible element in this column: it absorbs whatever the
+            // wrap-content timeline and tool rail leave over, so the rail
+            // always hugs the bottom edge with no dead panel space.
             if (hasClips || hasOpenPanel) Box(
-                modifier = (if (isClipMode) {
-                    Modifier.height(selectedPreviewHeight)
-                } else {
-                    Modifier.weight(1f)
-                })
+                modifier = Modifier
+                    .weight(1f)
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onLongPress = { offset ->
@@ -791,11 +793,10 @@ fun EditorScreen(
                 isTrimInteractionActive
 
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = true)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Timeline
+                // Timeline — wraps its track stack between min/max bounds so
+                // the tool rail below stays snug against the timeline content.
                 if (shouldShowTimeline) {
                     Timeline(
                         tracks = state.tracks,
@@ -849,12 +850,9 @@ fun EditorScreen(
                         onDeleteSelectedClip = viewModel::deleteSelectedClip,
                         engine = viewModel.engine,
                         modifier = Modifier
-                            .weight(1f, fill = true)
                             .fillMaxWidth()
-                            .heightIn(min = timelineMinHeight)
+                            .heightIn(min = timelineMinHeight, max = timelineMaxHeight)
                     )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f, fill = true))
                 }
 
                 // Bottom tool area (PowerDirector-style tab bar + sub-menu grids)
@@ -864,9 +862,9 @@ fun EditorScreen(
                     textOverlays = state.textOverlays,
                     onEditTextOverlay = { id -> viewModel.editTextOverlay(id) },
                     editorMode = state.editorMode,
-                    compactLocked = isTrimInteractionActive,
+                    compactLocked = isTrimToolActive,
                     onExpandedChange = { expanded ->
-                        isToolPanelExpanded = expanded && !isTrimInteractionActive
+                        isToolPanelExpanded = expanded
                     },
                     onDeleteTextOverlay = { id ->
                         viewModel.removeTextOverlay(id)
