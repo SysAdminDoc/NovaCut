@@ -32,7 +32,9 @@ fun TextEditorSheet(
     existingOverlay: TextOverlay? = null,
     playheadMs: Long,
     onSave: (TextOverlay) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    importedFonts: List<Pair<String, String>> = emptyList(),
+    onImportFont: () -> Unit = {}
 ) {
     val defaultText = stringResource(R.string.text_editor_your_text)
     // Key all state to the overlay id (or "new" sentinel) so editing a different
@@ -61,7 +63,7 @@ fun TextEditorSheet(
     var lineHeight by remember(overlayKey) { mutableFloatStateOf(safeTextEditorFloat(existingOverlay?.lineHeight ?: 1.2f, 1.2f, 0.8f, 3f)) }
     var textRotation by remember(overlayKey) { mutableFloatStateOf(safeTextEditorFloat(existingOverlay?.rotation ?: 0f, 0f, -180f, 180f)) }
 
-    val fontFamilies = listOf(
+    val systemFonts = listOf(
         "sans-serif" to "Sans Serif",
         "serif" to "Serif",
         "monospace" to "Monospace",
@@ -69,6 +71,7 @@ fun TextEditorSheet(
         "sans-serif-condensed" to "Condensed",
         "sans-serif-medium" to "Medium"
     )
+    val fontFamilies = systemFonts + importedFonts
 
     val colorOptions = listOf(
         0xFFFFFFFF, 0xFF000000, 0xFFF38BA8, 0xFFFAB387,
@@ -223,7 +226,21 @@ fun TextEditorSheet(
 
             EffectSlider(stringResource(R.string.panel_text_editor_font_size), fontSize, 12f, 120f) { fontSize = it }
 
-            Text(stringResource(R.string.text_editor_font), color = Mocha.Subtext1, style = MaterialTheme.typography.labelLarge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.text_editor_font), color = Mocha.Subtext1, style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = "Import",
+                    color = Mocha.Mauve,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .clickable { onImportFont() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(fontFamilies) { (family, label) ->
                     FilterChip(
