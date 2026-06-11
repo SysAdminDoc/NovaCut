@@ -148,12 +148,19 @@ class ProjectListViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val trashedProjects = projectDao.getTrashedProjects()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     init {
         refreshUserTemplates()
-        // Push dynamic launcher shortcuts whenever the project list changes so
-        // long-pressing the launcher icon surfaces "Resume recovered draft"
-        // and "Open <last-project-name>" in sync with reality. Driven by the
-        // pure ProjectShortcutPlanner — this view-model only owns the I/O.
+        viewModelScope.launch(Dispatchers.IO) {
+            val cutoffMs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+            val purged = projectDao.purgeTrashedOlderThan(cutoffMs)
+            if (purged > 0) {
+                Log.d("ProjectListVM", "Auto-purged $purged trashed projects older than 30 days")
+                sweepManagedMediaAfterDeletion()
+            }
+        }
         viewModelScope.launch {
             allProjects.collect { projects ->
                 refreshDynamicShortcuts(projects)
@@ -276,18 +283,58 @@ class ProjectListViewModel @Inject constructor(
                 description = appContext.getString(R.string.projects_operation_delete_body, project.name)
             )
             try {
-                val deleted = withContext(Dispatchers.IO) {
-                    deleteProjectAndCleanup(project)
+                withContext(Dispatchers.IO) {
+                    projectDao.softDelete(project.id, System.currentTimeMillis())
                 }
-                showToast(
-                    if (deleted) {
-                        appContext.getString(R.string.project_delete_success, project.name)
-                    } else {
-                        appContext.getString(R.string.project_delete_failed)
-                    }
-                )
+                showToast(appContext.getString(R.string.project_delete_success, project.name))
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Failed to soft-delete project ${project.id}", e)
+                showToast(appContext.getString(R.string.project_delete_failed))
             } finally {
                 endOperation(operation)
+            }
+        }
+    }
+
+    fun restoreProject(project: Project) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    projectDao.restoreProject(project.id)
+                }
+                showToast("Restored \"${project.name}\"")
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Failed to restore project ${project.id}", e)
+                showToast("Restore failed")
+            }
+        }
+    }
+
+    fun deleteProjectForever(project: Project) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    deleteProjectAndCleanup(project)
+                }
+                showToast("Permanently deleted \"${project.name}\"")
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Failed to permanently delete ${project.id}", e)
+                showToast("Delete failed")
+            }
+        }
+    }
+
+    fun emptyTrash() {
+        viewModelScope.launch {
+            try {
+                val count = withContext(Dispatchers.IO) {
+                    projectDao.purgeTrashedOlderThan(Long.MAX_VALUE)
+                }
+                if (count > 0) sweepManagedMediaAfterDeletion()
+                showToast("Emptied trash ($count projects)")
+            } catch (e: Exception) {
+                Log.w("ProjectListVM", "Failed to empty trash", e)
+                showToast("Empty trash failed")
             }
         }
     }
