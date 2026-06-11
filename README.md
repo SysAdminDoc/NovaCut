@@ -1,6 +1,6 @@
 # NovaCut
 
-A professional Android video editor built with Kotlin and Jetpack Compose. Open alternative to CapCut, PowerDirector, and DaVinci Resolve — with on-device AI, GPU-accelerated effects, and desktop NLE interoperability.
+A professional Android video editor built with Kotlin and Jetpack Compose. Open alternative to CapCut, PowerDirector, and DaVinci Resolve -- with AI-assisted tools, GPU-accelerated effects, and desktop NLE interoperability.
 
 
 ![novacut-logo](https://github.com/user-attachments/assets/5187e84f-e9e7-4dc6-b7f5-0c990049f31f)<svg width="1800" height="560" viewBox="0 0 1800 560" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -148,7 +148,7 @@ Planning files are local-only in the development checkout:
 ### AI Tools
 | Tool | Engine | On-Device? |
 |------|--------|------------|
-| **Auto Captions** | ONNX Runtime Whisper (multilingual, 99 languages) | Yes |
+| **Auto Captions** | ONNX Runtime Whisper tiny.en (English; multilingual Sherpa/Whisper path gated) | Yes |
 | **Background Removal** | MediaPipe Selfie Segmentation (~1-7MB, ~30fps) | Yes |
 | **AI Green Screen** | Planned -- RobustVideoMatting (requires model integration) | Planned |
 | **Object Removal** | LaMa-Dilated inpainting (40ms/frame @ 512x512 on flagship devices) | Yes |

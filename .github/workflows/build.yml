@@ -56,6 +56,11 @@ jobs:
       - name: Verify Play listing assets
         run: python3 scripts/validate_play_listing_assets.py
 
+      - name: Verify public release claims
+        run: |
+          python3 scripts/validate_public_claims.py --self-test
+          python3 scripts/validate_public_claims.py --explain
+
       - name: Locate Android build tools
         id: build-tools
         shell: bash

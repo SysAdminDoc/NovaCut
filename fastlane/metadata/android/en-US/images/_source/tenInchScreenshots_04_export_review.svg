@@ -25,5 +25,5 @@
 <rect x="694" y="690" width="900" height="90" rx="18" fill="#273044"/>
 <text x="734" y="502" fill="#f4f7fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="600">No missing media references</text>
 <text x="734" y="624" fill="#f4f7fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="600">Loudness and bitrate fit target platform</text>
-<text x="734" y="746" fill="#f4f7fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="600">Disclosure metadata ready for share targets</text>
+<text x="734" y="746" fill="#f4f7fb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="600">AI disclosure sidecar and manual platform reminders</text>
 </svg>

@@ -1,4 +1,4 @@
-NovaCut is a full-featured, open-source video editor for Android. Built with Kotlin, Jetpack Compose, and Media3 Transformer, it delivers professional editing capabilities entirely on-device.
+NovaCut is a full-featured, open-source video editor for Android. Built with Kotlin, Jetpack Compose, and Media3 Transformer, it delivers professional editing with clear local, optional-download, and planned-tool gates.
 
 Features:
 - Multi-track timeline with magnetic snapping, slip/slide editing, and clip grouping
@@ -8,7 +8,7 @@ Features:
 - Keyframe animation for opacity, scale, rotation, position, and volume
 - Color grading with lift/gamma/gain wheels, RGB curves, HSL qualifier, and 3D LUT import
 - 18 blend modes and freehand/rect/ellipse masks with feathering
-- On-device AI tools: auto captions (Whisper ONNX), scene detection, smart crop, background removal (MediaPipe), motion tracking, video stabilization, audio denoise, style transfer
+- AI-assisted tools with clear gates: auto captions (Whisper tiny.en), background removal (MediaPipe), object removal (LaMa), scene detection, smart crop, motion tracking, auto color, and audio denoise; planned stabilization and style transfer stay labeled until dependency review
 - Filler word auto-strip from generated captions
 - Beat detection and beat-sync editing
 - Audio mixing with per-track volume, pan, EQ, compressor, reverb, and 15 DSP effects
@@ -22,4 +22,4 @@ Features:
 - Project auto-save with crash recovery
 - Catppuccin Mocha dark theme throughout
 
-NovaCut requires no internet connection for editing. AI model downloads (Whisper, MediaPipe) are optional and fetched once on first use.
+Core editing works offline. Network use is explicit for optional model downloads, provider-backed assets, cloud-capable tools, remote signing, LAN streaming, and user-directed share/export handoff.
