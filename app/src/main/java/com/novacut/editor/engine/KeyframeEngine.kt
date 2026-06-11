@@ -306,18 +306,48 @@ object KeyframeEngine {
         return mask.points
     }
 
-    private fun interpolatePointLists(
+    internal fun interpolatePointLists(
         a: List<MaskPoint>, b: List<MaskPoint>, t: Float
     ): List<MaskPoint> {
-        val size = minOf(a.size, b.size)
+        // A keyframed mask can legitimately change point count between
+        // keyframes (e.g. a freehand outline redrawn at a later time). The
+        // old minOf() truncation silently dropped the extra points, visibly
+        // corrupting the shape mid-morph in preview AND export. Resample both
+        // outlines to the larger count so every point participates.
+        if (a.isEmpty() || b.isEmpty()) return if (t < 0.5f) a else b
+        val size = maxOf(a.size, b.size)
+        val ra = resamplePoints(a, size)
+        val rb = resamplePoints(b, size)
         return (0 until size).map { i ->
             MaskPoint(
-                x = lerp(a[i].x, b[i].x, t),
-                y = lerp(a[i].y, b[i].y, t),
-                handleInX = lerp(a[i].handleInX, b[i].handleInX, t),
-                handleInY = lerp(a[i].handleInY, b[i].handleInY, t),
-                handleOutX = lerp(a[i].handleOutX, b[i].handleOutX, t),
-                handleOutY = lerp(a[i].handleOutY, b[i].handleOutY, t)
+                x = lerp(ra[i].x, rb[i].x, t),
+                y = lerp(ra[i].y, rb[i].y, t),
+                handleInX = lerp(ra[i].handleInX, rb[i].handleInX, t),
+                handleInY = lerp(ra[i].handleInY, rb[i].handleInY, t),
+                handleOutX = lerp(ra[i].handleOutX, rb[i].handleOutX, t),
+                handleOutY = lerp(ra[i].handleOutY, rb[i].handleOutY, t)
+            )
+        }
+    }
+
+    /** Index-space resample of a mask outline to exactly [target] points. */
+    private fun resamplePoints(points: List<MaskPoint>, target: Int): List<MaskPoint> {
+        if (points.size == target || points.isEmpty()) return points
+        if (points.size == 1) return List(target) { points[0] }
+        return (0 until target).map { i ->
+            val pos = if (target == 1) 0f else i.toFloat() * (points.size - 1) / (target - 1)
+            val lo = pos.toInt().coerceIn(0, points.size - 1)
+            val hi = (lo + 1).coerceAtMost(points.size - 1)
+            val frac = pos - lo
+            val p0 = points[lo]
+            val p1 = points[hi]
+            MaskPoint(
+                x = lerp(p0.x, p1.x, frac),
+                y = lerp(p0.y, p1.y, frac),
+                handleInX = lerp(p0.handleInX, p1.handleInX, frac),
+                handleInY = lerp(p0.handleInY, p1.handleInY, frac),
+                handleOutX = lerp(p0.handleOutX, p1.handleOutX, frac),
+                handleOutY = lerp(p0.handleOutY, p1.handleOutY, frac)
             )
         }
     }

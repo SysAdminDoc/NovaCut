@@ -25,6 +25,7 @@ class ProjectAutoSave @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val autoSaveDir = File(context.filesDir, "autosave").apply { mkdirs() }
     private val saveMutex = Mutex()
+    private val lastSavedFingerprints = java.util.concurrent.ConcurrentHashMap<String, Long>()
     @Volatile
     private var autoSaveJob: Job? = null
     private var consecutiveFailures = 0
@@ -206,6 +207,7 @@ class ProjectAutoSave @Inject constructor(
             getAutoSaveFile(projectId).delete()
             getTempFile(projectId).delete()
             getBackupFile(projectId).delete()
+            lastSavedFingerprints.remove(projectId)
         }
     }
 
@@ -280,7 +282,17 @@ class ProjectAutoSave @Inject constructor(
     }
 
     private suspend fun saveState(projectId: String, state: AutoSaveState) = saveMutex.withLock {
-        writeAutoSaveFileLocked(projectId, state.serialize())
+        val contents = state.serialize()
+        // Skip the temp-write + double-rename + backup churn when nothing
+        // changed since the last save — the periodic loop fires every 30s
+        // regardless of activity, which otherwise grinds flash storage all
+        // session long on an idle project.
+        val fingerprint = contents.length.toLong() * 31 + contents.hashCode()
+        if (lastSavedFingerprints[projectId] == fingerprint && getAutoSaveFile(projectId).exists()) {
+            return@withLock
+        }
+        writeAutoSaveFileLocked(projectId, contents)
+        lastSavedFingerprints[projectId] = fingerprint
     }
 
     private fun writeAutoSaveFileLocked(projectId: String, contents: String) {

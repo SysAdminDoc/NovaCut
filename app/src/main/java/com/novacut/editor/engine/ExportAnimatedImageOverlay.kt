@@ -57,6 +57,11 @@ internal class ExportAnimatedImageOverlay private constructor(
 
     override fun release() {
         super.release()
+        // The drawable was started with REPEAT_INFINITE — without stop() it
+        // keeps scheduling frame-decode callbacks on the main looper long
+        // after the export has finished.
+        try { drawable.stop() } catch (_: Exception) {}
+        drawable.callback = null
         try { if (!frameBitmap.isRecycled) frameBitmap.recycle() } catch (_: Exception) {}
     }
 
@@ -75,6 +80,7 @@ internal class ExportAnimatedImageOverlay private constructor(
                 Log.w(TAG, "AnimatedImageDrawable requires API 28+")
                 return null
             }
+            var startedDrawable: AnimatedImageDrawable? = null
             return try {
                 val source = ImageDecoder.createSource(context.contentResolver, overlay.sourceUri)
                 val drawable = ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
@@ -88,10 +94,12 @@ internal class ExportAnimatedImageOverlay private constructor(
                 }
                 if (drawable !is AnimatedImageDrawable) {
                     Log.w(TAG, "Source is not animated, falling back to static overlay")
+                    drawable.callback = null
                     return null
                 }
                 drawable.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
                 drawable.start()
+                startedDrawable = drawable
 
                 val settings = StaticOverlaySettings.Builder()
                     .setAlphaScale(overlay.opacity.coerceIn(0f, 1f))
@@ -117,6 +125,10 @@ internal class ExportAnimatedImageOverlay private constructor(
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to decode animated overlay ${overlay.sourceUri}", e)
+                startedDrawable?.let {
+                    try { it.stop() } catch (_: Exception) {}
+                    it.callback = null
+                }
                 null
             }
         }
