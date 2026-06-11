@@ -401,6 +401,7 @@ class VideoEngine @Inject constructor(
         val reversedTempFiles = mutableListOf<File>()
         try {
             val processedTracks = preRenderReversedClips(tracks, reversedTempFiles, onProgress)
+            ensureExportActive("reversed-clip pre-render")
 
             val transformerPlan = buildTransformerExportPlan(
                 tracks = processedTracks,
@@ -426,6 +427,22 @@ class VideoEngine @Inject constructor(
                     onError(e)
                 }
             )
+        } catch (e: CancellationException) {
+            // User cancelled while pre-rendering or before the transformer
+            // started. cancelExport() had no transformer to tear down in that
+            // window, so the scratch files are cleaned up here instead. Not an
+            // error — don't invoke onError; rethrow so the launching coroutine
+            // finishes as cancelled (ExportDelegate handles this contract).
+            Log.d(TAG, "Export cancelled during setup", e)
+            reversedTempFiles.forEach { it.delete() }
+            if (_exportState.value == ExportState.EXPORTING) {
+                _exportState.value = ExportState.CANCELLED
+            }
+            _exportProgress.value = 0f
+            activeTransformer = null
+            activeExportOutputFile = null
+            runCatching { outputFile.delete() }
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Export setup failed", e)
             reversedTempFiles.forEach { it.delete() }
@@ -455,6 +472,10 @@ class VideoEngine @Inject constructor(
         val clipReplacements = mutableMapOf<String, Clip>()
 
         for ((index, pair) in reversedClips.withIndex()) {
+            // cancelExport() has no transformer to cancel while FFmpeg owns
+            // this phase — honor the CANCELLED state between clips so a
+            // cancelled export stops queueing minutes of reverse renders.
+            if (_exportState.value != ExportState.EXPORTING) break
             val (_, clip) = pair
             val clipDurationMs = clip.trimEndMs - clip.trimStartMs
             if (clipDurationMs > maxReverseDurationMs) {
@@ -569,7 +590,7 @@ class VideoEngine @Inject constructor(
             val outputsByName = mutableMapOf<String, File>()
 
             for (execution in plan.runs.sortedBy { it.index }) {
-                ensureMixedExportActive("mixed run ${execution.index}")
+                ensureExportActive("mixed run ${execution.index}")
                 val stepWeight = execution.run.durationMs.coerceAtLeast(1L)
                 val runOutput = File(tempDir, execution.outputFileName)
                 when (execution.engine) {
@@ -634,7 +655,7 @@ class VideoEngine @Inject constructor(
                 publishMixedProgress(completedWeight, 1L, 0f)
             }
 
-            ensureMixedExportActive("mixed concat")
+            ensureExportActive("mixed concat")
             val concat = plan.concat ?: return false
             val concatInputs = concat.inputs.map { name ->
                 outputsByName[name] ?: throw IllegalStateException("Mixed concat input missing: $name")
@@ -702,14 +723,14 @@ class VideoEngine @Inject constructor(
         return null
     }
 
-    private fun ensureMixedExportActive(step: String) {
+    private fun ensureExportActive(step: String) {
         when (_exportState.value) {
             ExportState.EXPORTING -> Unit
-            ExportState.CANCELLED -> throw CancellationException("Mixed export cancelled during $step")
+            ExportState.CANCELLED -> throw CancellationException("Export cancelled during $step")
             ExportState.ERROR -> throw IllegalStateException(
-                _exportErrorMessage.value ?: "Mixed export failed during $step"
+                _exportErrorMessage.value ?: "Export failed during $step"
             )
-            else -> throw CancellationException("Mixed export stopped during $step")
+            else -> throw CancellationException("Export stopped during $step")
         }
     }
 
@@ -1473,6 +1494,13 @@ class VideoEngine @Inject constructor(
         markCompleteOnFinish: Boolean = true
     ) {
         withContext(Dispatchers.Main) {
+            // Cancelled before the transformer was built: starting it anyway
+            // would run a detached full encode whose state-guarded listener
+            // never fires — leaking scratch files and burning CPU/battery
+            // until the encode finishes on its own.
+            if (_exportState.value != ExportState.EXPORTING) {
+                throw CancellationException("Export cancelled before encoding started")
+            }
             var terminalReached = false
             val transformer = Transformer.Builder(context)
                 .setVideoMimeType(mimeType)
@@ -1570,6 +1598,14 @@ class VideoEngine @Inject constructor(
                 activeExportOutputFile = null
                 terminalReached = true
                 onError(Exception(message))
+            }
+            if (_exportState.value == ExportState.CANCELLED && !terminalReached) {
+                // transformer.cancel() (already invoked by cancelExport()) fires
+                // no listener callback, so neither onComplete nor onError runs.
+                // Signal the caller so per-export scratch files (reversed-clip
+                // pre-renders, mixed-run segments) still get cleaned up.
+                activeTransformer = null
+                throw CancellationException("Export cancelled")
             }
             activeTransformer = null
             // Ensure the file-handle mirror is always nulled when the transformer
