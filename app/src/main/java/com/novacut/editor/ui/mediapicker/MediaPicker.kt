@@ -94,12 +94,27 @@ fun MediaPickerSheet(
                     description = context.getString(R.string.media_picker_importing_batch_description)
                 )
                 try {
-                    val sortedUris = withContext(Dispatchers.IO) {
-                        sortMediaChronologically(context, uris)
+                    val importResult = withContext(Dispatchers.IO) {
+                        val sortedUris = sortMediaChronologically(context, uris)
+                        sortedUris.mapNotNull { uri ->
+                            val mediaType = resolvePickedMediaType(context, uri, fallbackType = "video")
+                            try {
+                                importUriToManagedMedia(context, uri, mediaType)?.let { localUri ->
+                                    localUri to mediaType
+                                }
+                            } finally {
+                                releasePersistedReadPermission(context, uri)
+                            }
+                        } to sortedUris.size
                     }
-                    sortedUris.forEach { uri ->
-                        val mediaType = resolvePickedMediaType(context, uri, fallbackType = "video")
-                        onMediaSelected(uri, mediaType)
+                    val (mediaItems, requestedCount) = importResult
+                    mediaItems.forEach { (localUri, mediaType) -> onMediaSelected(localUri, mediaType) }
+                    if (mediaItems.size < requestedCount) {
+                        permissionMessage = if (mediaItems.isEmpty()) {
+                            context.getString(R.string.media_picker_local_copy_failed)
+                        } else {
+                            context.getString(R.string.media_picker_some_imports_failed)
+                        }
                     }
                 } finally {
                     operationState = null
@@ -113,7 +128,11 @@ fun MediaPickerSheet(
             operationState = MediaPickerOperationState(title = title, description = description)
             try {
                 val localUri = withContext(Dispatchers.IO) {
-                    importUriToManagedMedia(context, uri, mediaType)
+                    try {
+                        importUriToManagedMedia(context, uri, mediaType)
+                    } finally {
+                        releasePersistedReadPermission(context, uri)
+                    }
                 }
                 if (localUri != null) {
                     onMediaSelected(localUri, mediaType)
@@ -196,7 +215,12 @@ fun MediaPickerSheet(
                     return@rememberLauncherForActivityResult
                 }
             }
-            onMediaSelected(uri, pendingMediaType)
+            importPickedMedia(
+                uri = uri,
+                mediaType = pendingMediaType,
+                title = context.getString(R.string.media_picker_importing_batch_title),
+                description = context.getString(R.string.media_picker_importing_batch_description)
+            )
         }
     }
 
@@ -602,6 +626,20 @@ private fun sortMediaChronologically(
     fun naturalKey(name: String): String =
         digitPadRegex.replace(name) { it.value.padStart(10, '0') }
     return keyed.sortedBy { naturalKey(it.second) }.map { it.first }
+}
+
+private fun releasePersistedReadPermission(
+    context: android.content.Context,
+    uri: Uri
+) {
+    try {
+        context.contentResolver.releasePersistableUriPermission(
+            uri,
+            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+    } catch (_: SecurityException) {
+    } catch (_: IllegalArgumentException) {
+    }
 }
 
 private fun resolvePickedMediaType(
