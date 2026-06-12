@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,6 +34,7 @@ import androidx.annotation.StringRes
 import com.novacut.editor.R
 import com.novacut.editor.model.*
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.TouchTarget
 import java.util.Locale
 
@@ -330,7 +330,7 @@ private fun BottomTabBar(
 ) {
     Surface(
         color = Mocha.Panel,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = Radius.xl, topEnd = Radius.xl),
         modifier = modifier.fillMaxWidth()
     ) {
         BoxWithConstraints(
@@ -432,8 +432,8 @@ private fun BottomTabBarItem(
 ) {
     val isBack = tab.id == "back"
     val tabLabel = if (tab.labelRes != 0) stringResource(tab.labelRes) else ""
-    val itemShape = RoundedCornerShape(16.dp)
-    val iconShape = CircleShape
+    val itemShape = RoundedCornerShape(Radius.md)
+    val iconShape = RoundedCornerShape(Radius.sm)
     val iconBoxSize = if (compact) 32.dp else 34.dp
     val iconSize = if (compact) 17.dp else 18.dp
     val labelSlotHeight = if (compact) 18.dp else 20.dp
@@ -521,11 +521,11 @@ private fun BottomTabBarItem(
             if (tabLabel.isNotEmpty()) {
                 Text(
                     text = tabLabel,
-                    fontSize = if (compact) 8.sp else 9.sp,
+                    fontSize = if (compact) 9.sp else 10.sp,
                     color = labelColor,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
-                    lineHeight = if (compact) 9.sp else 10.sp,
+                    lineHeight = if (compact) 10.sp else 11.sp,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -543,7 +543,7 @@ private fun SubMenuGrid(
     val itemsPerRow = 5
     val preferredTileWidth = 76.dp
     val tileHeight = 74.dp
-    val tileShape = RoundedCornerShape(16.dp)
+    val tileShape = RoundedCornerShape(Radius.md)
     val iconBoxSize = 32.dp
     val iconSize = 18.dp
     val labelSlotHeight = 24.dp
@@ -551,7 +551,7 @@ private fun SubMenuGrid(
 
     Surface(
         color = Mocha.Panel,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = Radius.xl, topEnd = Radius.xl),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -608,7 +608,7 @@ private fun SubMenuGrid(
                                     Box(
                                         modifier = Modifier
                                             .size(iconBoxSize)
-                                            .clip(CircleShape)
+                                            .clip(RoundedCornerShape(Radius.sm))
                                             .background(itemAccent.copy(alpha = if (isDisabled) 0.10f else 0.16f)),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -962,7 +962,7 @@ fun EffectSlider(
     val safeValue = if (value.isFinite()) value.coerceIn(rangeStart, rangeEnd) else rangeStart
     Surface(
         color = Mocha.PanelHighest.copy(alpha = 0.92f),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(Radius.md),
         border = BorderStroke(1.dp, Mocha.CardStroke),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1086,7 +1086,7 @@ fun SpeedPanel(
 
             Surface(
                 color = Mocha.Panel,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(Radius.lg),
                 border = BorderStroke(1.dp, Mocha.CardStroke)
             ) {
                 Row(
@@ -1363,7 +1363,7 @@ private fun CropPresetCard(
         modifier = modifier,
         onClick = onClick,
         color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(Radius.lg),
         border = BorderStroke(
             width = 1.dp,
             color = if (isActive) Mocha.Sapphire.copy(alpha = 0.32f) else Mocha.CardStroke
@@ -1391,7 +1391,7 @@ private fun CropPresetCard(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(Radius.md))
                     .background(Mocha.Panel),
                 contentAlignment = Alignment.Center
             ) {
@@ -1677,7 +1677,7 @@ private fun TransformMetricCard(
     Surface(
         modifier = modifier,
         color = Mocha.Panel,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(Radius.md),
         border = BorderStroke(1.dp, Mocha.CardStroke)
     ) {
         Column(

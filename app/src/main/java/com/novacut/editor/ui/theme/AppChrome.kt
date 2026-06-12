@@ -139,7 +139,7 @@ fun NovaCutPrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(Radius.md),
         colors = ButtonDefaults.buttonColors(
             containerColor = Mocha.Rosewater,
             contentColor = Mocha.Midnight,
@@ -179,7 +179,7 @@ fun NovaCutSecondaryButton(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(Radius.md),
         border = BorderStroke(1.dp, colors.cardStrokeStrong),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = colors.panelHighest.copy(alpha = if (colors.highContrast) 0.88f else 0.42f),
@@ -219,11 +219,11 @@ fun NovaCutMetricPill(
     Surface(
         modifier = modifier,
         color = accent.copy(alpha = if (colors.highContrast) 0.26f else 0.12f),
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(Radius.xs),
         border = BorderStroke(1.dp, accent.copy(alpha = if (colors.highContrast) 0.95f else 0.2f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -232,7 +232,7 @@ fun NovaCutMetricPill(
                     imageVector = icon,
                     contentDescription = null,
                     tint = accent,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(13.dp)
                 )
             }
             Text(
@@ -281,7 +281,7 @@ fun NovaCutFilterChip(
         } else {
             null
         },
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(Radius.sm),
         colors = FilterChipDefaults.filterChipColors(
             containerColor = colors.panelHighest,
             labelColor = colors.subtext,
@@ -307,24 +307,35 @@ fun NovaCutChromeIconButton(
     tint: Color = Mocha.Subtext1,
     containerColor: Color = Mocha.PanelHighest,
     borderColor: Color = Mocha.CardStroke,
-    shape: Shape = RoundedCornerShape(Radius.lg),
-    size: Dp = TouchTarget.minimum
+    shape: Shape = RoundedCornerShape(Radius.md),
+    size: Dp = TouchTarget.minimum,
+    enabled: Boolean = true
 ) {
     val colors = LocalNovaCutColors.current
     Surface(
         modifier = modifier,
-        color = containerColor,
+        color = if (enabled) containerColor else colors.panelRaised.copy(alpha = 0.46f),
         shape = shape,
-        border = BorderStroke(1.dp, if (colors.highContrast && borderColor == Mocha.CardStroke) colors.cardStrokeStrong else borderColor)
+        border = BorderStroke(
+            1.dp,
+            if (!enabled) {
+                colors.cardStroke.copy(alpha = 0.46f)
+            } else if (colors.highContrast && borderColor == Mocha.CardStroke) {
+                colors.cardStrokeStrong
+            } else {
+                borderColor
+            }
+        )
     ) {
         IconButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = Modifier.size(size)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = tint,
+                tint = if (enabled) tint else colors.disabledText.copy(alpha = 0.72f),
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -341,7 +352,7 @@ fun NovaCutDialogIcon(
     Surface(
         modifier = modifier,
         color = accent.copy(alpha = if (colors.highContrast) 0.26f else 0.14f),
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(Radius.md),
         border = BorderStroke(1.dp, accent.copy(alpha = if (colors.highContrast) 0.95f else 0.24f))
     ) {
         Icon(
