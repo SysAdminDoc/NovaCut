@@ -8,7 +8,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -36,36 +35,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.novacut.editor.ui.theme.Elevation
+import com.novacut.editor.ui.theme.LocalNovaCutColors
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.Motion
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
 
-/**
- * Severity for toast/snackbar messages. Infers icon and accent color so callers don't have to.
- * Inferred automatically from message text via [inferSeverity] when not explicitly specified.
- */
 enum class ToastSeverity { Info, Success, Warning, Error }
 
-/**
- * Premium snackbar/toast.
- *
- * Replaces the bare Material 3 Snackbar with a more refined treatment:
- *  - Animated slide-up + fade-in entrance, fade-out exit
- *  - Subtle severity-tinted vertical accent stripe (calm, not noisy)
- *  - Severity icon on the leading edge (not color-only — accessible)
- *  - PanelHighest surface + hairline border consistent with the editor's other floating chrome
- *
- * Use [PremiumSnackbarHost] from screen scaffolds; it handles AnimatedVisibility so that
- * messages cleanly come and go instead of popping in.
- */
 @Composable
 fun PremiumSnackbar(
     message: String,
     severity: ToastSeverity = ToastSeverity.Info,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalNovaCutColors.current
     val accent = when (severity) {
         ToastSeverity.Info -> Mocha.Lavender
         ToastSeverity.Success -> Mocha.Green
@@ -78,38 +68,31 @@ fun PremiumSnackbar(
         ToastSeverity.Warning -> Icons.Outlined.WarningAmber
         ToastSeverity.Error -> Icons.Outlined.ErrorOutline
     }
+
     Surface(
-        // wrapContentHeight on the Surface caps the snackbar to the intrinsic height
-        // of its Row content. Without this, the accent stripe's `fillMaxHeight()`
-        // below cascades the ancestor Box's screen-height constraint all the way
-        // down, which stretched the snackbar to cover the full screen (and, being
-        // opaque-ish, absorbed touch input to the play button underneath).
-        modifier = modifier.wrapContentHeight(),
-        color = Mocha.PanelHighest,
-        contentColor = Mocha.Text,
+        modifier = modifier
+            .wrapContentHeight()
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        color = colors.panelHighest,
+        contentColor = colors.text,
         shape = RoundedCornerShape(Radius.lg),
-        border = BorderStroke(1.dp, Mocha.CardStroke),
-        shadowElevation = 8.dp
+        border = BorderStroke(1.dp, if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke),
+        shadowElevation = Elevation.toast
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // IntrinsicSize.Min tells children "you can ask for fillMaxHeight and
-                // you'll get the row's intrinsic (wrap-content) height" rather than
-                // the incoming constraint from above. This is what makes the accent
-                // stripe match the text's line height instead of blowing up to screen.
                 .height(IntrinsicSize.Min)
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            accent.copy(alpha = 0.12f),
+                            accent.copy(alpha = if (colors.highContrast) 0.18f else 0.12f),
                             Color.Transparent
                         )
                     )
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Accent stripe — vertical slim bar carrying the severity color.
             Box(
                 modifier = Modifier
                     .width(3.dp)
@@ -126,11 +109,10 @@ fun PremiumSnackbar(
             Spacer(Modifier.width(Spacing.md))
             Text(
                 text = message,
-                // Body text uses primary Text color, not Subtext, so messages are instantly
-                // readable. Status meaning is carried by the icon + accent stripe (color is
-                // never the only signal — important for accessibility).
-                color = Mocha.Text,
+                color = colors.text,
                 style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = 14.dp, horizontal = Spacing.xs)
@@ -140,10 +122,6 @@ fun PremiumSnackbar(
     }
 }
 
-/**
- * Animated host. Pass the current message + severity from EditorState; this composable handles
- * enter/exit timing so callers don't have to wrap each callsite in their own AnimatedVisibility.
- */
 @Composable
 fun PremiumSnackbarHost(
     message: String?,
@@ -167,12 +145,6 @@ fun PremiumSnackbarHost(
     }
 }
 
-/**
- * Heuristic severity inference. Toast callsites are scattered through 30+ files and most
- * pass plain strings. Rather than refactor every single call to add a severity parameter,
- * this helper extracts a sensible severity from the message text — and callers that *want*
- * to be explicit can still pass [ToastSeverity] directly to [showToast]/[PremiumSnackbar].
- */
 fun inferSeverity(message: String): ToastSeverity {
     val lower = message.lowercase()
     return when {

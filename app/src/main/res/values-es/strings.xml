@@ -112,6 +112,13 @@
     <string name="export_ai_use_title">uso de IA</string>
     <string name="export_ai_use_description">Resume cada edición asistida por IA que la exportación declarará en su sidecar de procedencia.</string>
     <string name="export_ai_use_empty">No se registró asistencia de IA para este proyecto.</string>
+    <string name="export_ai_use_disclose_title">Divulgar uso de IA</string>
+    <string name="export_ai_use_sidecar_title">Escribir sidecar de uso de IA</string>
+    <string name="export_ai_use_sidecar_description">Crea .ai-use.json y un .c2pa-draft-manifest.json sin firmar. Las credenciales de contenido firmadas requieren un firmante configurado.</string>
+    <string name="export_ai_ledger_clear_button">Borrar registro de IA</string>
+    <string name="export_ai_ledger_clear_title">¿Borrar registro de IA?</string>
+    <string name="export_ai_ledger_clear_message">Esto elimina el registro de uso de IA por proyecto que se usa para los valores de divulgación y la exportación sidecar.</string>
+    <string name="export_ai_ledger_clear_action">Borrar registro</string>
     <string name="export_ai_use_chip_format">%1$s · %2$s</string>
     <string name="export_ai_use_severity_required">Divulgar</string>
     <string name="export_ai_use_severity_recommended">Recomendado</string>
@@ -1883,6 +1890,7 @@
     <string name="v369_midi_not_found">No se encontró ningún dispositivo MIDI</string>
     <string name="v369_collapse_format">Contraer %1$s</string>
     <string name="v369_expand_format">Expandir %1$s</string>
+    <string name="trash_title">Papelera</string>
     <string name="trash_empty_button">Vaciar la basura</string>
     <string name="trash_collapse_cd">Colapsar basura</string>
     <string name="trash_expand_cd">Expandir papelera</string>

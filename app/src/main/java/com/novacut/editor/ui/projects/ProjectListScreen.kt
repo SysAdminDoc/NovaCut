@@ -1451,7 +1451,7 @@ private fun TrashSectionHeader(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "Trash",
+                    text = stringResource(R.string.trash_title),
                     color = Mocha.Text,
                     style = MaterialTheme.typography.titleSmall
                 )
