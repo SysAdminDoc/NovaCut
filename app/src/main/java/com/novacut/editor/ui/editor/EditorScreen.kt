@@ -11,6 +11,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -60,6 +62,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import com.novacut.editor.R
@@ -524,6 +527,25 @@ fun EditorScreen(
                 onToggleEditorMode = viewModel::toggleEditorMode,
                 onOpenScratchpad = viewModel::showScratchpad,
                 onOpenV369Features = viewModel::showV369Features
+            )
+
+            val editConfidenceStatus = remember(
+                state.undoStack.size,
+                state.redoStack.size,
+                state.projectSnapshots.size,
+                state.saveIndicator
+            ) {
+                editConfidenceStatusFor(
+                    undoableEdits = state.undoStack.size,
+                    redoableEdits = state.redoStack.size,
+                    restorePoints = state.projectSnapshots.size,
+                    saveIndicator = state.saveIndicator
+                )
+            }
+            EditConfidenceRail(
+                status = editConfidenceStatus,
+                onOpenHistory = viewModel::showUndoHistory,
+                onOpenSnapshots = viewModel::showSnapshotHistory
             )
 
             // Empty project onboarding hint
@@ -1062,6 +1084,136 @@ fun EditorScreen(
             isTutorialOpen = isTutorialOpen
         )
     }
+    }
+}
+
+@Composable
+private fun EditConfidenceRail(
+    status: EditConfidenceStatus,
+    onOpenHistory: () -> Unit,
+    onOpenSnapshots: () -> Unit
+) {
+    val undoLabel = when {
+        status.undoableEdits > 0 && status.redoableEdits > 0 -> stringResource(
+            R.string.edit_confidence_undo_redo,
+            status.undoableEdits,
+            status.redoableEdits
+        )
+        status.undoableEdits > 0 -> pluralStringResource(
+            R.plurals.undo_history_action_count,
+            status.undoableEdits,
+            status.undoableEdits
+        )
+        status.redoableEdits > 0 -> stringResource(R.string.undo_history_newer_count, status.redoableEdits)
+        else -> stringResource(R.string.undo_history_empty)
+    }
+    val snapshotLabel = if (status.restorePoints > 0) {
+        pluralStringResource(
+            R.plurals.panel_snapshot_saved_count,
+            status.restorePoints,
+            status.restorePoints
+        )
+    } else {
+        stringResource(R.string.snapshot_status_empty)
+    }
+    val saveLabel = when (status.saveIndicator) {
+        SaveIndicatorState.SAVING -> stringResource(R.string.autosave_saving)
+        SaveIndicatorState.SAVED -> stringResource(R.string.autosave_saved)
+        SaveIndicatorState.ERROR -> stringResource(R.string.autosave_failed)
+        SaveIndicatorState.HIDDEN -> stringResource(R.string.edit_confidence_autosave_ready)
+    }
+    val saveAccent = when (status.saveIndicator) {
+        SaveIndicatorState.SAVING -> Mocha.Sapphire
+        SaveIndicatorState.SAVED,
+        SaveIndicatorState.HIDDEN -> Mocha.Green
+        SaveIndicatorState.ERROR -> Mocha.Red
+    }
+
+    Surface(
+        color = Mocha.Mantle,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Surface0.copy(alpha = 0.72f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            EditConfidenceChip(
+                label = undoLabel,
+                icon = Icons.Default.History,
+                accent = if (status.hasUndoHistory) Mocha.Mauve else Mocha.Overlay0,
+                onClick = onOpenHistory
+            )
+            EditConfidenceChip(
+                label = snapshotLabel,
+                icon = Icons.Default.Restore,
+                accent = if (status.hasRestorePoints) Mocha.Green else Mocha.Overlay0,
+                onClick = onOpenSnapshots
+            )
+            EditConfidenceChip(
+                label = saveLabel,
+                icon = if (status.saveNeedsAttention) Icons.Default.Warning else Icons.Default.CheckCircle,
+                accent = saveAccent,
+                onClick = null
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditConfidenceChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    onClick: (() -> Unit)?
+) {
+    val chipColor = accent.copy(alpha = if (accent == Mocha.Overlay0) 0.1f else 0.14f)
+    val borderColor = accent.copy(alpha = if (accent == Mocha.Overlay0) 0.22f else 0.28f)
+    val content: @Composable RowScope.() -> Unit = {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = label,
+            color = if (accent == Mocha.Overlay0) Mocha.Subtext0 else Mocha.Text,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1
+        )
+    }
+
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            color = chipColor,
+            shape = RoundedCornerShape(14.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = content
+            )
+        }
+    } else {
+        Surface(
+            color = chipColor,
+            shape = RoundedCornerShape(14.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = content
+            )
+        }
     }
 }
 
