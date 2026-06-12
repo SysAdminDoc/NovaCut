@@ -27,12 +27,15 @@ import com.novacut.editor.engine.TemplateManager
 import com.novacut.editor.engine.MediaImportEngine
 import com.novacut.editor.engine.UserTemplate
 import com.novacut.editor.engine.VideoEngine
+import com.novacut.editor.engine.attachMediaAssetIdsToTracks
+import com.novacut.editor.engine.buildProjectMediaAssets
 import com.novacut.editor.engine.deleteManagedMediaUri
 import com.novacut.editor.engine.importUriToManagedMedia
 import com.novacut.editor.engine.resolveMediaDisplayName
 import com.novacut.editor.engine.sanitizeFileName
 import com.novacut.editor.engine.sweepUnreferencedManagedMedia
 import com.novacut.editor.engine.db.ProjectDao
+import com.novacut.editor.engine.db.toProjectMediaAssetEntities
 import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Clip
 import com.novacut.editor.model.Project
@@ -601,6 +604,10 @@ class ProjectListViewModel @Inject constructor(
                             updatedAt = System.currentTimeMillis()
                         )
                         projectDao.insertProject(newProject)
+                        projectDao.replaceProjectMediaAssets(
+                            newId,
+                            projectDao.getProjectMediaAssetEntities(project.id).map { it.copy(projectId = newId) }
+                        )
                         if (autoSave.copyAutoSave(project.id, newId)) {
                             true
                         } else {
@@ -831,8 +838,17 @@ class ProjectListViewModel @Inject constructor(
         initialState: AutoSaveState
     ): Boolean {
         return try {
+            val mediaAssets = buildProjectMediaAssets(appContext, initialState)
+            val stateWithAssets = initialState.copy(
+                tracks = attachMediaAssetIdsToTracks(initialState.tracks, mediaAssets),
+                mediaAssets = mediaAssets
+            )
             projectDao.insertProject(project)
-            if (autoSave.saveNow(project.id, initialState)) {
+            projectDao.replaceProjectMediaAssets(
+                project.id,
+                stateWithAssets.mediaAssets.toProjectMediaAssetEntities(project.id)
+            )
+            if (autoSave.saveNow(project.id, stateWithAssets)) {
                 true
             } else {
                 projectDao.deleteById(project.id)

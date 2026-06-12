@@ -68,6 +68,7 @@ import com.novacut.editor.engine.buildProjectMediaAssets
 import com.novacut.editor.engine.sanitizeFileName
 import com.novacut.editor.engine.writeUtf8TextAtomically
 import com.novacut.editor.engine.db.ProjectDao
+import com.novacut.editor.engine.db.toProjectMediaAssetEntities
 import com.novacut.editor.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -954,6 +955,7 @@ class EditorViewModel @Inject constructor(
                 showSaveIndicator(com.novacut.editor.model.SaveIndicatorState.SAVING)
                 val s = _state.value
                 val state = buildAutoSaveState(s)
+                persistProjectMediaAssets(state)
                 viewModelScope.launch {
                     delay(500)
                     showSaveIndicator(com.novacut.editor.model.SaveIndicatorState.SAVED)
@@ -4405,6 +4407,19 @@ class EditorViewModel @Inject constructor(
     private fun analyzeMediaHealthForRecovery(recovery: AutoSaveState) =
         MediaHealth.analyze(recovery)
 
+    private fun persistProjectMediaAssets(state: AutoSaveState) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                projectDao.replaceProjectMediaAssets(
+                    state.projectId,
+                    state.mediaAssets.toProjectMediaAssetEntities(state.projectId)
+                )
+            } catch (e: Exception) {
+                Log.w("EditorVM", "Failed to persist media asset manifest for ${state.projectId}", e)
+            }
+        }
+    }
+
     private fun sanitizedProjectFileStem(name: String): String {
         return sanitizeFileName(name, fallback = "NovaCut")
     }
@@ -4422,12 +4437,17 @@ class EditorViewModel @Inject constructor(
                 durationMs = s.totalDurationMs,
                 thumbnailUri = firstClipUri
             )
+            val autoSaveState = buildAutoSaveState(s, project.id)
             projectDao.insertProject(project)
+            projectDao.replaceProjectMediaAssets(
+                project.id,
+                autoSaveState.mediaAssets.toProjectMediaAssetEntities(project.id)
+            )
             _state.update { it.copy(project = project) }
 
             // Persist track/clip data immediately (don't wait for auto-save timer)
             if (recoveryOpenComplete && !autoSaveBlockedByRecovery) {
-                autoSave.saveNow(project.id, buildAutoSaveState(s, project.id))
+                autoSave.saveNow(project.id, autoSaveState)
             }
         }
     }

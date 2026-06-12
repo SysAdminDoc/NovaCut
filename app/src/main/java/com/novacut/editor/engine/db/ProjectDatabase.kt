@@ -4,12 +4,13 @@ import android.util.Log
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.novacut.editor.engine.ProjectMediaAsset
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Resolution
 import kotlinx.coroutines.flow.Flow
 
-@Database(entities = [Project::class], version = 7, exportSchema = true)
+@Database(entities = [Project::class, ProjectMediaAssetEntity::class], version = 8, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class ProjectDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
@@ -50,8 +51,127 @@ abstract class ProjectDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `project_media_assets` (
+                        `projectId` TEXT NOT NULL,
+                        `assetId` TEXT NOT NULL,
+                        `managedUri` TEXT NOT NULL,
+                        `originalUri` TEXT NOT NULL,
+                        `displayName` TEXT,
+                        `mediaType` TEXT NOT NULL,
+                        `mimeType` TEXT,
+                        `sizeBytes` INTEGER NOT NULL,
+                        `durationMs` INTEGER,
+                        `width` INTEGER,
+                        `height` INTEGER,
+                        `quickFingerprint` TEXT,
+                        `importStatus` TEXT NOT NULL,
+                        `lastVerifiedAtEpochMs` INTEGER NOT NULL,
+                        PRIMARY KEY(`projectId`, `assetId`),
+                        FOREIGN KEY(`projectId`) REFERENCES `projects`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_project_media_assets_projectId` ON `project_media_assets` (`projectId`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_project_media_assets_projectId_managedUri` ON `project_media_assets` (`projectId`, `managedUri`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_project_media_assets_projectId_originalUri` ON `project_media_assets` (`projectId`, `originalUri`)"
+                )
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8
+        )
     }
+}
+
+@Entity(
+    tableName = "project_media_assets",
+    primaryKeys = ["projectId", "assetId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = Project::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("projectId"),
+        Index(value = ["projectId", "managedUri"]),
+        Index(value = ["projectId", "originalUri"])
+    ]
+)
+data class ProjectMediaAssetEntity(
+    val projectId: String,
+    val assetId: String,
+    val managedUri: String,
+    val originalUri: String,
+    val displayName: String?,
+    val mediaType: String,
+    val mimeType: String?,
+    val sizeBytes: Long,
+    val durationMs: Long?,
+    val width: Int?,
+    val height: Int?,
+    val quickFingerprint: String?,
+    val importStatus: String,
+    val lastVerifiedAtEpochMs: Long
+)
+
+fun ProjectMediaAsset.toProjectMediaAssetEntity(projectId: String): ProjectMediaAssetEntity {
+    return ProjectMediaAssetEntity(
+        projectId = projectId,
+        assetId = assetId,
+        managedUri = managedUri,
+        originalUri = originalUri,
+        displayName = displayName,
+        mediaType = mediaType,
+        mimeType = mimeType,
+        sizeBytes = sizeBytes,
+        durationMs = durationMs,
+        width = width,
+        height = height,
+        quickFingerprint = quickFingerprint,
+        importStatus = importStatus,
+        lastVerifiedAtEpochMs = lastVerifiedAtEpochMs
+    )
+}
+
+fun ProjectMediaAssetEntity.toProjectMediaAsset(): ProjectMediaAsset {
+    return ProjectMediaAsset(
+        assetId = assetId,
+        managedUri = managedUri,
+        originalUri = originalUri,
+        displayName = displayName,
+        mediaType = mediaType,
+        mimeType = mimeType,
+        sizeBytes = sizeBytes,
+        durationMs = durationMs,
+        width = width,
+        height = height,
+        quickFingerprint = quickFingerprint,
+        importStatus = importStatus,
+        lastVerifiedAtEpochMs = lastVerifiedAtEpochMs
+    )
+}
+
+fun List<ProjectMediaAsset>.toProjectMediaAssetEntities(projectId: String): List<ProjectMediaAssetEntity> {
+    return map { it.toProjectMediaAssetEntity(projectId) }
 }
 
 @Dao
@@ -88,6 +208,23 @@ interface ProjectDao {
 
     @Query("DELETE FROM projects WHERE deletedAtEpochMs IS NOT NULL AND deletedAtEpochMs < :cutoffEpochMs")
     suspend fun purgeTrashedOlderThan(cutoffEpochMs: Long): Int
+
+    @Query("SELECT * FROM project_media_assets WHERE projectId = :projectId ORDER BY assetId")
+    suspend fun getProjectMediaAssetEntities(projectId: String): List<ProjectMediaAssetEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProjectMediaAssets(assets: List<ProjectMediaAssetEntity>)
+
+    @Query("DELETE FROM project_media_assets WHERE projectId = :projectId")
+    suspend fun deleteProjectMediaAssets(projectId: String)
+
+    @Transaction
+    suspend fun replaceProjectMediaAssets(projectId: String, assets: List<ProjectMediaAssetEntity>) {
+        deleteProjectMediaAssets(projectId)
+        if (assets.isNotEmpty()) {
+            insertProjectMediaAssets(assets)
+        }
+    }
 }
 
 class Converters {
