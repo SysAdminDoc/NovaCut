@@ -1778,6 +1778,28 @@
     <string name="recovery_title">Autosaved edit restored</string>
     <string name="recovery_message">NovaCut found autosaved project data newer than the last metadata save and loaded it. Continue after confirming the timeline looks right.</string>
     <string name="recovery_keep">Continue</string>
+    <string name="recovery_media_ready_title">Media ready</string>
+    <plurals name="recovery_media_ready_body">
+        <item quantity="one">%1$d restored media reference is available for editing and export.</item>
+        <item quantity="other">%1$d restored media references are available for editing and export.</item>
+    </plurals>
+    <string name="recovery_media_no_media_title">No media in this recovery</string>
+    <string name="recovery_media_no_media_body">Text, markers, and project settings were restored without linked media.</string>
+    <string name="recovery_media_repair_title">Media needs attention</string>
+    <plurals name="recovery_media_repair_body">
+        <item quantity="one">%1$d restored media item needs repair before preview or export is reliable.</item>
+        <item quantity="other">%1$d restored media items need repair before preview or export is reliable.</item>
+    </plurals>
+    <string name="recovery_media_proxy_title">Preview proxy fallback</string>
+    <plurals name="recovery_media_proxy_body">
+        <item quantity="one">%1$d preview proxy is missing or empty. NovaCut will use source media while the proxy is rebuilt.</item>
+        <item quantity="other">%1$d preview proxies are missing or empty. NovaCut will use source media while proxies are rebuilt.</item>
+    </plurals>
+    <string name="recovery_media_warning_title">Media warnings found</string>
+    <plurals name="recovery_media_warning_body">
+        <item quantity="one">%1$d restored media warning is available in Media Manager.</item>
+        <item quantity="other">%1$d restored media warnings are available in Media Manager.</item>
+    </plurals>
 
     <!-- KeyframeCurveEditor -->
     <string name="cd_keyframe_presets">Presets</string>
