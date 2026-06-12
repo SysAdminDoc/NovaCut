@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -96,11 +97,16 @@ fun BoxScope.EditorUtilityPanelHost(
                 )
             },
             text = {
-                Text(
-                    text = stringResource(R.string.recovery_message),
-                    color = Mocha.Subtext0,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.recovery_message),
+                        color = Mocha.Subtext0,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    recoveryMediaStatusFor(state.media.healthReport)?.let { status ->
+                        RecoveryMediaStatusSummary(status = status)
+                    }
+                }
             },
             confirmButton = {
                 NovaCutPrimaryButton(
@@ -552,6 +558,60 @@ fun BoxScope.EditorUtilityPanelHost(
             playheadMs = playheadMs,
             onTemplateSelected = { template -> viewModel.applyTextTemplate(template) },
             onClose = viewModel::hideTextTemplates
+        )
+    }
+}
+
+@Composable
+private fun RecoveryMediaStatusSummary(status: RecoveryMediaStatus) {
+    val title = when (status.kind) {
+        RecoveryMediaStatusKind.NO_MEDIA -> stringResource(R.string.recovery_media_no_media_title)
+        RecoveryMediaStatusKind.READY -> stringResource(R.string.recovery_media_ready_title)
+        RecoveryMediaStatusKind.NEEDS_REPAIR -> stringResource(R.string.recovery_media_repair_title)
+        RecoveryMediaStatusKind.PROXY_FALLBACK -> stringResource(R.string.recovery_media_proxy_title)
+        RecoveryMediaStatusKind.WARNINGS -> stringResource(R.string.recovery_media_warning_title)
+    }
+    val body = when (status.kind) {
+        RecoveryMediaStatusKind.NO_MEDIA -> stringResource(R.string.recovery_media_no_media_body)
+        RecoveryMediaStatusKind.READY -> pluralStringResource(
+            R.plurals.recovery_media_ready_body,
+            status.totalReferences,
+            status.totalReferences
+        )
+        RecoveryMediaStatusKind.NEEDS_REPAIR -> pluralStringResource(
+            R.plurals.recovery_media_repair_body,
+            status.blockingCount,
+            status.blockingCount
+        )
+        RecoveryMediaStatusKind.PROXY_FALLBACK -> pluralStringResource(
+            R.plurals.recovery_media_proxy_body,
+            status.warningCount,
+            status.warningCount
+        )
+        RecoveryMediaStatusKind.WARNINGS -> pluralStringResource(
+            R.plurals.recovery_media_warning_body,
+            status.warningCount,
+            status.warningCount
+        )
+    }
+    val accent = when (status.kind) {
+        RecoveryMediaStatusKind.NEEDS_REPAIR -> Mocha.Red
+        RecoveryMediaStatusKind.PROXY_FALLBACK,
+        RecoveryMediaStatusKind.WARNINGS -> Mocha.Yellow
+        RecoveryMediaStatusKind.NO_MEDIA,
+        RecoveryMediaStatusKind.READY -> Mocha.Green
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = title,
+            color = accent,
+            style = MaterialTheme.typography.titleSmall
+        )
+        Text(
+            text = body,
+            color = Mocha.Subtext0,
+            style = MaterialTheme.typography.bodySmall
         )
     }
 }

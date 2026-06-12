@@ -1586,6 +1586,28 @@
     <string name="recovery_title">Edición guardada automáticamente restaurada</string>
     <string name="recovery_message">NovaCut encontró datos del proyecto guardados automáticamente más recientes que los últimos metadatos guardados y los cargó. Continúe después de confirmar que la línea de tiempo se ve correcta.</string>
     <string name="recovery_keep">Continuar</string>
+    <string name="recovery_media_ready_title">Medios listos</string>
+    <plurals name="recovery_media_ready_body">
+        <item quantity="one">%1$d referencia de medios restaurada está disponible para editar y exportar.</item>
+        <item quantity="other">%1$d referencias de medios restauradas están disponibles para editar y exportar.</item>
+    </plurals>
+    <string name="recovery_media_no_media_title">No hay medios en esta recuperación</string>
+    <string name="recovery_media_no_media_body">El texto, los marcadores y los ajustes del proyecto se restauraron sin medios vinculados.</string>
+    <string name="recovery_media_repair_title">Los medios necesitan atención</string>
+    <plurals name="recovery_media_repair_body">
+        <item quantity="one">%1$d elemento de medios restaurado necesita reparación antes de que la vista previa o la exportación sean confiables.</item>
+        <item quantity="other">%1$d elementos de medios restaurados necesitan reparación antes de que la vista previa o la exportación sean confiables.</item>
+    </plurals>
+    <string name="recovery_media_proxy_title">Respaldo de proxy de vista previa</string>
+    <plurals name="recovery_media_proxy_body">
+        <item quantity="one">Falta %1$d proxy de vista previa o está vacío. NovaCut usará los medios de origen mientras se reconstruye el proxy.</item>
+        <item quantity="other">Faltan %1$d proxies de vista previa o están vacíos. NovaCut usará los medios de origen mientras se reconstruyen los proxies.</item>
+    </plurals>
+    <string name="recovery_media_warning_title">Se encontraron advertencias de medios</string>
+    <plurals name="recovery_media_warning_body">
+        <item quantity="one">%1$d advertencia de medios restaurados está disponible en el Administrador de Medios.</item>
+        <item quantity="other">%1$d advertencias de medios restaurados están disponibles en el Administrador de Medios.</item>
+    </plurals>
     <string name="cd_keyframe_presets">Preajustes</string>
     <string name="cd_keyframe_delete">Eliminar fotograma clave</string>
     <string name="keyframe_preset_ken_burns">Ken Burns</string>
