@@ -1211,6 +1211,8 @@
     <string name="autosave_saving">Guardando\u2026</string>
     <string name="autosave_saved">Guardado</string>
     <string name="autosave_failed">Error al guardar</string>
+    <string name="edit_confidence_autosave_ready">Autoguardado listo</string>
+    <string name="edit_confidence_undo_redo">%1$d deshacer / %2$d rehacer</string>
     <string name="clip_label">Etiqueta</string>
     <string name="clip_label_none">Sin etiqueta</string>
     <string name="collapse_all_tracks">Contraer todas las pistas</string>

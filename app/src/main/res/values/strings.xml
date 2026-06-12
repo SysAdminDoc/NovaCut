@@ -1315,6 +1315,8 @@
     <string name="autosave_saving">Saving\u2026</string>
     <string name="autosave_saved">Saved</string>
     <string name="autosave_failed">Save failed</string>
+    <string name="edit_confidence_autosave_ready">Autosave ready</string>
+    <string name="edit_confidence_undo_redo">%1$d undo / %2$d redo</string>
 
     <!-- Clip Labels -->
     <string name="clip_label">Label</string>
