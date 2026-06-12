@@ -82,6 +82,7 @@ import com.novacut.editor.model.Watermark
 import com.novacut.editor.model.WatermarkPosition
 import com.novacut.editor.ui.NovaCutTestTags
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.NovaCutDialogIcon
 import com.novacut.editor.ui.theme.NovaCutPrimaryButton
 import com.novacut.editor.ui.theme.NovaCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
@@ -248,9 +249,15 @@ fun ExportSheet(
     if (showClearAiLedgerConfirm) {
         AlertDialog(
             onDismissRequest = { showClearAiLedgerConfirm = false },
-            title = { Text("Clear AI ledger") },
+            icon = {
+                NovaCutDialogIcon(
+                    icon = Icons.Default.AutoAwesome,
+                    accent = Mocha.Mauve
+                )
+            },
+            title = { Text(stringResource(R.string.export_ai_ledger_clear_title)) },
             text = {
-                Text("This removes the per-project AI usage record used for disclosure defaults and sidecar export.")
+                Text(stringResource(R.string.export_ai_ledger_clear_message))
             },
             confirmButton = {
                 TextButton(
@@ -259,7 +266,7 @@ fun ExportSheet(
                         showClearAiLedgerConfirm = false
                     }
                 ) {
-                    Text("Clear")
+                    Text(stringResource(R.string.export_ai_ledger_clear_action))
                 }
             },
             dismissButton = {
@@ -634,11 +641,11 @@ fun ExportSheet(
 
                 ExportToggleRow(
                     icon = Icons.Default.AutoAwesome,
-                    title = "Disclose AI use",
+                    title = stringResource(R.string.export_ai_use_disclose_title),
                     description = if (hasAiUsage) {
                         aiDisclosureSummary
                     } else {
-                        "No AI assistance recorded for this project."
+                        stringResource(R.string.export_ai_use_empty)
                     },
                     checked = config.discloseAiUse && hasAiUsage,
                     enabled = hasAiUsage,
@@ -656,10 +663,8 @@ fun ExportSheet(
                 if (config.discloseAiUse && hasAiUsage) {
                     ExportToggleRow(
                         icon = Icons.AutoMirrored.Filled.Notes,
-                        title = "Write AI-use sidecar",
-                        description = "Creates .ai-use.json and an unsigned " +
-                            ".c2pa-draft-manifest.json; signed Content " +
-                            "Credentials need a configured signer.",
+                        title = stringResource(R.string.export_ai_use_sidecar_title),
+                        description = stringResource(R.string.export_ai_use_sidecar_description),
                         checked = config.writeAiUseSidecar,
                         onCheckedChange = {
                             onConfigChanged(config.copy(writeAiUseSidecar = it))
@@ -673,7 +678,10 @@ fun ExportSheet(
                         onClick = { showClearAiLedgerConfirm = true },
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("Clear AI ledger", color = Mocha.Red)
+                        Text(
+                            text = stringResource(R.string.export_ai_ledger_clear_button),
+                            color = Mocha.Red
+                        )
                     }
                 }
             }

@@ -126,6 +126,13 @@
     <string name="export_ai_use_title">AI use</string>
     <string name="export_ai_use_description">Summarises every AI-assisted edit the export will declare in its provenance sidecar.</string>
     <string name="export_ai_use_empty">No AI assistance recorded for this project.</string>
+    <string name="export_ai_use_disclose_title">Disclose AI use</string>
+    <string name="export_ai_use_sidecar_title">Write AI-use sidecar</string>
+    <string name="export_ai_use_sidecar_description">Creates .ai-use.json and an unsigned .c2pa-draft-manifest.json. Signed Content Credentials require a configured signer.</string>
+    <string name="export_ai_ledger_clear_button">Clear AI ledger</string>
+    <string name="export_ai_ledger_clear_title">Clear AI ledger?</string>
+    <string name="export_ai_ledger_clear_message">This removes the per-project AI-use record used for disclosure defaults and sidecar export.</string>
+    <string name="export_ai_ledger_clear_action">Clear ledger</string>
     <string name="export_ai_use_chip_format">%1$s · %2$s</string>
     <string name="export_ai_use_severity_required">Disclose</string>
     <string name="export_ai_use_severity_recommended">Recommended</string>
@@ -2155,6 +2162,7 @@
     <string name="v369_expand_format">Expand %1$s</string>
 
     <!-- Project trash -->
+    <string name="trash_title">Trash</string>
     <string name="trash_empty_button">Empty trash</string>
     <string name="trash_collapse_cd">Collapse trash</string>
     <string name="trash_expand_cd">Expand trash</string>

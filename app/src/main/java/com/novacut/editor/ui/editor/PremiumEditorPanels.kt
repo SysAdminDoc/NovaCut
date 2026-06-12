@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -35,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
-import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.LocalNovaCutColors
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
 import com.novacut.editor.ui.theme.TouchTarget
@@ -54,6 +55,7 @@ fun PremiumEditorPanel(
     headerActions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val colors = LocalNovaCutColors.current
     val scrollModifier = if (scrollable) {
         Modifier.verticalScroll(rememberScrollState())
     } else {
@@ -64,20 +66,21 @@ fun PremiumEditorPanel(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                Mocha.Panel,
+                colors.panel,
                 RoundedCornerShape(topStart = Radius.xxl, topEnd = Radius.xxl)
             )
             .then(scrollModifier)
             .padding(horizontal = Spacing.lg, vertical = 14.dp)
     ) {
-        // Drag handle — slightly slimmer + dimmer than before. Premium sheets use a quiet,
-        // single-pixel-feeling pill that suggests gesture without competing for attention.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .width(36.dp)
                 .height(3.dp)
-                .background(Mocha.Surface2.copy(alpha = 0.55f), RoundedCornerShape(Radius.sm))
+                .background(
+                    colors.cardStrokeStrong.copy(alpha = if (colors.highContrast) 0.55f else 0.28f),
+                    RoundedCornerShape(Radius.sm)
+                )
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -87,9 +90,12 @@ fun PremiumEditorPanel(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                color = accent.copy(alpha = 0.14f),
+                color = accent.copy(alpha = if (colors.highContrast) 0.24f else 0.14f),
                 shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))
+                border = BorderStroke(
+                    1.dp,
+                    accent.copy(alpha = if (colors.highContrast) 0.52f else 0.22f)
+                )
             ) {
                 Box(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -109,7 +115,7 @@ fun PremiumEditorPanel(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = Mocha.Text,
+                    color = colors.text,
                     style = MaterialTheme.typography.headlineMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -117,7 +123,7 @@ fun PremiumEditorPanel(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    color = Mocha.Subtext0,
+                    color = colors.subtext,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -149,24 +155,24 @@ fun PremiumPanelCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val colors = LocalNovaCutColors.current
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Mocha.PanelHighest,
-        // Slightly tighter radius (was 24) — feels more disciplined and matches the
-        // shared Radius.xl token used elsewhere in the system.
+        color = colors.panelHighest,
         shape = RoundedCornerShape(Radius.xl),
-        border = BorderStroke(1.dp, Mocha.CardStrokeStrong.copy(alpha = 0.9f))
+        border = BorderStroke(
+            1.dp,
+            if (colors.highContrast) colors.cardStrokeStrong else colors.cardStrokeStrong.copy(alpha = 0.86f)
+        )
     ) {
         Box(
             modifier = Modifier.background(
-                // Restrained accent wash: just a hint of color at the top edge that fades out.
-                // The previous 3-stop gradient produced a visible "fold" line in the middle of
-                // every panel card; this single soft fade reads as premium tinted-glass instead.
                 Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0f to accent.copy(alpha = 0.10f),
-                        0.55f to Mocha.PanelHighest,
-                        1f to Mocha.PanelHighest
+                        0f to accent.copy(alpha = if (colors.highContrast) 0.16f else 0.10f),
+                        0.54f to colors.panelHighest,
+                        1f to colors.panelRaised.copy(alpha = 0.96f)
                     )
                 )
             )
@@ -180,20 +186,19 @@ fun PremiumPanelCard(
     }
 }
 
-/**
- * Thin hairline divider for separating sections inside a PremiumPanelCard.
- * Slightly translucent to layer cleanly over the card's accent gradient.
- */
 @Composable
 fun PremiumHairlineDivider(
     modifier: Modifier = Modifier,
-    color: Color = Mocha.CardStroke
+    color: Color = Color.Unspecified
 ) {
+    val colors = LocalNovaCutColors.current
+    val resolvedColor = if (color == Color.Unspecified) colors.cardStroke else color
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(color.copy(alpha = 0.6f))
+            .background(resolvedColor.copy(alpha = if (colors.highContrast) 0.9f else 0.6f))
     )
 }
 
@@ -203,16 +208,20 @@ fun PremiumPanelPill(
     accent: Color,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalNovaCutColors.current
+
     Surface(
-        modifier = modifier,
-        color = accent.copy(alpha = 0.12f),
+        modifier = modifier.defaultMinSize(minHeight = 32.dp),
+        color = accent.copy(alpha = if (colors.highContrast) 0.22f else 0.12f),
         shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
+        border = BorderStroke(1.dp, accent.copy(alpha = if (colors.highContrast) 0.48f else 0.2f))
     ) {
         Text(
             text = text,
             color = accent,
             style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
     }
@@ -224,20 +233,29 @@ fun PremiumPanelIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Mocha.Subtext0,
-    containerColor: Color = Mocha.PanelHighest
+    tint: Color = Color.Unspecified,
+    containerColor: Color = Color.Unspecified,
+    enabled: Boolean = true
 ) {
+    val colors = LocalNovaCutColors.current
+    val resolvedContainer = if (containerColor == Color.Unspecified) colors.panelHighest else containerColor
+    val resolvedTint = if (tint == Color.Unspecified) colors.subtext else tint
+
     Surface(
         modifier = modifier,
-        color = containerColor,
+        color = resolvedContainer,
         shape = RoundedCornerShape(Radius.lg),
-        border = BorderStroke(1.dp, Mocha.CardStroke)
+        border = BorderStroke(1.dp, if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke)
     ) {
-        IconButton(onClick = onClick, modifier = Modifier.size(TouchTarget.minimum)) {
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.size(TouchTarget.minimum)
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = tint,
+                tint = if (enabled) resolvedTint else colors.disabledText.copy(alpha = 0.72f),
                 modifier = Modifier.size(18.dp)
             )
         }
