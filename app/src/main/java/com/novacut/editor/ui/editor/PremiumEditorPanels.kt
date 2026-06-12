@@ -91,7 +91,7 @@ fun PremiumEditorPanel(
         ) {
             Surface(
                 color = accent.copy(alpha = if (colors.highContrast) 0.24f else 0.14f),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(Radius.md),
                 border = BorderStroke(
                     1.dp,
                     accent.copy(alpha = if (colors.highContrast) 0.52f else 0.22f)
@@ -160,7 +160,7 @@ fun PremiumPanelCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = colors.panelHighest,
-        shape = RoundedCornerShape(Radius.xl),
+        shape = RoundedCornerShape(Radius.lg),
         border = BorderStroke(
             1.dp,
             if (colors.highContrast) colors.cardStrokeStrong else colors.cardStrokeStrong.copy(alpha = 0.86f)
@@ -211,9 +211,9 @@ fun PremiumPanelPill(
     val colors = LocalNovaCutColors.current
 
     Surface(
-        modifier = modifier.defaultMinSize(minHeight = 32.dp),
+        modifier = modifier.defaultMinSize(minHeight = 30.dp),
         color = accent.copy(alpha = if (colors.highContrast) 0.22f else 0.12f),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.xs),
         border = BorderStroke(1.dp, accent.copy(alpha = if (colors.highContrast) 0.48f else 0.2f))
     ) {
         Text(
@@ -222,7 +222,7 @@ fun PremiumPanelPill(
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
         )
     }
 }
@@ -244,7 +244,7 @@ fun PremiumPanelIconButton(
     Surface(
         modifier = modifier,
         color = resolvedContainer,
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(Radius.md),
         border = BorderStroke(1.dp, if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke)
     ) {
         IconButton(

@@ -894,7 +894,7 @@ private fun SettingsOverviewStat(
     Surface(
         modifier = modifier,
         color = accent.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(Radius.xl),
+        shape = RoundedCornerShape(Radius.md),
         border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.18f))
     ) {
         Column(
@@ -927,6 +927,7 @@ private fun SettingsFeedbackBanner(
     iconOverride: ImageVector? = null,
     onDismiss: () -> Unit
 ) {
+    val colors = LocalNovaCutColors.current
     val accent = accentOverride ?: if (isError) Mocha.Red else Mocha.Green
     val icon = iconOverride ?: if (isError) Icons.Default.Error else Icons.Default.CheckCircle
     Surface(
@@ -934,12 +935,21 @@ private fun SettingsFeedbackBanner(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
             .semantics { liveRegion = LiveRegionMode.Polite },
-        color = accent.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(Radius.lg),
-        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.22f))
+        color = colors.panelHighest,
+        shape = RoundedCornerShape(Radius.md),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.28f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            accent.copy(alpha = if (colors.highContrast) 0.18f else 0.11f),
+                            colors.panelHighest
+                        )
+                    )
+                )
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1303,7 +1313,7 @@ private fun SettingsSection(
         )
         Card(
             colors = CardDefaults.cardColors(containerColor = colors.panel),
-            shape = RoundedCornerShape(Radius.xl),
+            shape = RoundedCornerShape(Radius.lg),
             border = androidx.compose.foundation.BorderStroke(
                 1.dp,
                 if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke.copy(alpha = 0.85f)
@@ -1430,7 +1440,7 @@ private fun SettingsSlider(
     var localValue by remember(value) { mutableStateOf(value) }
     Surface(
         color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(Radius.md),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f))
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
@@ -1528,9 +1538,18 @@ private fun SettingsActionRow(
         onClick = onClick,
         modifier = modifier
     ) {
-        NovaCutMetricPill(
+        Text(
             text = actionLabel,
-            accent = accent
+            color = accent,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -1618,7 +1637,7 @@ private fun SettingsTile(
 ) {
     Surface(
         color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(Radius.md),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f))
     ) {
         Row(
@@ -1676,7 +1695,7 @@ private fun SettingsTileIcon(
 ) {
     Surface(
         color = accent.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(Radius.sm),
         border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.2f))
     ) {
         Icon(

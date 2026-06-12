@@ -1,0 +1,4 @@
+- Premium UX polish
+- Tightened shared control chrome with smaller-radius buttons, compact status labels, icon buttons, dialog icons, and panel cards across home, editor, and settings.
+- Refined the editor bottom tool bar and sub-menu grid with rectangular icon tiles, more legible compact labels, and clearer selected/disabled states.
+- Improved project home and settings hierarchy with stronger primary-action weight, sharper empty states, and explicit navigation affordances.

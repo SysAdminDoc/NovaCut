@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -531,7 +530,7 @@ private fun ProjectHomeHero(
 ) {
     NovaCutHeroCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(bottomStart = Radius.xxl, bottomEnd = Radius.xxl),
+        shape = RoundedCornerShape(bottomStart = Radius.xl, bottomEnd = Radius.xl),
         accent = Mocha.Mauve
     ) {
         Row(
@@ -564,7 +563,7 @@ private fun ProjectHomeHero(
             style = MaterialTheme.typography.bodyLarge
         )
 
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             item {
                 HeroMetricPill(
                     label = stringResource(
@@ -656,7 +655,7 @@ private fun ProjectHomeHero(
         }
 
         if (showSortControls) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 items(SortMode.entries.toList()) { mode ->
                     NovaCutFilterChip(
                         onClick = { onSortModeChanged(mode) },
@@ -688,17 +687,17 @@ private fun ProjectOperationCard(
     Surface(
         modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
         color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(Radius.xl),
+        shape = RoundedCornerShape(Radius.lg),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Mauve.copy(alpha = 0.26f))
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Surface(
                     color = Mocha.Mauve.copy(alpha = 0.14f),
@@ -746,7 +745,7 @@ private fun ProjectFilterChipsRow(
 ) {
     LazyRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         contentPadding = PaddingValues(horizontal = 0.dp)
     ) {
         items(ProjectFilterMode.entries.toList()) { mode ->
@@ -778,7 +777,7 @@ private fun ProjectEmptyState(
 
     Surface(
         color = Mocha.Panel,
-        shape = RoundedCornerShape(Radius.xxl),
+        shape = RoundedCornerShape(Radius.xl),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f)),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -792,7 +791,7 @@ private fun ProjectEmptyState(
                         )
                     )
                 )
-                .padding(horizontal = 24.dp, vertical = 28.dp)
+                .padding(horizontal = Spacing.xxl, vertical = Spacing.xxxl)
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -804,7 +803,7 @@ private fun ProjectEmptyState(
                     } else {
                         Mocha.Mauve.copy(alpha = 0.14f)
                     },
-                    shape = CircleShape,
+                    shape = RoundedCornerShape(Radius.lg),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
                         if (isConstrainedEmpty) {
@@ -819,7 +818,7 @@ private fun ProjectEmptyState(
                         contentDescription = null,
                         tint = if (isConstrainedEmpty) Mocha.Sapphire else Mocha.Rosewater,
                         modifier = Modifier
-                            .padding(18.dp)
+                            .padding(Spacing.lg)
                             .size(30.dp)
                     )
                 }
@@ -956,7 +955,7 @@ private fun ProjectActionRow(
                     onClick = onPrimary,
                     enabled = enabled,
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1.15f)
                         .then(primaryTestTag?.let { Modifier.testTag(it) } ?: Modifier)
                 )
                 NovaCutSecondaryButton(
@@ -1050,7 +1049,7 @@ private fun ProjectCard(
                 },
             colors = CardDefaults.cardColors(containerColor = Mocha.Panel),
             border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f)),
-            shape = RoundedCornerShape(Radius.xl)
+            shape = RoundedCornerShape(Radius.lg)
         ) {
             Box(
                 modifier = Modifier
@@ -1238,7 +1237,7 @@ private fun ProjectCard(
             containerColor = Mocha.PanelHighest,
             titleContentColor = Mocha.Text,
             textContentColor = Mocha.Subtext0,
-            shape = RoundedCornerShape(Radius.xxl)
+            shape = RoundedCornerShape(Radius.xl)
         )
     }
 
@@ -1332,7 +1331,7 @@ private fun ProjectCard(
             containerColor = Mocha.PanelHighest,
             titleContentColor = Mocha.Text,
             textContentColor = Mocha.Subtext0,
-            shape = RoundedCornerShape(Radius.xxl)
+            shape = RoundedCornerShape(Radius.xl)
         )
     }
 }
@@ -1344,7 +1343,7 @@ private fun ProjectThumbnail(project: Project) {
     Box(
         modifier = Modifier
             .size(92.dp)
-            .clip(RoundedCornerShape(Radius.xl))
+            .clip(RoundedCornerShape(Radius.lg))
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -1424,7 +1423,7 @@ private fun TrashSectionHeader(
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onToggle),
         color = Mocha.Panel,
-        shape = RoundedCornerShape(Radius.xl),
+        shape = RoundedCornerShape(Radius.lg),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f))
     ) {
         Row(
@@ -1540,7 +1539,7 @@ private fun TrashedProjectCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Mocha.Panel.copy(alpha = 0.72f),
-        shape = RoundedCornerShape(Radius.xl),
+        shape = RoundedCornerShape(Radius.lg),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.72f))
     ) {
         Row(
