@@ -54,6 +54,7 @@ import com.novacut.editor.engine.TimelineExchangeValidator
 import com.novacut.editor.engine.ProxyWorkflowEngine
 import com.novacut.editor.engine.MultiCamEngine
 import com.novacut.editor.engine.MediaImportEngine
+import com.novacut.editor.engine.MediaHealth
 import com.novacut.editor.engine.MediaRelinkProbe
 import com.novacut.editor.engine.OverlayAssetImportResult
 import com.novacut.editor.engine.OverlayAssetStore
@@ -862,6 +863,7 @@ class EditorViewModel @Inject constructor(
         val hadContent = recovery.tracks.any { it.clips.isNotEmpty() } ||
             recovery.textOverlays.isNotEmpty() ||
             recovery.imageOverlays.isNotEmpty()
+        val mediaHealthReport = MediaHealth.analyze(recovery)
         val showRecoveryDialog = shouldShowRecoveryDialog(
             projectUpdatedAtMs = _state.value.project.updatedAt,
             recoveryTimestampMs = recovery.timestamp,
@@ -880,6 +882,7 @@ class EditorViewModel @Inject constructor(
                 v369 = current.v369.copy(transcript = recovery.transcript ?: current.v369.transcript),
                 trackedObjects = recovery.trackedObjects.ifEmpty { current.trackedObjects },
                 ai = current.ai.copy(usageLedger = recovery.aiUsageLedger),
+                media = current.media.copy(healthReport = mediaHealthReport),
                 totalDurationMs = recovery.tracks.maxOfOrNull { t ->
                     t.clips.maxOfOrNull { c -> c.timelineEndMs } ?: 0L
                 } ?: 0L

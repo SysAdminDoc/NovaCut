@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.novacut.editor.R
+import com.novacut.editor.engine.MediaHealthReport
 import com.novacut.editor.engine.MediaRelinkProbe
 import com.novacut.editor.model.Clip
 import com.novacut.editor.model.Track
@@ -66,6 +67,7 @@ data class MediaAsset(
 fun MediaManagerPanel(
     tracks: List<Track>,
     relinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport>,
+    mediaHealthReport: MediaHealthReport?,
     onJumpToClip: (String) -> Unit,
     onRelinkMedia: (Uri) -> Unit,
     onRemoveUnused: () -> Unit,
@@ -86,11 +88,18 @@ fun MediaManagerPanel(
 
     val totalSize = assets.sumOf { it.fileSize }
     val missingCount = assets.count { !it.isAccessible }
+    val healthBlockingCount = mediaHealthReport?.blockingCount ?: 0
+    val healthWarningCount = mediaHealthReport?.warningCount ?: 0
     val emptyTrackCount = remember(tracks) {
         tracks.count { it.index >= 2 && it.clips.isEmpty() }
     }
     val statusLabel = when {
         isAnalyzing -> stringResource(R.string.media_manager_status_scanning)
+        healthBlockingCount > 0 -> pluralStringResource(
+            R.plurals.media_health_blocking_count,
+            healthBlockingCount,
+            healthBlockingCount
+        )
         missingCount > 0 -> pluralStringResource(
             R.plurals.media_manager_status_missing_count,
             missingCount,
@@ -105,9 +114,25 @@ fun MediaManagerPanel(
     }
     val statusAccent = when {
         isAnalyzing -> Mocha.Blue
+        healthBlockingCount > 0 -> Mocha.Red
         missingCount > 0 -> Mocha.Red
+        healthWarningCount > 0 -> Mocha.Peach
         emptyTrackCount > 0 -> Mocha.Yellow
         else -> Mocha.Green
+    }
+    val projectHealthLabel = when {
+        mediaHealthReport == null -> stringResource(R.string.media_health_unavailable)
+        healthBlockingCount > 0 -> pluralStringResource(
+            R.plurals.media_health_blocking_count,
+            healthBlockingCount,
+            healthBlockingCount
+        )
+        healthWarningCount > 0 -> pluralStringResource(
+            R.plurals.media_health_warning_count,
+            healthWarningCount,
+            healthWarningCount
+        )
+        else -> stringResource(R.string.media_health_ready)
     }
     val assetCountLabel = pluralStringResource(
         R.plurals.media_manager_asset_count,
@@ -187,6 +212,17 @@ fun MediaManagerPanel(
                     title = stringResource(R.string.media_stat_missing),
                     value = if (isAnalyzing) "..." else missingCount.toString(),
                     accent = if (missingCount > 0) Mocha.Red else Mocha.Green,
+                    modifier = Modifier.widthIn(min = 132.dp)
+                )
+                MediaHealthMetric(
+                    title = stringResource(R.string.media_stat_project_health),
+                    value = projectHealthLabel,
+                    accent = when {
+                        healthBlockingCount > 0 -> Mocha.Red
+                        healthWarningCount > 0 -> Mocha.Peach
+                        mediaHealthReport == null -> Mocha.Overlay1
+                        else -> Mocha.Green
+                    },
                     modifier = Modifier.widthIn(min = 132.dp)
                 )
                 MediaHealthMetric(

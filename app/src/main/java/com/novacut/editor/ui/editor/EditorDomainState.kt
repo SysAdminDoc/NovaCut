@@ -5,6 +5,7 @@ import com.novacut.editor.engine.AiUsageLedger
 import com.novacut.editor.engine.CaptionTranslationEngine
 import com.novacut.editor.engine.CutAssistantEngine
 import com.novacut.editor.engine.MediaRelinkProbe
+import com.novacut.editor.engine.MediaHealthReport
 import com.novacut.editor.engine.SmartRenderEngine
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.model.BatchExportItem
@@ -91,7 +92,8 @@ data class EditorAiState(
 data class EditorMediaState(
     val backupImportFeedback: BackupImportFeedback? = null,
     val timelineExchangeFeedback: TimelineExchangeFeedback? = null,
-    val relinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport> = emptyMap()
+    val relinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport> = emptyMap(),
+    val healthReport: MediaHealthReport? = null
 ) : EditorDomainState {
     override val kind: EditorDomainState.Kind = EditorDomainState.Kind.MEDIA
 }
