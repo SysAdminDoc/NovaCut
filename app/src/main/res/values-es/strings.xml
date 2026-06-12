@@ -1145,6 +1145,16 @@
     <string name="media_manager_health_description">Compruebe qué está vinculado, qué está fuera de línea y si se pueden eliminar pistas vacías de la pila.</string>
     <string name="media_manager_status_scanning">Escaneo</string>
     <string name="media_manager_status_healthy">saludable</string>
+    <string name="media_health_ready">Listo</string>
+    <string name="media_health_unavailable">No verificado</string>
+    <plurals name="media_health_blocking_count">
+        <item quantity="one">%1$d bloqueo</item>
+        <item quantity="other">%1$d bloqueos</item>
+    </plurals>
+    <plurals name="media_health_warning_count">
+        <item quantity="one">%1$d advertencia</item>
+        <item quantity="other">%1$d advertencias</item>
+    </plurals>
     <plurals name="media_manager_status_missing_count">
         <item quantity="one">%1$d problema</item>
         <item quantity="other">%1$d problemas</item>
@@ -1543,6 +1553,7 @@
     <string name="media_stat_assets">Activos</string>
     <string name="media_stat_size">Tamaño</string>
     <string name="media_stat_missing">desaparecido</string>
+    <string name="media_stat_project_health">Estado del proyecto</string>
     <string name="media_stat_empty_tracks">Pistas vacías</string>
     <string name="media_used_count">Usado %1$dx</string>
     <string name="media_goto_first_use">Ir al primer uso</string>

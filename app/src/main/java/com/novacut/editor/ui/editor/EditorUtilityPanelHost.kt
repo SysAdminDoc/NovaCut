@@ -235,6 +235,7 @@ fun BoxScope.EditorUtilityPanelHost(
         MediaManagerPanel(
             tracks = state.tracks,
             relinkReports = state.mediaRelinkReports,
+            mediaHealthReport = state.media.healthReport,
             onJumpToClip = viewModel::jumpToClip,
             onRelinkMedia = onRelinkMedia,
             onRemoveUnused = viewModel::removeUnusedMedia,

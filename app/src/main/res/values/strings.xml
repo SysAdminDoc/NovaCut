@@ -1245,6 +1245,16 @@
     <string name="media_manager_health_description">Check what is linked, what is offline, and whether any empty tracks can be trimmed out of the stack.</string>
     <string name="media_manager_status_scanning">Scanning</string>
     <string name="media_manager_status_healthy">Healthy</string>
+    <string name="media_health_ready">Ready</string>
+    <string name="media_health_unavailable">Not checked</string>
+    <plurals name="media_health_blocking_count">
+        <item quantity="one">%1$d blocker</item>
+        <item quantity="other">%1$d blockers</item>
+    </plurals>
+    <plurals name="media_health_warning_count">
+        <item quantity="one">%1$d warning</item>
+        <item quantity="other">%1$d warnings</item>
+    </plurals>
     <plurals name="media_manager_status_missing_count">
         <item quantity="one">%1$d issue</item>
         <item quantity="other">%1$d issues</item>
@@ -1723,6 +1733,7 @@
     <string name="media_stat_assets">Assets</string>
     <string name="media_stat_size">Size</string>
     <string name="media_stat_missing">Missing</string>
+    <string name="media_stat_project_health">Project Health</string>
     <string name="media_stat_empty_tracks">Empty Tracks</string>
     <string name="media_used_count">Used %1$dx</string>
     <string name="media_goto_first_use">Go to first use</string>
