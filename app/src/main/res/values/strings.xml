@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.74.91</string>
+    <string name="app_version">v3.74.92</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -1663,6 +1663,7 @@
     <string name="cd_smart_reframe">Smart reframe</string>
     <string name="cd_clip_thumbnail">Clip thumbnail</string>
     <string name="cd_clip_source_missing">Clip source missing</string>
+    <string name="cd_clip_locked">Locked</string>
     <string name="cd_tts_preview">Preview speech</string>
 
     <!-- Settings — v3.13.0 string extraction -->

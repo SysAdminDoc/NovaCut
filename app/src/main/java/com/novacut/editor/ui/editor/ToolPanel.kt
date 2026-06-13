@@ -347,7 +347,7 @@ private fun BottomTabBar(
             if (fitAllTabs) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     tabs.forEach { tab ->
                         BottomTabBarItem(
@@ -379,8 +379,8 @@ private fun BottomTabBar(
                     LazyRow(
                         state = listState,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        contentPadding = PaddingValues(start = 2.dp, end = 18.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        contentPadding = PaddingValues(start = 4.dp, end = 18.dp)
                     ) {
                         items(tabs, key = { it.id }) { tab ->
                             BottomTabBarItem(
@@ -567,8 +567,8 @@ private fun SubMenuGrid(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .width(40.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(Radius.xs))
                     .background(Mocha.Surface2.copy(alpha = 0.8f))
             )
             Spacer(modifier = Modifier.height(10.dp))
