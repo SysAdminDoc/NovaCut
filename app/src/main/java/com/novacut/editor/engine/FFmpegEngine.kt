@@ -45,6 +45,78 @@ import kotlin.coroutines.resume
  * - WebM / VP9 format conversion when target requires it
  * - Concat demuxer for seamless lossless joins
  * - atempo audio speed change with pitch correction
+ *
+ * ## R6.16 — ffmpeg-kt evaluation spike (2026-06-13)
+ *
+ * ### What was evaluated
+ *
+ * "ffmpeg-kt" (`zt64/ffmpeg-kt`, `dev.zt64:ffmpeg-kt-*`) — a Kotlin
+ * Multiplatform project wrapping FFmpeg's raw libav* C API (libavcodec,
+ * libavformat, libswscale, etc.) directly via native bindings. Inspired by
+ * PyAV, NOT by FFmpegKit's command-string execution model.
+ *
+ * ### API compatibility matrix
+ *
+ * | NovaCut call site                       | FFmpegKit (current)              | ffmpeg-kt (zt64)                  |
+ * |-----------------------------------------|----------------------------------|-----------------------------------|
+ * | `execute(command)`                       | `FFmpegKit.executeAsync(cmd,…)`  | No equivalent — raw libav* only   |
+ * | `executeArguments(args)`                 | `FFmpegKit.executeWithArgumentsAsync(…)` | No equivalent              |
+ * | SAF `content://` URIs                    | `FFmpegKitConfig.getSafParameterForRead()` | Not supported             |
+ * | Progress via `StatisticsCallback`        | `stats.time` in callback         | Not documented                    |
+ * | Session cancellation                     | `session.cancel()`               | Not documented                    |
+ * | Return codes                             | `ReturnCode.isSuccess()`         | Not applicable (API-level calls)  |
+ * | `concat` demuxer                        | Via command string               | Would require raw demuxer API     |
+ * | `atempo` filter chain                   | Via command string               | Would require filter graph API    |
+ * | `burnSubtitles` (libass)                | Via `-vf ass=` filter            | Would require filter graph API    |
+ *
+ * Verdict: **zero overlap** with current call sites. Adopting ffmpeg-kt
+ * would require a complete rewrite of FFmpegEngine from command-string
+ * dispatch to raw libav* API calls — a fundamentally different abstraction
+ * level. Every typed entry point (extractAudioToWav, reverseClipToFile,
+ * concat, changeSpeed, burnSubtitles, normalizeLoudness, streamCopyTrim)
+ * constructs FFmpeg CLI argument lists, which ffmpeg-kt cannot consume.
+ *
+ * ### 16KB page-size compliance
+ *
+ * Not documented. No published native .so artifacts to verify. The project
+ * does not mention Android 16 / API 35+ 16KB page alignment anywhere.
+ * NovaCut's current fork (`com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1`)
+ * was specifically rebuilt for 16KB alignment and is verified by the local
+ * `scripts/check_16kb_alignment.py` gate.
+ *
+ * ### APK size comparison
+ *
+ * Cannot be measured — ffmpeg-kt has no published releases, no AARs, and
+ * no artifacts on Maven Central or JitPack. The project README uses `x.y.z`
+ * placeholder version numbers.
+ *
+ * ### License analysis
+ *
+ * ffmpeg-kt is GPL v3.0. Same as NovaCut's current FFmpegKit fork, so no
+ * license improvement. The alternative JamaisMagic fork
+ * (`io.github.jamaismagic.ffmpeg:ffmpeg-kit-lts-16kb:6.1.7`) offers an
+ * LGPL-3.0 variant, which would be a license improvement if NovaCut ever
+ * needs a no-GPL distribution channel.
+ *
+ * ### Adopt / defer criteria
+ *
+ * **DECISION: DEFER indefinitely.**
+ *
+ * ffmpeg-kt is pre-alpha (no stable release, "API subject to change"),
+ * operates at a fundamentally different abstraction level (raw libav* vs
+ * command strings), lacks SAF support critical for Android, has no 16KB
+ * compliance documentation, and would require a full FFmpegEngine rewrite
+ * with no functional benefit over the current fork.
+ *
+ * The real supply-chain risk (upstream FFmpegKit archived, binaries removed
+ * from Maven Central) is already mitigated by NovaCut's pinned 16KB fork.
+ * If the moizhassankh fork goes stale, the JamaisMagic fork
+ * (`io.github.jamaismagic.ffmpeg`, 740 commits, NDK r27d, Maven Central,
+ * LGPL option) is a drop-in replacement with 100% API compatibility —
+ * a one-line Gradle coordinate swap, not a rewrite.
+ *
+ * Re-evaluate if ffmpeg-kt ships a 1.0 with command-string execution,
+ * SAF support, and published Android AARs.
  */
 @Singleton
 class FFmpegEngine @Inject constructor(
