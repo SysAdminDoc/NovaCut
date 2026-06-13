@@ -15,6 +15,7 @@ import com.novacut.editor.engine.AiUsageLedger
 import com.novacut.editor.engine.AppSettings
 import com.novacut.editor.engine.AudioEngine
 import com.novacut.editor.engine.AutoSaveState
+import com.novacut.editor.engine.ExportIncidentStore
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.FontRegistry
 import com.novacut.editor.engine.ProjectAutoSave
@@ -462,6 +463,7 @@ class EditorViewModel @Inject constructor(
     private val stylusMidiEngine: StylusMidiEngine,
     private val captionTranslationEngine: com.novacut.editor.engine.CaptionTranslationEngine,
     private val fontRegistry: FontRegistry,
+    private val exportIncidentStore: ExportIncidentStore,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -514,7 +516,9 @@ class EditorViewModel @Inject constructor(
         showExportSheet = ::showExportSheet,
         streamCopyEngine = streamCopyEngine,
         c2paExportEngine = c2paExportEngine,
-        mediaHealthPreflight = ::analyzeMediaHealthForState
+        mediaHealthPreflight = ::analyzeMediaHealthForState,
+        exportIncidentStore = exportIncidentStore,
+        appVersion = com.novacut.editor.NovaCutApp.VERSION
     )
 
     val aiToolsDelegate = AiToolsDelegate(

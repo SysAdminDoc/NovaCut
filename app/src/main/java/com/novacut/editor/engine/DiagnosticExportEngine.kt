@@ -73,6 +73,7 @@ class DiagnosticExportEngine @Inject constructor(
     private val memoryTrimBreadcrumbStore: MemoryTrimBreadcrumbStore,
     private val processExitRecorder: ProcessExitRecorder,
     private val settingsResetReportStore: SettingsResetReportStore,
+    private val exportIncidentStore: ExportIncidentStore,
 ) {
 
     /** Snapshot summary of a single model from [ModelDownloadManager]. */
@@ -235,6 +236,9 @@ class DiagnosticExportEngine @Inject constructor(
             processExitRecorder.buildDiagnosticJson().toByteArray(Charsets.UTF_8)
         settingsResetReportStore.buildDiagnosticText()?.let { settingsResetJsonl ->
             entries[SettingsResetReportStore.BUNDLE_ENTRY] = settingsResetJsonl.toByteArray(Charsets.UTF_8)
+        }
+        exportIncidentStore.buildDiagnosticJson()?.let { incidentsJson ->
+            entries[ExportIncidentStore.BUNDLE_ENTRY] = incidentsJson.toByteArray(Charsets.UTF_8)
         }
         entries["logcat-tail.txt"] = buildLogcatTail().toByteArray(Charsets.UTF_8)
         entries["manifest.txt"] = buildManifest(entries).toByteArray(Charsets.UTF_8)
