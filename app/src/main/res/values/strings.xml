@@ -936,6 +936,7 @@
     <string name="tool_undo">Undo</string>
     <string name="tool_redo">Redo</string>
     <string name="tool_search">Search tools</string>
+    <string name="editor_paste_fx">Paste FX</string>
 
     <!-- ToolPanel -->
     <string name="tool_effects">Effects</string>

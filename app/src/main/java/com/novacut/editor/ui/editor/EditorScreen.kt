@@ -762,6 +762,34 @@ fun EditorScreen(
                                 )
                             }
                         }
+                        if (state.copiedEffects.isNotEmpty()) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Mocha.Mauve.copy(alpha = 0.14f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Mauve.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .clickable(onClick = viewModel::copyEffectsToSelectedClips)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.ContentPaste,
+                                        contentDescription = stringResource(R.string.tool_paste_effects),
+                                        tint = Mocha.Mauve,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.editor_paste_fx),
+                                        color = Mocha.Mauve,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
+                        }
                         Spacer(Modifier.width(8.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -951,6 +979,7 @@ fun EditorScreen(
                         "ungroup" -> viewModel.ungroupSelectedClips()
                         "unlink_av" -> viewModel.unlinkAudioVideo()
                         "multi_delete" -> viewModel.deleteMultiSelectedClips()
+                        "multi_paste_fx" -> viewModel.copyEffectsToSelectedClips()
                         "batch_export" -> viewModel.showBatchExport()
                         "proxy_toggle" -> viewModel.setProxyEnabled(!state.proxySettings.enabled)
                         "beat_sync" -> viewModel.showBeatSync()

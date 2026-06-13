@@ -3885,6 +3885,84 @@ class EditorViewModel @Inject constructor(
         showToast("Deleted ${clipIds.size} clips")
     }
 
+    fun applyEffectToSelectedClips(effect: Effect) {
+        val ids = _state.value.selectedClipIds
+        if (ids.isEmpty()) { showToast("No clips selected"); return }
+        saveUndoState("Apply ${effect.type.name} to ${ids.size} clips")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id in ids && clip.effects.none { it.type == effect.type }) {
+                        clip.copy(effects = clip.effects + effect.copy(
+                            id = java.util.UUID.randomUUID().toString()
+                        ))
+                    } else clip
+                })
+            })
+        }
+        rebuildPlayerTimeline()
+        saveProject()
+        showToast("Applied ${effect.type.name} to ${ids.size} clips")
+    }
+
+    fun applySpeedToSelectedClips(speed: Float) {
+        val ids = _state.value.selectedClipIds
+        if (ids.isEmpty()) { showToast("No clips selected"); return }
+        val clampedSpeed = speed.coerceIn(0.1f, 100f)
+        saveUndoState("Set speed ${clampedSpeed}x on ${ids.size} clips")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id in ids) clip.copy(speed = clampedSpeed) else clip
+                })
+            })
+        }
+        rebuildPlayerTimeline()
+        saveProject()
+        showToast("Set ${clampedSpeed}x speed on ${ids.size} clips")
+    }
+
+    fun applyVolumeToSelectedClips(volume: Float) {
+        val ids = _state.value.selectedClipIds
+        if (ids.isEmpty()) { showToast("No clips selected"); return }
+        val clampedVolume = volume.coerceIn(0f, 3f)
+        saveUndoState("Set volume on ${ids.size} clips")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id in ids) clip.copy(volume = clampedVolume) else clip
+                })
+            })
+        }
+        saveProject()
+        showToast("Set volume on ${ids.size} clips")
+    }
+
+    fun copyEffectsToSelectedClips() {
+        val state = _state.value
+        val sourceEffects = state.copiedEffects
+        if (sourceEffects.isEmpty()) { showToast("No effects copied"); return }
+        val ids = state.selectedClipIds
+        if (ids.isEmpty()) { showToast("No clips selected"); return }
+        saveUndoState("Paste effects to ${ids.size} clips")
+        _state.update { s ->
+            s.copy(tracks = s.tracks.map { track ->
+                track.copy(clips = track.clips.map { clip ->
+                    if (clip.id in ids) {
+                        val existingTypes = clip.effects.map { it.type }.toSet()
+                        val newEffects = sourceEffects
+                            .filter { it.type !in existingTypes }
+                            .map { it.copy(id = java.util.UUID.randomUUID().toString()) }
+                        clip.copy(effects = clip.effects + newEffects)
+                    } else clip
+                })
+            })
+        }
+        rebuildPlayerTimeline()
+        saveProject()
+        showToast("Pasted effects to ${ids.size} clips")
+    }
+
     // --- Subtitle Export ---
     fun exportSubtitles(format: SubtitleFormat) {
         val captions = _state.value.tracks.flatMap { it.clips }.flatMap { clip ->
