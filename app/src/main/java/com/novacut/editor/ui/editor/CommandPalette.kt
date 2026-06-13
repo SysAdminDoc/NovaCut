@@ -140,6 +140,8 @@ object CommandRegistry {
         add(CommandEntry("export", Icons.Default.Upload, R.string.tool_export, cat))
         add(CommandEntry("undo", Icons.Default.Undo, R.string.tool_undo, cat))
         add(CommandEntry("redo", Icons.Default.Redo, R.string.tool_redo, cat))
+        add(CommandEntry("multi_delete", Icons.Default.Delete, R.string.editor_delete, "Batch", requiresClip = true))
+        add(CommandEntry("multi_paste_fx", Icons.Default.ContentPaste, R.string.editor_paste_fx, "Batch", requiresClip = true))
     }
 
     fun fuzzyMatch(query: String, label: String): Boolean {
