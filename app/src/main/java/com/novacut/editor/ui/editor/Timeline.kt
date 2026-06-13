@@ -1526,7 +1526,7 @@ fun Timeline(
                                                 if (track.isLocked) {
                                                     Icon(
                                                         imageVector = Icons.Default.Lock,
-                                                        contentDescription = null,
+                                                        contentDescription = stringResource(R.string.cd_clip_locked),
                                                         tint = Mocha.Text.copy(alpha = 0.72f),
                                                         modifier = Modifier.size(12.dp)
                                                     )
