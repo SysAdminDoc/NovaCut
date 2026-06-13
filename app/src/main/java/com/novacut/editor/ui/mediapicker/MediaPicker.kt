@@ -31,9 +31,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.novacut.editor.R
+import com.novacut.editor.engine.IngestResult
+import com.novacut.editor.engine.checkFreeSpace
 import com.novacut.editor.engine.finalizePendingCameraCapture
 import com.novacut.editor.engine.importUriToManagedMedia
+import com.novacut.editor.engine.importUriToManagedMediaWithProgress
 import com.novacut.editor.engine.pendingCameraCaptureDir
+import com.novacut.editor.engine.querySourceSize
 import com.novacut.editor.engine.resolveManagedMediaExtension
 import com.novacut.editor.ui.NovaCutTestTags
 import com.novacut.editor.ui.editor.PremiumEditorPanel
@@ -96,9 +100,19 @@ fun MediaPickerSheet(
                 try {
                     val importResult = withContext(Dispatchers.IO) {
                         val sortedUris = sortMediaChronologically(context, uris)
+                        var spaceChecked = false
                         sortedUris.mapNotNull { uri ->
                             val mediaType = resolvePickedMediaType(context, uri, fallbackType = "video")
                             try {
+                                if (!spaceChecked) {
+                                    val totalSize = sortedUris.sumOf { u ->
+                                        querySourceSize(context, u).coerceAtLeast(0L)
+                                    }
+                                    if (totalSize > 0L && !checkFreeSpace(context, totalSize)) {
+                                        return@withContext emptyList<Pair<Uri, String>>() to sortedUris.size
+                                    }
+                                    spaceChecked = true
+                                }
                                 importUriToManagedMedia(context, uri, mediaType)?.let { localUri ->
                                     localUri to mediaType
                                 }
@@ -127,17 +141,19 @@ fun MediaPickerSheet(
         coroutineScope.launch {
             operationState = MediaPickerOperationState(title = title, description = description)
             try {
-                val localUri = withContext(Dispatchers.IO) {
+                val result = withContext(Dispatchers.IO) {
                     try {
-                        importUriToManagedMedia(context, uri, mediaType)
+                        importUriToManagedMediaWithProgress(context, uri, mediaType)
                     } finally {
                         releasePersistedReadPermission(context, uri)
                     }
                 }
-                if (localUri != null) {
-                    onMediaSelected(localUri, mediaType)
-                } else {
-                    permissionMessage = context.getString(R.string.media_picker_local_copy_failed)
+                when (result) {
+                    is IngestResult.Success -> onMediaSelected(result.managedUri, mediaType)
+                    is IngestResult.InsufficientSpace ->
+                        permissionMessage = context.getString(R.string.media_picker_insufficient_space)
+                    else ->
+                        permissionMessage = context.getString(R.string.media_picker_local_copy_failed)
                 }
             } finally {
                 operationState = null
@@ -154,7 +170,12 @@ fun MediaPickerSheet(
             )
             try {
                 val imported = withContext(Dispatchers.IO) {
-                    sortMediaChronologically(context, uris).mapNotNull { uri ->
+                    val sorted = sortMediaChronologically(context, uris)
+                    val totalSize = sorted.sumOf { querySourceSize(context, it).coerceAtLeast(0L) }
+                    if (totalSize > 0L && !checkFreeSpace(context, totalSize)) {
+                        return@withContext emptyList<Pair<Uri, String>>()
+                    }
+                    sorted.mapNotNull { uri ->
                         val type = resolvePickedMediaType(context, uri, fallbackType = "video")
                         importUriToManagedMedia(context, uri, type)?.let { localUri -> localUri to type }
                     }

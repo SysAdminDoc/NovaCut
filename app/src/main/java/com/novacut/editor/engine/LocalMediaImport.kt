@@ -2,14 +2,20 @@ package com.novacut.editor.engine
 
 import android.content.Context
 import android.net.Uri
+import android.os.StatFs
 import android.provider.OpenableColumns
 import android.util.Log
 import android.webkit.MimeTypeMap
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.concurrent.CancellationException
 
 private const val LOCAL_MEDIA_IMPORT_TAG = "LocalMediaImport"
 private const val LOCAL_MEDIA_FALLBACK_STEM = "media"
 private const val MAX_MANAGED_MEDIA_EXTENSION_LENGTH = 10
+private const val COPY_BUFFER_SIZE = 64 * 1024
+private const val FREE_SPACE_MARGIN_BYTES = 50L * 1024L * 1024L
 
 internal fun managedMediaDir(context: Context): File = File(context.filesDir, "media/imports")
 
@@ -334,6 +340,158 @@ private fun createUniqueManagedMediaFile(
         index++
     }
     return candidate
+}
+
+internal sealed class IngestResult {
+    data class Success(val managedUri: Uri) : IngestResult()
+    data class InsufficientSpace(val requiredBytes: Long, val availableBytes: Long) : IngestResult()
+    data object Cancelled : IngestResult()
+    data class Failed(val reason: String) : IngestResult()
+}
+
+internal fun querySourceSize(context: Context, uri: Uri): Long {
+    if (uri.scheme == "file") {
+        return uri.path?.let(::File)?.length() ?: -1L
+    }
+    return runCatching {
+        context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
+            ?: context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.SIZE), null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (idx >= 0) cursor.getLong(idx) else -1L
+                } else -1L
+            } ?: -1L
+    }.getOrDefault(-1L)
+}
+
+internal fun checkFreeSpace(context: Context, requiredBytes: Long): Boolean {
+    if (requiredBytes <= 0L) return true
+    val statFs = StatFs(context.filesDir.path)
+    val available = statFs.availableBytes
+    val margin = maxOf(FREE_SPACE_MARGIN_BYTES, requiredBytes / 10)
+    return available >= requiredBytes + margin
+}
+
+internal fun importUriToManagedMediaWithProgress(
+    context: Context,
+    uri: Uri,
+    mediaType: String,
+    onProgress: (Float) -> Unit = {},
+    isCancelled: () -> Boolean = { false }
+): IngestResult {
+    if (uri.scheme == "file") {
+        val sourceFile = uri.path?.let(::File)
+        if (sourceFile != null && sourceFile.exists()) {
+            val sourceCanonical = runCatching { sourceFile.canonicalFile }.getOrNull()
+            if (sourceCanonical != null &&
+                sourceCanonical.isFile &&
+                sourceCanonical.length() > 0L &&
+                isInsideDirectory(sourceCanonical, managedMediaDir(context))
+            ) {
+                val managedUri = Uri.fromFile(sourceCanonical)
+                if (!mediaAssetSidecarFileFor(sourceCanonical).isFile) {
+                    writeManagedMediaAssetSidecar(context, managedUri, uri, mediaType)
+                }
+                onProgress(1f)
+                return IngestResult.Success(managedUri)
+            }
+        }
+    }
+
+    val sourceSize = querySourceSize(context, uri)
+    if (sourceSize > 0L && !checkFreeSpace(context, sourceSize)) {
+        val statFs = StatFs(context.filesDir.path)
+        return IngestResult.InsufficientSpace(sourceSize, statFs.availableBytes)
+    }
+
+    if (isCancelled()) return IngestResult.Cancelled
+
+    val destinationDir = managedMediaDir(context)
+    if (!destinationDir.exists() && !destinationDir.mkdirs() && !destinationDir.exists()) {
+        return IngestResult.Failed("Failed to create managed media directory")
+    }
+
+    sweepAbandonedPartials(destinationDir)
+
+    val destinationFile = createUniqueManagedMediaFile(
+        directory = destinationDir,
+        displayName = resolveMediaDisplayName(context, uri),
+        extension = resolveManagedMediaExtension(context, uri, mediaType)
+    )
+    val partialFile = File(destinationFile.parentFile, destinationFile.name + ".partial")
+
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri)
+            ?: return IngestResult.Failed("Cannot open input stream").also { partialFile.delete() }
+
+        inputStream.use { input ->
+            partialFile.outputStream().use { output ->
+                copyWithProgress(input, output, sourceSize, onProgress, isCancelled)
+            }
+        }
+
+        if (isCancelled()) {
+            partialFile.delete()
+            return IngestResult.Cancelled
+        }
+
+        if (partialFile.length() <= 0L) {
+            partialFile.delete()
+            return IngestResult.Failed("Imported file was empty")
+        }
+
+        if (!partialFile.renameTo(destinationFile)) {
+            try {
+                writeFileAtomically(destinationFile, requireNonEmpty = true) { tempFile ->
+                    partialFile.inputStream().use { input ->
+                        tempFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                partialFile.delete()
+            } catch (copyErr: Exception) {
+                partialFile.delete()
+                destinationFile.delete()
+                return IngestResult.Failed("Rename and fallback copy both failed: ${copyErr.message}")
+            }
+        }
+
+        onProgress(1f)
+        val managedUri = Uri.fromFile(destinationFile)
+        writeManagedMediaAssetSidecar(context, managedUri, uri, mediaType)
+        IngestResult.Success(managedUri)
+    } catch (e: CancellationException) {
+        partialFile.delete()
+        IngestResult.Cancelled
+    } catch (e: Exception) {
+        partialFile.delete()
+        destinationFile.delete()
+        IngestResult.Failed(e.message ?: "Unknown error")
+    }
+}
+
+private fun copyWithProgress(
+    input: InputStream,
+    output: OutputStream,
+    totalBytes: Long,
+    onProgress: (Float) -> Unit,
+    isCancelled: () -> Boolean
+) {
+    val buffer = ByteArray(COPY_BUFFER_SIZE)
+    var bytesCopied = 0L
+    var lastProgressReport = 0L
+    while (true) {
+        if (isCancelled()) throw CancellationException("Import cancelled")
+        val bytes = input.read(buffer)
+        if (bytes < 0) break
+        output.write(buffer, 0, bytes)
+        bytesCopied += bytes
+        if (totalBytes > 0L && bytesCopied - lastProgressReport >= totalBytes / 100) {
+            onProgress((bytesCopied.toFloat() / totalBytes).coerceIn(0f, 0.99f))
+            lastProgressReport = bytesCopied
+        }
+    }
 }
 
 private fun isInsideDirectory(file: File, directory: File): Boolean {

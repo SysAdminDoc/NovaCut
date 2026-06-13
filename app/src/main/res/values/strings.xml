@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.74.82</string>
+    <string name="app_version">v3.74.83</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -632,6 +632,7 @@
     <string name="media_picker_importing_image_description">Keeping this still available in the project.</string>
     <string name="media_picker_importing_capture_title">Saving capture</string>
     <string name="media_picker_importing_capture_description">Moving the recorded clip into your project media.</string>
+    <string name="media_picker_insufficient_space">Not enough storage space to import this media.</string>
     <string name="media_picker_audio_only">That file isn\'t audio. Pick a .mp3, .m4a, .wav, .ogg, or .flac.</string>
 
     <!-- ProjectListScreen -->
@@ -1291,6 +1292,10 @@
         <item quantity="one">%1$d source needs attention</item>
         <item quantity="other">%1$d sources need attention</item>
     </plurals>
+    <plurals name="media_manager_bulk_relink">
+        <item quantity="one">Relink %1$d missing source</item>
+        <item quantity="other">Relink %1$d missing sources</item>
+    </plurals>
     <string name="media_manager_missing_body">Resolve missing or unverified source files before export so previews, renders, and relink decisions stay predictable.</string>
     <string name="media_manager_ready_title">All linked files are available</string>
     <string name="media_manager_ready_body">Your source media is available on this device, so preview, export, and handoff workflows should stay reliable.</string>
@@ -1650,6 +1655,7 @@
     <string name="project_import_copy_failed">NovaCut couldn\'t copy that media into local storage.</string>
     <string name="cd_smart_reframe">Smart reframe</string>
     <string name="cd_clip_thumbnail">Clip thumbnail</string>
+    <string name="cd_clip_source_missing">Clip source missing</string>
     <string name="cd_tts_preview">Preview speech</string>
 
     <!-- Settings — v3.13.0 string extraction -->

@@ -94,11 +94,19 @@ data class EditorAiState(
     override val kind: EditorDomainState.Kind = EditorDomainState.Kind.AI
 }
 
+data class PendingIngest(
+    val workId: String,
+    val displayName: String,
+    val mediaType: String,
+    val progress: Float = 0f
+)
+
 data class EditorMediaState(
     val backupImportFeedback: BackupImportFeedback? = null,
     val timelineExchangeFeedback: TimelineExchangeFeedback? = null,
     val relinkReports: Map<String, MediaRelinkProbe.ClipRelinkReport> = emptyMap(),
-    val healthReport: MediaHealthReport? = null
+    val healthReport: MediaHealthReport? = null,
+    val pendingIngests: List<PendingIngest> = emptyList()
 ) : EditorDomainState {
     override val kind: EditorDomainState.Kind = EditorDomainState.Kind.MEDIA
 }

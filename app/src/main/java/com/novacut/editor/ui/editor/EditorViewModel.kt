@@ -55,6 +55,7 @@ import com.novacut.editor.engine.TimelineExchangeValidator
 import com.novacut.editor.engine.ProxyWorkflowEngine
 import com.novacut.editor.engine.MultiCamEngine
 import com.novacut.editor.engine.MediaImportEngine
+import com.novacut.editor.engine.MediaIngestWorker
 import com.novacut.editor.engine.MediaHealth
 import com.novacut.editor.engine.MediaRelinkProbe
 import com.novacut.editor.engine.OverlayAssetImportResult
@@ -977,7 +978,10 @@ class EditorViewModel @Inject constructor(
         cancelGapPlayback()
         _state.update(::normalizeTimelineState)
         _playheadMs.value = _state.value.playheadMs
-        videoEngine.prepareTimeline(_state.value.tracks)
+        val missingClipIds = _state.value.media.relinkReports
+            .filter { it.value.state == MediaRelinkProbe.RelinkState.MISSING }
+            .keys
+        videoEngine.prepareTimeline(_state.value.tracks, missingClipIds)
         videoEngine.seekTo(_state.value.playheadMs)
         updatePreview()
         preloadVisibleWaveforms(_state.value)
@@ -1082,6 +1086,101 @@ class EditorViewModel @Inject constructor(
                 ExistingWorkPolicy.KEEP,
                 request
             )
+    }
+
+    // --- Background Media Ingest ---
+    fun enqueueMediaIngest(sourceUri: Uri, mediaType: String, displayName: String) {
+        val workId = java.util.UUID.randomUUID().toString()
+        val request = OneTimeWorkRequestBuilder<MediaIngestWorker>()
+            .setInputData(
+                androidx.work.workDataOf(
+                    MediaIngestWorker.KEY_SOURCE_URI to sourceUri.toString(),
+                    MediaIngestWorker.KEY_MEDIA_TYPE to mediaType
+                )
+            )
+            .addTag(MediaIngestWorker.TAG)
+            .setId(java.util.UUID.fromString(workId))
+            .build()
+
+        _state.update { state ->
+            state.copyMedia { media ->
+                media.copy(
+                    pendingIngests = media.pendingIngests + PendingIngest(
+                        workId = workId,
+                        displayName = displayName,
+                        mediaType = mediaType
+                    )
+                )
+            }
+        }
+
+        val wm = WorkManager.getInstance(appContext)
+        wm.enqueue(request)
+
+        val liveData = wm.getWorkInfoByIdLiveData(java.util.UUID.fromString(workId))
+        val observer = object : androidx.lifecycle.Observer<androidx.work.WorkInfo?> {
+            override fun onChanged(value: androidx.work.WorkInfo?) {
+                val info = value ?: return
+                when (info.state) {
+                    androidx.work.WorkInfo.State.RUNNING -> {
+                        val progress = info.progress.getFloat(MediaIngestWorker.KEY_PROGRESS, 0f)
+                        updateIngestProgress(workId, progress)
+                    }
+                    androidx.work.WorkInfo.State.SUCCEEDED -> {
+                        val managedUri = info.outputData.getString(MediaIngestWorker.KEY_MANAGED_URI)
+                        val type = info.outputData.getString(MediaIngestWorker.KEY_MEDIA_TYPE) ?: "video"
+                        removeIngest(workId)
+                        if (managedUri != null) {
+                            val trackType = when {
+                                type.startsWith("audio") -> TrackType.AUDIO
+                                type.startsWith("image") -> TrackType.OVERLAY
+                                else -> TrackType.VIDEO
+                            }
+                            addClipToTrack(Uri.parse(managedUri), trackType)
+                        }
+                        liveData.removeObserver(this)
+                    }
+                    androidx.work.WorkInfo.State.FAILED -> {
+                        val error = info.outputData.getString(MediaIngestWorker.KEY_ERROR)
+                        removeIngest(workId)
+                        showToast(error ?: "Import failed")
+                        liveData.removeObserver(this)
+                    }
+                    androidx.work.WorkInfo.State.CANCELLED -> {
+                        removeIngest(workId)
+                        liveData.removeObserver(this)
+                    }
+                    else -> { /* ENQUEUED, BLOCKED — no action */ }
+                }
+            }
+        }
+        liveData.observeForever(observer)
+    }
+
+    fun cancelMediaIngest(workId: String) {
+        WorkManager.getInstance(appContext).cancelWorkById(java.util.UUID.fromString(workId))
+        removeIngest(workId)
+        showToast("Import cancelled")
+    }
+
+    private fun updateIngestProgress(workId: String, progress: Float) {
+        _state.update { state ->
+            state.copyMedia { media ->
+                media.copy(
+                    pendingIngests = media.pendingIngests.map { ingest ->
+                        if (ingest.workId == workId) ingest.copy(progress = progress) else ingest
+                    }
+                )
+            }
+        }
+    }
+
+    private fun removeIngest(workId: String) {
+        _state.update { state ->
+            state.copyMedia { media ->
+                media.copy(pendingIngests = media.pendingIngests.filter { it.workId != workId })
+            }
+        }
     }
 
     // --- Clip Editing (delegated) ---
@@ -1269,6 +1368,15 @@ class EditorViewModel @Inject constructor(
             videoEngine.pause()
             _state.update { it.copy(isPlaying = false) }
         } else {
+            val missingCount = _state.value.media.relinkReports
+                .values.count { it.state == MediaRelinkProbe.RelinkState.MISSING }
+            if (missingCount > 0) {
+                showToast(
+                    if (missingCount == 1) "1 clip source is missing — it will appear as a gap"
+                    else "$missingCount clip sources are missing — they will appear as gaps",
+                    ToastSeverity.Warning
+                )
+            }
             val playhead = _playheadMs.value
             val currentPreviewClip = previewClipAtPosition(playhead)
             if (currentPreviewClip == null && _state.value.totalDurationMs > playhead) {
@@ -3363,6 +3471,13 @@ class EditorViewModel @Inject constructor(
                         )
                     }
             }
+            if (missingCount > 0) {
+                val missingIds = reports
+                    .filter { it.value.state == MediaRelinkProbe.RelinkState.MISSING }
+                    .keys
+                videoEngine.prepareTimeline(_state.value.tracks, missingIds)
+                videoEngine.seekTo(_state.value.playheadMs)
+            }
             if (openPanelOnProblems) {
                 mediaRelinkOpenToast(
                     missingCount = missingCount,
@@ -3401,6 +3516,17 @@ class EditorViewModel @Inject constructor(
         val removed = currentTracks.size - kept.size
         showToast("Removed $removed empty track${if (removed != 1) "s" else ""}")
         saveProject()
+    }
+
+    fun getMissingSources(): List<Uri> {
+        val missingClipIds = _state.value.media.relinkReports
+            .filter { it.value.state == MediaRelinkProbe.RelinkState.MISSING }
+            .keys
+        return _state.value.tracks
+            .flatMap { it.clips }
+            .filter { it.id in missingClipIds }
+            .map { it.sourceUri }
+            .distinct()
     }
 
     // --- Audio Normalization (delegated) ---
