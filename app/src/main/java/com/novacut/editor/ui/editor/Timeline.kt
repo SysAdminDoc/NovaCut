@@ -89,6 +89,7 @@ fun Timeline(
     scrollOffsetMs: Long,
     selectedClipId: String?,
     modifier: Modifier = Modifier,
+    playheadMsProvider: (() -> Long)? = null,
     isTrimMode: Boolean = false,
     waveforms: Map<String, List<Float>> = emptyMap(),
     onClipSelected: (String?, String?) -> Unit,
@@ -1719,8 +1720,9 @@ fun Timeline(
                                 }
                             }
 
-                            // Playhead line
-                            val playheadPx = ((playheadMs - scrollOffsetMs) * pixelsPerMs)
+                            // Playhead line — use provider to defer recomposition
+                            val deferredPlayheadMs = playheadMsProvider?.invoke() ?: playheadMs
+                            val playheadPx = ((deferredPlayheadMs - scrollOffsetMs) * pixelsPerMs)
                             if (playheadPx in 0f..timelineWidthPx) {
                                 Canvas(
                                     modifier = Modifier
@@ -1738,8 +1740,9 @@ fun Timeline(
                     }
                     }
 
-                // Playhead indicator on ruler
-                val playheadPx = ((playheadMs - scrollOffsetMs) * pixelsPerMs)
+                // Playhead indicator on ruler — use provider to defer recomposition
+                val rulerPlayheadMs = playheadMsProvider?.invoke() ?: playheadMs
+                val playheadPx = ((rulerPlayheadMs - scrollOffsetMs) * pixelsPerMs)
                 if (playheadPx >= 0) {
                     Canvas(
                         modifier = Modifier
