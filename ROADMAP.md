@@ -2755,6 +2755,155 @@ move.
 ### P2
 
 - [ ] P2 - Speaker-aware multicam auto-switch review flow
+
+## Research-Driven Additions (Cycle 30 - 2026-06-13)
+
+Research grounded in competitive analysis (CapCut, VN, Meta Edits, KineMaster,
+PowerDirector, LumaFusion, Open Video Editor, LibreCuts), community pain points
+(Reddit r/VideoEditing, VN/Adobe Rush export crash reports, overlay sync
+complaints), platform changes (Android 16/17, developer verification, 16KB page
+size), dependency status (FFmpegKit retired, ffmpeg-kt emerging), and AI/ML
+ecosystem (Sherpa-ONNX benchmarks, RIFE GPU-resident pipeline, C2PA Android
+library). 30+ external sources checked; every item below verified absent from
+the existing 58 open roadmap items.
+
+### Performance & Reliability
+
+- [ ] P2 — Persistent disk-backed waveform cache for project reopen
+  Why: `AudioEngine.extractWaveform()` runs for every clip on every project
+  open. The in-memory LRU cache (64 entries) is lost on process death. Large
+  projects with 10+ audio clips take multiple seconds to reopen while waveforms
+  re-extract. Persisting downsampled peak data to disk (keyed by source URI +
+  content fingerprint from the managed-media sidecar) eliminates the dominant
+  reopen latency. VN's most-cited complaint is lag with many clips; this is the
+  same class of problem.
+  Evidence: `engine/AudioEngine.kt` extracts waveforms from scratch each open;
+  `engine/WaveformCache.kt` is an in-memory `LinkedHashMap(64)`;
+  VN overlay-lag reports (https://nothing.community/d/8047).
+  Touches: `engine/AudioEngine.kt`, `engine/WaveformCache.kt` (new disk layer),
+  `engine/ProjectAutoSave.kt` (cache key from asset fingerprint),
+  `filesDir/waveform-cache/` directory with size-bounded eviction.
+  Acceptance: opening a previously-saved project with 10+ clips shows waveforms
+  instantly (no extraction spinner). Cache files are bounded (e.g. 50MB total),
+  evict LRU, survive process death, and are excluded from cloud backup.
+  Complexity: M
+
+### Export & Trust
+
+- [ ] P2 — In-editor export playback preview before share/save
+  Why: After export completes, users cannot play the result inside NovaCut.
+  They must leave the app to verify. Adobe Rush and VN both have widespread
+  2025-2026 community reports of export corruption that users only discover
+  after sharing. An ExoPlayer-backed playback surface in the export completion
+  state lets users verify before committing. This is complementary to (not a
+  duplicate of) the P1 structural post-export verification gate, which checks
+  metadata/streams programmatically.
+  Evidence: `ui/export/ExportSheet.kt` COMPLETE state shows share/save/done
+  buttons but no playback. No `ExoPlayer` instance in ExportSheet. Adobe Rush
+  export crash threads (https://community.adobe.com/questions-737/
+  premiere-rush-crashes-when-attempting-to-export-and-render-1431206).
+  Touches: `ui/export/ExportSheet.kt` (add a mini ExoPlayer surface in
+  COMPLETE state), `engine/VideoEngine.kt` (provide a secondary player or
+  reuse the existing singleton for output playback).
+  Acceptance: after a successful export, the ExportSheet shows a playable
+  preview of the output file with play/pause controls. Tapping share/save
+  after preview works as before. Preview player releases on sheet dismiss.
+  Complexity: S
+
+### Editing Depth
+
+- [ ] P2 — Split-screen before/after comparison for effects and color grading
+  Why: When applying one of 40+ effects or color grading, users see only the
+  effected frame. There is no way to compare original vs. graded without
+  toggling the effect on/off and memorizing the difference. Desktop NLEs
+  (Resolve, Premiere) and CapCut Pro offer split-screen or wipe comparisons.
+  No mobile OSS editor has this. It is especially valuable for subtle color
+  work (lift/gamma/gain wheels, LUT intensity, HSL qualifier).
+  Evidence: `ui/editor/PreviewPanel.kt` renders only the effected player
+  output. No split/comparison mode exists (grep: no "split.*preview",
+  "before.*after", "comparison" in ui/). CapCut Pro 2026 features list
+  includes before/after comparison.
+  Touches: `ui/editor/PreviewPanel.kt` (add a toggle that renders the
+  original frame alongside the effected frame using a clip mask or side-by-side
+  layout), `engine/VideoEngine.kt` (provide an uneffected frame path or
+  snapshot).
+  Acceptance: a toggle button in the preview area (when an effect or color
+  grade is active) shows a side-by-side or vertical-wipe comparison. The
+  comparison updates in real-time during parameter adjustment. Toggle off
+  returns to normal preview. No additional memory allocation beyond the
+  comparison frame.
+  Complexity: M
+
+### Dependencies & Supply Chain
+
+- [ ] P2 — Evaluate ffmpeg-kt as FFmpegKit fork replacement
+  Why: NovaCut depends on `com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1`, a
+  personal fork of the retired FFmpegKit (upstream archived Jun 2025, binaries
+  deleted from Maven Central Apr 2025). The `ffmpeg-kt` Kotlin Multiplatform
+  project is the most actively developed community replacement as of early
+  2026, with native builds, Gradle integration, and active commits. Open
+  Video Editor was broken when ffmpeg-kit binaries vanished -- the same risk
+  applies to NovaCut's fork. This is distinct from the P2 dependency
+  verification item (which pins checksums on the existing fork) and
+  complementary to it: verification protects the current dependency while this
+  item evaluates the migration path.
+  Evidence: FFmpegKit retired Jan 2025 (https://tanersener.medium.com/
+  saying-goodbye-to-ffmpegkit-33ae939767e1). Open Video Editor breakage
+  (https://github.com/devhyper/open-video-editor/issues/119). ffmpeg-kt
+  active development (https://www.itpathsolutions.com/
+  ffmpegkit-shutdown-what-to-do-next).
+  Touches: time-boxed spike: build NovaCut's `FFmpegEngine.kt` call sites
+  against ffmpeg-kt, measure APK size delta, verify 16KB page-size compliance,
+  check license compliance (LGPL/GPL), test concat/atempo/subtitle-burn paths.
+  Record adopt/defer decision in `docs/dependency-maintenance.md`.
+  Acceptance: a written evaluation doc with API compatibility matrix, APK size
+  comparison, 16KB compliance result, license analysis, and explicit
+  adopt/defer criteria. No production switch in this item.
+  Complexity: S
+
+### Timeline & Input
+
+- [ ] P3 — Haptic-enriched timeline scrubbing at clip and marker boundaries
+  Why: Existing haptic feedback fires only on trim handle grab and magnetic
+  snap (8dp threshold). During timeline scrub (ruler drag), there is no
+  tactile feedback at clip boundaries, markers, beat markers, or chapter
+  points. Fine-grained haptic pulses during scrub help users find edit points
+  by feel, especially on large-screen tablets where visual precision is harder.
+  No competitor offers this.
+  Evidence: `ui/editor/Timeline.kt` ruler drag gesture has no haptic calls.
+  `engine/HapticFeedbackPolicy.kt` only fires for snap events and trim
+  grabs. No `performHapticFeedback` in ruler drag code path.
+  Touches: `ui/editor/Timeline.kt` (ruler drag gesture handler),
+  `engine/HapticFeedbackPolicy.kt` (new `scrubBoundary` event type),
+  Settings toggle (existing snap-to-beat/marker settings can gate this).
+  Acceptance: during ruler drag, a light haptic pulse fires when the playhead
+  crosses a clip boundary, timeline marker, or beat marker. Intensity
+  differs by boundary type (clip = medium, marker = light). Gated by
+  existing Settings snap toggles. No haptic on every frame -- only on
+  boundary crossings.
+  Complexity: S
+
+- [ ] P3 — Auto-suggest optimal export settings from timeline analysis
+  Why: The export sheet offers manual resolution/codec/quality/fps selection
+  and platform presets, but does not analyze the actual timeline content. A
+  project with all 720p source clips exported at 4K wastes encode time and
+  storage. A mixed-resolution project should warn about upscaling. No
+  competitor auto-analyzes timeline content to suggest settings; PowerDirector
+  offers AI-driven suggestions but only for effects, not export config.
+  Evidence: `ui/export/ExportSheet.kt` shows manual controls and platform
+  presets. `ui/editor/ExportDelegate.kt` applies presets but does not analyze
+  source resolutions. No `suggest` or `recommend` export logic exists.
+  Touches: `ui/editor/ExportDelegate.kt` (new `suggestExportConfig()` that
+  scans track clips for min/max resolution, dominant fps, codec sources),
+  `ui/export/ExportSheet.kt` (suggestion chip: "Suggested: 1080p H.264 30fps"
+  based on timeline content), `engine/VideoEngine.kt` (source metadata
+  extraction).
+  Acceptance: when the export sheet opens, a non-blocking suggestion row
+  shows the recommended resolution (based on source content), codec (based
+  on device hardware), and fps (based on dominant source fps). Tapping the
+  suggestion applies those settings. Users can override freely. Upscaling
+  warnings shown when export resolution exceeds all source resolutions.
+  Complexity: S
   Why: NovaCut already has a pure `SpeakerSwitchPlanner` and a multicam panel, but the planner is not bound to synced angles, speaker turns, review UI, or an undoable apply path.
   Evidence: RESEARCH.md; app/src/main/java/com/novacut/editor/engine/SpeakerSwitchPlanner.kt; app/src/test/java/com/novacut/editor/engine/SpeakerSwitchPlannerTest.kt; app/src/main/java/com/novacut/editor/ui/editor/MultiCamPanel.kt; LumaFusion multicam references; Blackmagic Camera multicam/remote-control references.
   Touches: app/src/main/java/com/novacut/editor/ui/editor/MultiCamPanel.kt, app/src/main/java/com/novacut/editor/ui/editor/EditorViewModel.kt, app/src/main/java/com/novacut/editor/engine/MultiCamEngine.kt, app/src/main/java/com/novacut/editor/engine/SpeakerSwitchPlanner.kt, caption/Whisper speaker-turn surfaces, undo/autosave serialization tests

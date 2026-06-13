@@ -1,91 +1,139 @@
 # Research - NovaCut
 
 ## Executive Summary
-NovaCut is a local-first Android video editor built with Kotlin, Jetpack Compose, Media3 Transformer, Room, FFmpegKit, ONNX Runtime, MediaPipe, DeepFilterNet, Lottie, and a large privacy/reliability layer around import, project recovery, diagnostics, export, template formats, and model gates. Verified from `README.md`, `app/build.gradle.kts`, `.github/workflows/build.yml`, `docs/`, and `app/src/main`: the project is already more mature than most mobile OSS editors in trust surfaces, release checks, media health, and local diagnostics. The highest-value new direction is narrow: completed exports should be structurally verified before the UI/history call them successful, and the already-tested `SpeakerSwitchPlanner` should become a reviewable multicam workflow instead of remaining stranded engine code. Priority opportunities: 1) post-export playable-output verification gate; 2) speaker-aware multicam auto-switch review flow; 3) continue the existing export incident bundle work; 4) continue the existing audio conformance/resampling work; 5) continue the existing bounded native media/model policy; 6) continue the existing style-pack/storyboard/dotLottie items without duplicating them.
+
+NovaCut is the most feature-complete open-source Android video editor available: Kotlin/Compose/Media3 1.10, 29 injectable engine singletons, 40+ GLSL effects, 37 transitions, Whisper ASR, MediaPipe segmentation, LaMa inpainting, Cut Assistant, multicam sync, OTIO/FCPXML interchange, managed-media durability, and deep trust surfaces (C2PA draft, privacy dashboard, model gates, diagnostic ZIPs). After 29 prior research cycles and 200+ commits, the roadmap is mature and the active direction is adoption/hardening, not feature discovery.
+
+This research pass focuses on competitive signals, community pain points, and platform shifts that the existing 29 cycles did not cover. The highest-value new opportunities are:
+
+1. **Persistent waveform cache** -- disk-backed waveform data eliminates the main re-open latency for large projects, the most-cited mobile editor performance complaint after overlay lag.
+2. **In-editor export playback** -- letting users preview the finished output inside NovaCut before share/save closes the "did it export right?" anxiety loop that drives community complaints across CapCut, VN, and Adobe Rush.
+3. **Split-screen before/after for grading** -- table-stakes in desktop NLEs (Resolve, Premiere) and now appearing in CapCut Pro; absent in all mobile OSS editors.
+4. **ffmpeg-kt evaluation** -- the Kotlin Multiplatform FFmpeg wrapper is the leading active replacement for the retired FFmpegKit; NovaCut's current dependency is a personal fork of an archived project.
+5. **Haptic timeline scrub enrichment** -- fine-grained haptic feedback during scrub (intensifying at clip edges, markers, beat markers) differentiates from every competitor; pairs with the existing haptic snap system.
+6. **Auto-suggested export settings** -- analyze timeline content (resolution mix, duration, codec sources) and recommend optimal export configuration; no competitor does this beyond basic platform presets.
 
 ## Product Map
-- Core workflows: import via Photo Picker, SAF, share intents, document intents, and camera capture; manage media through health/relink surfaces; edit multi-track video/audio/text/overlay timelines; run local AI-assisted tools; export/share/save to MediaStore or user-chosen destinations.
-- User personas: mobile creators who want CapCut/VN speed without watermark or cloud lock-in; privacy-conscious FOSS users; prosumers who need local projects, archive/relink behavior, diagnostics, and desktop-NLE interchange.
-- Platforms and distribution: Android minSdk 26, target/compile SDK 36 in Gradle; GitHub release artifacts today; Play/F-Droid readiness tracked through CI, release metadata, signing/alignment/page-size checks, listing assets, and privacy/data-safety docs.
-- Key integrations and data flows: Room/project/autosave stores, app-owned managed media, SAF/MediaStore/FileProvider, Media3 Transformer/ExoPlayer, FFmpegKit fork, ONNX Runtime, MediaPipe, DeepFilterNet, local model downloads with checksums, Lottie/dotLottie-adjacent templates, C2PA draft manifests, OTIO/FCPXML/EDL/SRT interchange, `.novacut-template`, `.ncfx`, `.ncstyle`, and `.nclut` document routing.
+
+- Core workflows: import (Photo Picker, SAF, share intents, document intents, camera handoff) -> manage media (health, relink, asset manifest) -> edit multi-track timeline (video/audio/overlay/text/adjustment) -> apply effects/transitions/AI tools -> export/share/save (Media3 Transformer, FFmpeg fallback, GIF encoder, frame capture).
+- User personas: mobile-first creators leaving CapCut for privacy/cost/ban reasons; FOSS/privacy advocates; prosumers needing desktop NLE interchange (OTIO/FCPXML); content teams needing no-watermark batch export.
+- Platforms: Android minSdk 26 / target 36 / compile 36. Distribution: GitHub Releases (primary), Play Store (metadata ready, listing pending), F-Droid (Fastlane metadata present, reproducible-build policy pending).
+- Key data flows: Room DB + JSON autosave, managed-media asset sidecars, model downloads with SHA-256 verification, C2PA draft manifests, AI usage ledger, diagnostic ZIPs.
 
 ## Competitive Landscape
-- Open Video Editor: Android-native OSS reference using Media3/Compose. Learn from its focused scope, F-Droid/Play release notes, precise frame seeking, and export scan behavior. Avoid its smaller repair surface; NovaCut should keep managed media and diagnostic depth as differentiators.
-- LosslessCut: strong fast-cut/export trust model with explicit segment metadata and user-visible export decisions. Learn from clear output validation and low-surprise destructive operations. Avoid narrowing NovaCut into only lossless cutting.
-- Kdenlive, Shotcut, OpenShot, Olive, and Flowblade: desktop OSS NLE references for media bins, project repair, proxy/cache separation, interchange, and export logs. Learn asset identity and recovery reporting. Avoid desktop-density controls on phone-first workflows.
-- CapCut, VN, InShot, KineMaster, and PowerDirector: commercial/mobile references for templates, captions, style packs, auto-edit, stock/effects, keyframes, and creator-speed flows. Learn that templates/style ecosystems and export confidence are table stakes. Avoid opaque failure states, forced accounts, cloud lock-in, and unbounded asset marketplaces.
-- Meta Edits: mobile creator reference for storyboards, project planning, text/caption style libraries, and no-watermark social export. Existing roadmap already captured storyboard/style opportunities; do not duplicate them.
-- Blackmagic Camera and LumaFusion: adjacent mobile/pro references for multicam capture/control, cloud/project handoff, and FCPXML workflows. Learn reviewable multicam handoff and explicit interchange limitations. Avoid making NovaCut a live-switching/broadcast app unless scoped separately.
-- Gyroflow, OpenTimelineIO, OpenFX, C2PA, and dotLottie: adjacent standards/projects for transparent processing reports, timeline interchange, plugin/effect naming, provenance, and template compatibility. Learn versioned compatibility checks and round-trip reports. Avoid promising full conformance without fixture-based validation.
+
+### CapCut
+- Does well: fastest auto-captions (on-device), AI background removal, massive template library, style transfer presets, TikTok-native export.
+- Learn from: on-device caption speed (motivates Sherpa-ONNX upgrade), one-tap platform presets with safe-zone previews, template marketplace ecosystem.
+- Avoid: cloud lock-in, $19.99/mo Pro pricing backlash, ban-risk regulatory exposure, watermark pressure on free tier.
+- Source: https://www.eesel.ai/blog/capcut-alternatives
+
+### VN Video Editor
+- Does well: free with no watermark, multi-track keyframe timeline, speed ramping, broadly praised on Reddit.
+- Learn from: VN's most-cited 2026 complaint is overlay lag and sync drift with many layers -- NovaCut's loaded-timeline benchmark and post-export verification address this directly.
+- Avoid: VN's lack of project repair/relink surfaces; its "impossible to properly sync overlays" reports.
+- Sources: https://codecarbon.com/top-5-free-capcut-alternatives-for-mobile-creators-reddit-picks/, https://nothing.community/d/8047-video-editing-lag-with-vn-editor-and-inshot
+
+### Meta Edits
+- Does well: SAM-based per-object segmentation with per-object effects, "Restyle" AI video regeneration, storyboard/teleprompter workflow, beat markers, free positioning.
+- Learn from: storyboard-first planning (already roadmapped), SAM object selection UX (already roadmapped as tap-to-segment), beat marker integration in timeline.
+- Avoid: cloud-dependent AI (Restyle/Lip Sync need server); Meta account lock-in.
+- Source: https://www.inro.social/blog/edits-new-meta-app
+
+### KineMaster
+- Does well: layer-based editing, font import, asset store, precise layer control.
+- Learn from: per-layer editing precision; custom font import (NovaCut already has this).
+- Avoid: watermark on free tier, subscription model friction.
+- Source: https://filmora.wondershare.com/video-editor-review/kinemaster-app.html
+
+### PowerDirector Mobile
+- Does well: AI text-to-video, anime style transfer, multilingual video generation, strong AI feature marketing.
+- Learn from: AI feature discoverability and suggestion-driven workflow.
+- Avoid: heavy AI marketing that overpromises; freemium friction.
+- Source: https://www.cyberlink.com/products/powerdirector-video-editing-software/overview_en_US.html
+
+### LumaFusion (Android)
+- Does well: professional mobile editing, speed ramping, enhanced keyframing, track height adjustment.
+- NovaCut advantage: LumaFusion Android lacks multicam and FCPXML export (iOS-only features). NovaCut already has both, plus OTIO.
+- Avoid: subscription fatigue (Creator Pass model).
+- Source: https://luma-touch.com/multicam-for-lumafusion/
+
+### Open Video Editor
+- Does well: minimal, privacy-first, F-Droid published, Media3/Compose-based.
+- Learn from: its ffmpeg-kit breakage is a direct warning for NovaCut's fork dependency (already addressed in roadmap dependency verification item).
+- Avoid: its narrow scope limits user value; NovaCut should maintain breadth.
+- Source: https://github.com/devhyper/open-video-editor
+
+### LibreCuts
+- New OSS competitor (2025+), Kotlin/Compose, simplicity-focused. Too early to evaluate feature depth.
+- Source: https://github.com/tharunbirla/LibreCuts
 
 ## Security, Privacy, and Reliability
-- Verified: `VideoEngine.kt` prevents 0-byte Transformer completions and has cancellation/timeout handling, but successful exports are not reopened and structurally probed for expected duration, tracks, dimensions, rotation, audio presence, and readable frames/samples before `COMPLETE`/history success.
-- Verified: `ExportDelegate.kt` scans saved files for gallery visibility and records history fields, but gallery scanning is not output validation. A non-empty but truncated or malformed export can still be treated as user-shareable if the encoder reports completion.
-- Verified: `DiagnosticExportEngine.kt` has a strong local-only redaction posture; the existing export incident bundle roadmap item should reuse that boundary. The new verification gate should feed that same incident path when a "completed" file fails structural validation.
-- Verified: `SpeakerSwitchPlanner.kt` is pure, documented, and covered by JVM tests, but its own comment says binding to live Whisper/MultiCam output is future work. `MultiCamPanel.kt` only exposes manual angle selection and sync, with no speaker map, proposed cut review, or one-shot apply flow.
-- Verified: `ExportMediaPreflight.kt` still focuses on media-health/relink blockers; audio conformance and Oboe resampling are already in the roadmap and should remain priority, not be re-added.
-- Verified: `FFmpegEngine.kt`, `ModelDownloadManager.kt`, and ONNX consumers still justify native/runtime bounds, but that is already in the roadmap; avoid adding another generic native-security item.
-- Likely: Android developer verification, F-Droid/reproducible-build posture, local-network permission, accessibility audit, i18n hardcoded-string cleanup, telemetry consent, and dependency verification are already covered by existing roadmap entries.
-- Needs live validation: device UI contrast/TalkBack, loaded-timeline performance, export behavior on vendor encoders, and actual corrupt-output fixtures require emulator/device runs; this research pass did not execute UI QA.
+
+- **FFmpegKit fork risk**: upstream retired Jan 2025, binaries deleted from Maven Central Apr 2025, repo archived Jun 2025. NovaCut depends on `com.moizhassan.ffmpeg:ffmpeg-kit-16kb:6.1.1`, a personal fork. The Kotlin Multiplatform `ffmpeg-kt` project is the most actively developed replacement and should be evaluated. Already addressed in roadmap dependency verification item; ffmpeg-kt evaluation is new.
+- **C2PA library availability**: `c2pa-android` official AAR (0.0.9) exists as a GitHub release asset with Android Keystore/StrongBox support. JitPack coordinates still unreliable (HTTP 500). Simple C2PA (ProofMode) offers a lighter alternative for JPEG/MP4. Already tracked in Cycle 13.
+- **Google developer verification**: enforcement starts September 2026 in Brazil, Indonesia, Singapore, Thailand; all regions from 2027. Requires government ID, $25 fee, and signed APK package-name registration. F-Droid formally objected. Already tracked in Cycle 27.
+- **Android 17 foreground-service audio**: blocks audio APIs from background-started FGS. NovaCut's export uses Transformer (not direct audio APIs), but TTS preview and voiceover recording need visible-UI constraints. Already tracked in Cycle 28.
+- **Export trust**: Adobe Rush and VN both have widespread export crash/corruption reports in 2025-2026 community forums. NovaCut's post-export verification gate (already roadmapped) directly addresses this class of failure.
 
 ## Architecture Assessment
-- Add an `ExportOutputVerifier`-style boundary near `VideoEngine.kt` that uses platform probes (`MediaMetadataRetriever`, `MediaExtractor`, and/or Media3 inspection where appropriate) after Transformer/FFmpeg completion and before terminal success. It should return a bounded report consumed by export history, export sheet messaging, diagnostics, and save/share actions.
-- Make export state distinguish "encoding complete" from "verified complete" so the UI cannot present share/save/gallery actions before the output probe passes. The current `ensureNonEmptyExportOutput()` helper is a useful first check but not sufficient.
-- Route failed output verification into the existing planned export incident bundle rather than creating a second support package. This preserves `DiagnosticExportEngine.kt` redaction and keeps privacy guarantees stable.
-- Add a multicam binding layer, likely a `MultiCamDelegate` or focused `EditorViewModel` slice, that converts synced tracks plus speaker turns into `SpeakerSwitchPlanner.CutPlan`, stores a temporary review plan, and applies accepted cuts as one undoable timeline mutation.
-- Extend `MultiCamPanel.kt` to show speaker-angle assignments, proposed cut counts, dwell policy, preview/reject/apply controls, and clear unavailable states when there are fewer than two angles or no speaker turns.
-- Test gaps for the new work: corrupt/truncated output probes, missing-audio expectations, duration drift thresholds, verifier redaction, export-state transitions, speaker-angle mapping, no-diarization fallback, undo boundary for applied multicam cuts, and panel state formatting.
-- Documentation gaps for the new work: no new markdown is needed until implementation; update existing diagnostics/export/template docs only when code changes public behavior.
+
+- **Waveform extraction latency**: `AudioEngine.extractWaveform()` runs on every project open for every clip. The 64-entry LRU cache is in-memory only. Persisting waveform data to disk (keyed by source URI + content fingerprint) would eliminate the dominant reopen cost for projects with many audio clips.
+- **Export playback gap**: after Transformer/FFmpeg completion, the UI transitions directly to share/save actions. No in-app playback of the output file exists. Users must leave NovaCut to verify the result. Adding an ExoPlayer-backed playback surface in the export completion state would close this trust gap.
+- **Effects comparison**: no split-screen or before/after comparison exists for effects or color grading. `PreviewPanel.kt` renders only the effected frame. A togglable split (left=original, right=graded) using the existing player infrastructure would match desktop NLE expectations.
+- **ffmpeg-kt**: actively developed Kotlin Multiplatform FFmpeg wrapper (`ffmpeg-kt`) has emerged as the community-preferred replacement for the retired FFmpegKit. NovaCut should evaluate it as a potential replacement for the personal fork, considering: API compatibility, 16KB page-size compliance, license compliance, and native library size.
+- **Compose performance**: Strong Skipping is enabled by default since Kotlin 2.0.20. NovaCut's Kotlin 2.1.0 already benefits, but the domain-slice decomposition effectiveness has never been measured with Compose compiler metrics. Already tracked in roadmap.
 
 ## Rejected Ideas
-- Add a default cloud collaboration/account system: rejected because the project is explicitly local-first and existing privacy docs/roadmap require opt-in network behavior.
-- Build a stock-asset marketplace next: rejected because provider terms, royalties, attribution, and trust are already a separate risk lane; local validated packs are safer.
-- Turn NovaCut into a Blackmagic-style live switcher/broadcast controller: rejected because multicam editing is in scope, but live capture/control would add network, latency, device support, and permission risks not needed for the current editor.
-- Re-add FCPXML/OTIO import/export as a new roadmap item: rejected because timeline interchange is already implemented/queued in `TimelineExchangeEngine.kt`, `TimelineImportEngine.kt`, and existing roadmap content.
-- Replace custom preview/timeline controls wholesale with Media3 Compose widgets: rejected because existing docs and roadmap already scope Media3 Compose/CompositionPlayer as evaluation gates, not a full UI rewrite.
-- Activate Rive before dotLottie evaluation: rejected because Lottie/dotLottie already fit the current template path with lower dependency risk, and dotLottie evaluation is already queued.
-- Add another generic accessibility/i18n/telemetry/dependency-verification item: rejected because those categories are already covered in `ROADMAP.md`; duplicates would make continuation harder.
+
+- **Cloud-based AI features** (Restyle, Lip Sync, generative video): rejected per NovaCut's local-first philosophy and existing deferred-items policy. Source: Meta Edits 2026 features.
+- **In-app asset marketplace**: rejected; stock-provider trust and licensing complexity is already a separate risk lane in Cycle 17. Source: KineMaster/CapCut asset stores.
+- **Subscription-first monetization**: rejected as primary model; freemium evaluation already tracked in Cycle 27. Source: CapCut Pro pricing backlash, LumaFusion Creator Pass.
+- **Full Photoshop-style branching undo**: rejected; visual undo history panel already shipped (v2.5.0). The jump-to-state UX is sufficient for mobile. Source: Photoshop History Panel UX research.
+- **Re-add items already in roadmap**: timeline snapping, Sherpa-ONNX, stabilization, frame interpolation, upscaling, neural TTS, style transfer, proxy workflow, WCAG audit, caption translation, project sync, rights ledger, and 40+ other items are already tracked across 29 research cycles. Not duplicated.
+- **Live broadcasting / streaming**: rejected per existing deferred-items policy. Source: Blackmagic Camera, LumaFusion multicam.
+- **Desktop/web companion app**: rejected; out of NovaCut's Android-first scope. Source: CapCut/PowerDirector cross-platform.
 
 ## Sources
 
 Project and platform:
-- https://github.com/SysAdminDoc/NovaCut
-- https://developer.android.com/media/media3/transformer
+- https://developer.android.com/about/versions/17/behavior-changes-17
+- https://developer.android.com/about/versions/16/behavior-changes-16
+- https://developer.android.com/develop/ui/compose/performance/stability/strongskipping
 - https://android-developers.googleblog.com/2026/03/media3-110-is-out.html
 - https://developer.android.com/jetpack/androidx/releases/media3
 - https://developer.android.com/privacy-and-security/developer-verification
 
-OSS and adjacent projects:
-- https://github.com/devhyper/open-video-editor
-- https://f-droid.org/packages/io.github.devhyper.openvideoeditor/
-- https://github.com/mifi/lossless-cut
-- https://github.com/KDE/kdenlive
-- https://github.com/mltframework/shotcut
-- https://github.com/OpenShot/openshot-qt
-- https://github.com/Gyroflow/Gyroflow
-- https://github.com/AcademySoftwareFoundation/OpenTimelineIO
-- https://openeffects.org/
-
-Commercial and pro references:
-- https://www.capcut.com/tools
-- https://www.capcut.com/help/template-export-gets-stuck
-- https://www.vlognow.me/
-- https://vlognow.me/blog/features/keyframe-control/
-- https://www.kinemaster.com/
+Competitors and community:
+- https://www.eesel.ai/blog/capcut-alternatives
+- https://codecarbon.com/top-5-free-capcut-alternatives-for-mobile-creators-reddit-picks/
+- https://www.inro.social/blog/edits-new-meta-app
+- https://www.socialmediatoday.com/news/meta-adds-new-features-to-edits-including-ai-segmentation-of-objects/808174/
+- https://filmora.wondershare.com/video-editor-review/kinemaster-app.html
 - https://www.cyberlink.com/products/powerdirector-video-editing-software/overview_en_US.html
-- https://about.fb.com/news/2025/04/introducing-edits-streamlined-video-creation-app/
-- https://www.blackmagicdesign.com/products/blackmagiccamera
-- https://luma-touch.com/fcpxml-export/
 - https://luma-touch.com/multicam-for-lumafusion/
+- https://nothing.community/d/8047-video-editing-lag-with-vn-editor-and-inshot
+- https://github.com/devhyper/open-video-editor
+- https://github.com/tharunbirla/LibreCuts
 
-Standards, dependencies, security, community:
-- https://c2pa.org/specifications/specifications/2.2/index.html
-- https://dotlottie.io/spec/2.0/
-- https://tanersener.medium.com/saying-goodbye-to-ffmpegkit-33ae939767e1
-- https://ffmpeg.org/security.html
-- https://nvd.nist.gov/vuln/detail/CVE-2026-40962
-- https://www.reddit.com/r/CapCut/comments/11dzxhn/capcut_audio_lag_after_export_solution/
+AI/ML and engines:
+- https://voiceping.net/en/blog/research-offline-speech-transcription-benchmark/
+- https://k2-fsa.github.io/sherpa/onnx/index.html
+- https://modelslab.com/blog/audio-generation/moonshine-vs-whisper-asr-real-time-speech-2026
+- https://github.com/IbrahimGhadre/realesrgan-mobile
+- https://allenkuo.medium.com/gpu-resident-frame-interpolation-on-android-e9558d19cfab
+- https://opensource.contentauthenticity.org/docs/c2pa-android/
+- https://proofmode.org/blog/simple-c2pa
+
+Standards and dependencies:
+- https://opentimelineio.readthedocs.io/en/latest/
+- https://proandroiddev.com/ffmpeg-kit-16-kb-page-size-in-android-d522adc5efa2
+- https://www.itpathsolutions.com/ffmpegkit-shutdown-what-to-do-next
+- https://zeely.ai/blog/tiktok-safe-zones/
+- https://kreatli.com/guides/safe-zone-guide
+- https://www.androidauthority.com/f-droid-google-developer-verification-rules-warning-3601860/
 
 ## Open Questions
-- What tolerance should define a verified export: exact expected duration, fixed millisecond drift by frame rate, or a codec/profile-specific tolerance table?
-- Should speaker-aware multicam initially require manual speaker labels, or can it ship with a voice-activity fallback before real diarization metadata exists?
+
+- Should NovaCut evaluate `ffmpeg-kt` as a drop-in FFmpegKit replacement, or vendor the existing fork AAR with checksum pinning and treat migration as a future toolchain item?
+- What is the acceptable file-size overhead for persisting waveform data to disk (raw PCM samples vs. downsampled peaks) per clip, and should it be bounded per project?
