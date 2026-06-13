@@ -15,6 +15,8 @@ import com.novacut.editor.engine.C2paExportEngine
 import com.novacut.editor.engine.ContactSheetExporter
 import com.novacut.editor.engine.ExportHistoryStatus
 import com.novacut.editor.engine.ExportHistoryStore
+import com.novacut.editor.engine.ExportIncidentBuilder
+import com.novacut.editor.engine.ExportIncidentStore
 import com.novacut.editor.engine.ExportService
 import com.novacut.editor.engine.ExportState
 import com.novacut.editor.engine.MediaHealthReport
@@ -60,9 +62,12 @@ class ExportDelegate(
     private val showExportSheet: () -> Unit,
     private val streamCopyEngine: StreamCopyExportEngine? = null,
     private val c2paExportEngine: C2paExportEngine? = null,
-    private val mediaHealthPreflight: (EditorState) -> MediaHealthReport? = { it.media.healthReport }
+    private val mediaHealthPreflight: (EditorState) -> MediaHealthReport? = { it.media.healthReport },
+    private val exportIncidentStore: ExportIncidentStore? = null,
+    private val appVersion: String = "unknown"
 ) {
     // --- Export ---
+    private val progressSamples = mutableListOf<Float>()
     // Holder for the GIF-style / contact-sheet / any other non-Transformer
     // export coroutine. The Transformer-based video export is cancelled via
     // `videoEngine.cancelExport()` directly; this job covers the paths that
@@ -86,6 +91,7 @@ class ExportDelegate(
     }
 
     private fun markExportStarted(startedAtMs: Long = System.currentTimeMillis()): Long {
+        progressSamples.clear()
         updateExport {
             it.copy(
                 startTime = startedAtMs,
@@ -96,6 +102,58 @@ class ExportDelegate(
             )
         }
         return startedAtMs
+    }
+
+    private fun sampleProgress(progress: Float) {
+        synchronized(progressSamples) {
+            progressSamples.add(progress.coerceIn(0f, 1f))
+        }
+    }
+
+    private fun recordExportIncident(
+        sourceState: EditorState,
+        failedPhase: String,
+        error: Throwable?,
+        errorMessage: String?,
+        config: ExportConfig,
+        timelineDurationMs: Long,
+        startedAtMs: Long,
+        streamCopyAttempted: Boolean = false,
+        healthReport: MediaHealthReport? = sourceState.media.healthReport
+    ) {
+        val store = exportIncidentStore ?: return
+        val samples = synchronized(progressSamples) { progressSamples.toList() }
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                val bundle = ExportIncidentBuilder.build(
+                    appVersion = appVersion,
+                    projectId = sourceState.project.id,
+                    projectName = sourceState.project.name,
+                    failedPhase = failedPhase,
+                    error = error,
+                    errorMessage = errorMessage,
+                    codecLabel = if (config.exportAudioOnly || config.exportStemsOnly) {
+                        config.audioCodec.label
+                    } else config.codec.label,
+                    resolutionLabel = if (config.exportAudioOnly || config.exportStemsOnly) {
+                        "Audio"
+                    } else config.resolution.label,
+                    frameRate = config.frameRate,
+                    exportAudioOnly = config.exportAudioOnly,
+                    hdrRequested = config.hdr10PlusMetadata,
+                    streamCopyAttempted = streamCopyAttempted,
+                    timelineDurationMs = timelineDurationMs,
+                    startedAtMs = startedAtMs,
+                    progressSamples = samples,
+                    mediaWarningCount = healthReport?.warningCount ?: 0,
+                    mediaBlockingCount = healthReport?.blockingCount ?: 0,
+                    mediaHealthSummary = healthReport?.let {
+                        "${it.totalReferences} refs, ${it.warningCount} warnings, ${it.blockingCount} blocking"
+                    }
+                )
+                store.save(bundle)
+            }
+        }
     }
 
     private fun recordExportHistory(
@@ -826,6 +884,16 @@ class ExportDelegate(
                     diagnosticSummary = "Video export failed in the encoder pipeline.",
                     healthReport = healthReport
                 )
+                recordExportIncident(
+                    sourceState = currentState,
+                    failedPhase = "encoder",
+                    error = e,
+                    errorMessage = message,
+                    config = configWithChapters,
+                    timelineDurationMs = totalDurationMs,
+                    startedAtMs = startedAtMs,
+                    healthReport = healthReport
+                )
             }
 
             try {
@@ -873,6 +941,7 @@ class ExportDelegate(
                         imageOverlays = currentState.imageOverlays,
                         trackedObjects = currentState.trackedObjects,
                         onProgress = { progress ->
+                            sampleProgress(progress)
                             updateExport { it.copy(progress = progress) }
                         },
                         onComplete = ::handleVideoExportComplete,
@@ -889,6 +958,7 @@ class ExportDelegate(
                     imageOverlays = currentState.imageOverlays,
                     trackedObjects = currentState.trackedObjects,
                     onProgress = { progress ->
+                        sampleProgress(progress)
                         updateExport { it.copy(progress = progress) }
                     },
                     onComplete = ::handleVideoExportComplete,
@@ -920,6 +990,16 @@ class ExportDelegate(
                     timelineDurationMs = totalDurationMs,
                     errorMessage = message,
                     diagnosticSummary = "Video export failed before the encoder could finish.",
+                    healthReport = healthReport
+                )
+                recordExportIncident(
+                    sourceState = currentState,
+                    failedPhase = "setup",
+                    error = e,
+                    errorMessage = message,
+                    config = configWithChapters,
+                    timelineDurationMs = totalDurationMs,
+                    startedAtMs = startedAtMs,
                     healthReport = healthReport
                 )
             }
