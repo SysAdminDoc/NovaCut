@@ -78,7 +78,9 @@ fun EditorScreen(
     viewModel: EditorViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val playheadMs by viewModel.playheadMs.collectAsStateWithLifecycle()
+    val playheadState = viewModel.playheadMs.collectAsStateWithLifecycle()
+    val playheadMs by playheadState
+    val playheadMsProvider: () -> Long = { playheadState.value }
     val oneHandedMode by viewModel.oneHandedMode.collectAsStateWithLifecycle()
     val desktopOverride by viewModel.desktopOverride.collectAsStateWithLifecycle()
     val layoutMode = rememberLayoutMode(oneHandedMode, desktopOverride)
@@ -849,6 +851,7 @@ fun EditorScreen(
                         tracks = state.tracks,
                         playheadMs = playheadMs,
                         totalDurationMs = state.totalDurationMs,
+                        playheadMsProvider = playheadMsProvider,
                         zoomLevel = state.zoomLevel,
                         scrollOffsetMs = state.scrollOffsetMs,
                         selectedClipId = state.selectedClipId,
