@@ -398,6 +398,17 @@
     <string name="settings_diagnostic_rebuild">reconstruir</string>
     <string name="settings_diagnostic_share_chooser">Compartir ZIP de diagnóstico</string>
     <string name="settings_reset_notice_message">La configuración se restableció a los valores predeterminados después de que no se pudo leer el archivo de preferencias. Se incluirá un informe de restablecimiento redactado en los ZIP de diagnóstico.</string>
+    <string name="settings_updates_section_title">Actualizaciones</string>
+    <string name="settings_updates_section_description">Solo para instalaciones externas y de versiones de GitHub. NovaCut nunca descarga ni instala una actualización por ti.</string>
+    <string name="settings_update_check_label">Buscar actualizaciones</string>
+    <string name="settings_update_check_description">Cuando está activado, NovaCut hace una sola solicitud segura a la página de versiones de GitHub para ver si existe una versión más reciente. Desactivado de forma predeterminada.</string>
+    <string name="settings_update_check_now_label">Buscar ahora</string>
+    <string name="settings_update_check_now_description">Compara la versión instalada con la última versión de GitHub.</string>
+    <string name="settings_update_check_now_action">Buscar</string>
+    <string name="settings_update_checking_action">Buscando…</string>
+    <string name="settings_update_available_label">Actualización disponible: %1$s</string>
+    <string name="settings_update_available_description">Abre la página de versiones de GitHub para que puedas descargar la nueva versión.</string>
+    <string name="settings_update_view_action">Ver</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_about_description">Detalles de compilación y motor para solución de problemas y soporte.</string>
     <string name="settings_version">Versión</string>
@@ -408,6 +419,9 @@
     <string name="settings_off">Apagado</string>
     <string name="preview_scopes">Alcances</string>
     <string name="preview_composition_guides">Guías de composición</string>
+    <string name="preview_compare">Comparación antes/después</string>
+    <string name="preview_compare_original">Original</string>
+    <string name="preview_compare_edited">Editado</string>
     <string name="preview_add_media">Agregue medios para comenzar</string>
     <string name="preview_back_5s">Atrás 5</string>
     <string name="preview_previous_frame">Fotograma anterior</string>
@@ -590,6 +604,9 @@
     <string name="media_picker_importing_image_description">Manteniendo esto todavía disponible en el proyecto.</string>
     <string name="media_picker_importing_capture_title">Guardando captura</string>
     <string name="media_picker_importing_capture_description">Mover el clip grabado al medio de su proyecto.</string>
+    <string name="media_picker_insufficient_space">No hay suficiente espacio de almacenamiento para importar este medio.</string>
+    <string name="audio_conformance_mixed_rates">Los clips tienen frecuencias de muestreo mixtas. El audio se volverá a muestrear para coincidir con el formato de exportación.</string>
+    <string name="audio_conformance_mixed_channels">Los clips tienen configuraciones de canales mixtas. El audio se normalizará para la exportación.</string>
     <string name="media_picker_audio_only">Ese archivo no es audio. Elija un .mp3, .m4a, .wav, .ogg o .flac.</string>
     <string name="projects_app_title">NovaCut</string>
     <string name="projects_count">%1$d proyecto%2$s</string>
@@ -868,8 +885,10 @@
     <string name="tool_proxy_edit">Proxy\nEditar</string>
     <string name="tool_beat_sync">Beat\nSincronizar</string>
     <string name="tool_auto_edit">Auto\nEditar</string>
+    <string name="tool_storyboard">Guion\ngráfico</string>
     <string name="tool_multi_cam">Cámara múltiple\n</string>
     <string name="tool_marker_list">Marcador\nLista</string>
+    <string name="tool_project_inspector">Info del\nproyecto</string>
     <string name="tool_add_media">Add Media</string>
     <string name="tool_export">Export</string>
     <string name="tool_undo">Undo</string>
@@ -1502,6 +1521,7 @@
     <string name="cd_smart_reframe">Replanteo inteligente</string>
     <string name="cd_clip_thumbnail">Miniatura del clip</string>
     <string name="cd_clip_source_missing">Fuente del clip no encontrada</string>
+    <string name="cd_clip_locked">Bloqueado</string>
     <string name="cd_tts_preview">Vista previa del discurso</string>
     <string name="settings_editor">Redactor</string>
     <string name="settings_editor_description">Elija cuánto control y orientación muestra el editor de forma predeterminada.</string>
@@ -1929,4 +1949,27 @@
     <string name="trash_delete_forever_action">Eliminar para siempre</string>
     <string name="keyframe_time_label">Tiempo (s)</string>
     <string name="keyframe_value_label">Valor</string>
+
+    <!-- Project Inspector -->
+    <string name="inspector_title">Inspector de proyecto</string>
+    <string name="inspector_section_media">Medios</string>
+    <string name="inspector_section_issues">Problemas</string>
+    <string name="inspector_section_export">Ajustes de exportación</string>
+    <string name="inspector_section_storage">Almacenamiento y recuperación</string>
+    <string name="inspector_clips">Clips</string>
+    <string name="inspector_video_tracks">Pistas de video</string>
+    <string name="inspector_audio_tracks">Pistas de audio</string>
+    <string name="inspector_overlay_tracks">Pistas de superposición</string>
+    <string name="inspector_text_overlays">Superposiciones de texto</string>
+    <string name="inspector_effects">Efectos</string>
+    <string name="inspector_keyframes">Fotogramas clave</string>
+    <string name="inspector_duration">Duración</string>
+    <string name="inspector_missing_media">%1$d archivo(s) de medios faltante(s)</string>
+    <string name="inspector_resolution">Resolución</string>
+    <string name="inspector_codec">Códec</string>
+    <string name="inspector_frame_rate">Velocidad de fotogramas</string>
+    <string name="inspector_autosave_size">Tamaño de autoguardado</string>
+    <string name="inspector_last_saved">Último guardado</string>
+    <string name="inspector_backup_files">Archivos de respaldo</string>
+    <string name="inspector_db_version">Versión del esquema</string>
 </resources>
