@@ -1,0 +1,3 @@
+- Localized remaining AI tool status and result messages.
+- Replaced unfinished AI tool fallback copy with release-safe messages.
+- Bumped release metadata to version 3.74.99.

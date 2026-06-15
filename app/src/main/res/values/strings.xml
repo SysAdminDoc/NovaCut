@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.74.98</string>
+    <string name="app_version">v3.74.99</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -243,6 +243,57 @@
     <string name="ai_face_tracking_failed_toast">Face tracking failed. Try a clip with a clearer face.</string>
     <string name="ai_smart_reframe_failed_toast">Smart reframe failed. Try a different clip.</string>
     <string name="ai_upscale_failed_toast">Upscale failed. Try a different clip or resolution.</string>
+    <string name="ai_no_scene_changes_toast">No scene changes detected.</string>
+    <string name="ai_scene_split_toast">Split into %1$d clips at scene boundaries.</string>
+    <string name="ai_transcribing_whisper_toast">Transcribing with Whisper…</string>
+    <string name="ai_no_speech_detected_toast">No speech detected.</string>
+    <string name="ai_caption_source_whisper">Whisper</string>
+    <string name="ai_caption_source_energy_detection">energy detection</string>
+    <string name="ai_captions_added_toast">Added %1$d captions (%2$s).</string>
+    <string name="ai_crop_analyze_failed_toast">Could not analyze the frame for crop.</string>
+    <string name="ai_smart_crop_applied_toast">Smart crop applied (%1$.0f%% confidence).</string>
+    <string name="ai_color_analyze_failed_toast">Could not analyze color.</string>
+    <string name="ai_colors_ok_toast">Colors already look good.</string>
+    <string name="ai_color_corrections_applied_toast">Applied %1$d color corrections.</string>
+    <string name="ai_video_stable_toast">Video is already stable.</string>
+    <string name="ai_stabilized_summary_toast">Stabilized: %1$.0f%% shake corrected, %2$.0f%% zoom applied.</string>
+    <string name="ai_audio_noise_analyze_failed_toast">Could not analyze audio noise.</string>
+    <string name="ai_audio_clean_toast">Audio is already clean (SNR: %1$.0f dB).</string>
+    <string name="ai_denoised_summary_toast">Denoised: SNR %1$.0f dB, reduction %2$.0f%%.</string>
+    <string name="ai_subject_not_detected_toast">Could not detect a subject in the frame.</string>
+    <string name="ai_background_removed_toast">AI background removal applied (%1$.0f%% coverage).</string>
+    <string name="ai_background_replace_ready_toast">Background removed. Add replacement media on the track below.</string>
+    <string name="ai_background_not_detected_toast">Could not detect the background.</string>
+    <string name="ai_bg_type_green_screen">green screen</string>
+    <string name="ai_bg_type_blue_screen">blue screen</string>
+    <string name="ai_bg_type_background">background</string>
+    <string name="ai_bg_action_removal">removal</string>
+    <string name="ai_bg_action_replace">replacement</string>
+    <string name="ai_background_fallback_applied_toast">Applied %1$s %2$s (%3$.0f%% confidence).</string>
+    <string name="ai_motion_tracking_empty_toast">Motion tracking could not find stable points.</string>
+    <string name="ai_motion_tracking_applied_toast">Tracked %1$d motion points across the clip.</string>
+    <string name="ai_style_analyzing_toast">Analyzing frame style…</string>
+    <string name="ai_frame_style_analyze_failed_toast">Could not analyze frame style.</string>
+    <string name="ai_style_adjustments_not_needed_toast">No style adjustments needed for %1$s.</string>
+    <string name="ai_style_applied_toast">Applied %1$s style (%2$d effects).</string>
+    <string name="ai_face_tracking_detecting_toast">Face tracking: detecting faces…</string>
+    <string name="ai_face_tracked_toast">Face tracked: %1$d points.</string>
+    <string name="ai_face_not_detected_toast">No face detected.</string>
+    <string name="ai_smart_reframe_applied_toast">Smart reframed for vertical (%1$.0f%%).</string>
+    <string name="ai_smart_reframe_region_failed_toast">Could not determine a reframe region.</string>
+    <string name="ai_upscale_analyzing_toast">Analyzing source resolution…</string>
+    <string name="ai_upscale_max_resolution_toast">Already at maximum resolution (%1$dx%2$d).</string>
+    <string name="ai_upscale_applied_toast">Upscaled to %1$s with sharpening applied.</string>
+    <string name="ai_object_removal_unavailable_toast">Object removal painting is not ready in this build.</string>
+    <string name="ai_stabilize_fallback_toast">Advanced stabilization is unavailable on this device. Using basic stabilization.</string>
+    <string name="ai_basic_stabilization_applied_toast">Basic stabilization applied (%1$.0f%% shake).</string>
+    <string name="ai_motion_analysis_failed_fallback_toast">Motion analysis failed. Basic stabilization remains available.</string>
+    <string name="ai_camera_motion_analyzing_toast">Analyzing camera motion…</string>
+    <string name="ai_applying_stabilization_toast">Applying stabilization (%1$d frames)…</string>
+    <string name="ai_stabilization_empty_output_toast">Stabilization failed because the output was empty.</string>
+    <string name="ai_stabilized_crop_toast">Stabilized with %1$.0f%% crop.</string>
+    <string name="ai_stabilization_unavailable_toast">Stabilization output could not be created on this device. Basic stabilization remains available.</string>
+    <string name="ai_model_size_not_available">Availability varies by model pack.</string>
     <string name="audio_mastering_unknown_preset">That mastering preset is not available.</string>
     <string name="audio_track_not_found">That audio track is no longer available.</string>
     <string name="audio_mastering_audio_video_only">Mastering presets apply to audio or video tracks only.</string>
