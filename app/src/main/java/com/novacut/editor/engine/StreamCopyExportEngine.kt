@@ -107,7 +107,7 @@ class StreamCopyExportEngine @Inject constructor(
         opacity != 1f -> "clip opacity < 1"
         anchorX != 0.5f || anchorY != 0.5f -> "clip anchor moved"
         blendMode != BlendMode.NORMAL -> "clip uses blend mode"
-        transition != null -> "clip has transition"
+        headTransition != null || tailTransition != null -> "clip has transition"
         masks.isNotEmpty() -> "clip has mask"
         fadeInMs > 0L -> "clip has audio fade-in"
         fadeOutMs > 0L -> "clip has audio fade-out"
