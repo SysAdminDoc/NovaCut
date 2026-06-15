@@ -351,7 +351,10 @@ fun Timeline(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     TimelineToolbarButton(
                         icon = Icons.Default.Remove,
                         contentDescription = stringResource(R.string.cd_zoom_out),

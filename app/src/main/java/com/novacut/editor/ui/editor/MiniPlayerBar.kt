@@ -10,8 +10,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.novacut.editor.R
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.TouchTarget
 
 @Composable
 fun MiniPlayerBar(
@@ -55,11 +59,13 @@ fun MiniPlayerBar(
             ) {
                 IconButton(
                     onClick = onTogglePlayback,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(TouchTarget.minimum)
                 ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = stringResource(
+                            if (isPlaying) R.string.preview_pause else R.string.preview_play
+                        ),
                         tint = Mocha.Rosewater,
                         modifier = Modifier.size(18.dp)
                     )
@@ -70,7 +76,9 @@ fun MiniPlayerBar(
                 text = formatTimecode(playheadMs),
                 color = Mocha.Text,
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.width(46.dp)
+                modifier = Modifier.width(46.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             Slider(
@@ -82,7 +90,7 @@ fun MiniPlayerBar(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .height(24.dp),
+                    .height(TouchTarget.minimum),
                 colors = SliderDefaults.colors(
                     thumbColor = Mocha.Sky,
                     activeTrackColor = Mocha.Sky,
@@ -96,7 +104,9 @@ fun MiniPlayerBar(
                 text = formatTimecode(totalDurationMs),
                 color = Mocha.Subtext0,
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.width(46.dp)
+                modifier = Modifier.width(46.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

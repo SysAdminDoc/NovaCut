@@ -66,6 +66,7 @@ import com.novacut.editor.ui.theme.NovaCutSectionHeader
 import com.novacut.editor.ui.theme.NovaCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
+import com.novacut.editor.ui.theme.TouchTarget
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.roundToInt
@@ -1019,7 +1020,7 @@ private fun SettingsFeedbackBanner(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
-            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = onDismiss, modifier = Modifier.size(TouchTarget.minimum)) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = stringResource(R.string.close),

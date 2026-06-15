@@ -55,6 +55,7 @@ import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Clip
 import com.novacut.editor.model.ImageOverlay
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.TouchTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -304,7 +305,7 @@ fun PreviewPanel(
                                     ) {
                                         IconButton(
                                             onClick = onToggleScopes,
-                                            modifier = Modifier.size(38.dp)
+                                            modifier = Modifier.size(TouchTarget.minimum)
                                         ) {
                                             Icon(
                                                 Icons.Default.Insights,
@@ -325,7 +326,7 @@ fun PreviewPanel(
                                 ) {
                                     IconButton(
                                         onClick = onToggleCompositionGuides,
-                                        modifier = Modifier.size(38.dp)
+                                        modifier = Modifier.size(TouchTarget.minimum)
                                     ) {
                                         Icon(
                                             Icons.Default.GridOn,
@@ -346,7 +347,7 @@ fun PreviewPanel(
                                     ) {
                                         IconButton(
                                             onClick = onToggleSplitPreview,
-                                            modifier = Modifier.size(38.dp)
+                                            modifier = Modifier.size(TouchTarget.minimum)
                                         ) {
                                             Icon(
                                                 Icons.Default.Compare,
@@ -443,7 +444,7 @@ fun PreviewPanel(
                 ) {
                     IconButton(
                         onClick = onTogglePlayback,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(TouchTarget.minimum)
                     ) {
                         Icon(
                             if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,

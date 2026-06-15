@@ -2,6 +2,8 @@ package com.novacut.editor.ui.editor
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,12 +19,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.model.TrackType
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.TouchTarget
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -59,7 +65,7 @@ internal fun TimelineToolbarButton(
         IconButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = Modifier.size(if (compact) 34.dp else 38.dp)
+            modifier = Modifier.size(TouchTarget.minimum)
         ) {
             Icon(
                 imageVector = icon,
@@ -101,21 +107,28 @@ internal fun TimelineTextActionChip(
     onClick: () -> Unit
 ) {
     Surface(
+        modifier = Modifier
+            .defaultMinSize(minHeight = TouchTarget.minimum)
+            .clickable(role = Role.Button, onClick = onClick),
         color = Mocha.PanelHighest,
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, Mocha.CardStroke)
     ) {
-        Text(
-            text = text,
-            color = Mocha.Text,
-            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-            modifier = Modifier
-                .clickable(onClick = onClick)
-                .padding(
-                    horizontal = if (compact) 10.dp else 12.dp,
-                    vertical = if (compact) 5.dp else 6.dp
-                )
-        )
+        Box(
+            modifier = Modifier.padding(
+                horizontal = if (compact) 10.dp else 12.dp,
+                vertical = if (compact) 5.dp else 6.dp
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                color = Mocha.Text,
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

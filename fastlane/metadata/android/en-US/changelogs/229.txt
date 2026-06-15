@@ -1,0 +1,3 @@
+- Improved preview and timeline control accessibility with 48dp interaction targets.
+- Added narrow-screen scrolling for timeline toolbar controls.
+- Localized Mini Player play/pause accessibility labels.
