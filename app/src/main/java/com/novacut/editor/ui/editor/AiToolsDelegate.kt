@@ -333,7 +333,7 @@ class AiToolsDelegate(
             .sortedDescending()
             .toList()
         if (splitOffsets.isEmpty()) {
-            showToast("No scene changes detected")
+            showToast(text(R.string.ai_no_scene_changes_toast))
             return
         }
         saveUndoState("AI scene detect")
@@ -378,15 +378,15 @@ class AiToolsDelegate(
         }
         rebuildPlayerTimeline()
         saveProject()
-        showToast("Split into ${splitOffsets.size + 1} clips at scene boundaries")
+        showToast(text(R.string.ai_scene_split_toast, splitOffsets.size + 1))
     }
 
     private suspend fun runAutoCaptions(clip: Clip) {
         val useWhisper = aiFeatures.whisperEngine.isReady()
-        if (useWhisper) showToast("Transcribing with Whisper...")
+        if (useWhisper) showToast(text(R.string.ai_transcribing_whisper_toast))
         val captions = withContext(Dispatchers.Default) { aiFeatures.generateAutoCaptions(clip.sourceUri) }
         if (captions.isEmpty()) {
-            showToast("No speech detected")
+            showToast(text(R.string.ai_no_speech_detected_toast))
             return
         }
         saveUndoState("AI auto captions")
@@ -401,8 +401,12 @@ class AiToolsDelegate(
             state.copy(textOverlays = existing + deduped)
         }
         saveProject()
-        val source = if (useWhisper) "Whisper" else "energy detection"
-        showToast("Added ${captions.size} captions ($source)")
+        val source = if (useWhisper) {
+            text(R.string.ai_caption_source_whisper)
+        } else {
+            text(R.string.ai_caption_source_energy_detection)
+        }
+        showToast(text(R.string.ai_captions_added_toast, captions.size, source))
     }
 
     private suspend fun runSmartCrop(clip: Clip) {
@@ -411,7 +415,7 @@ class AiToolsDelegate(
         ) }
         val confidence = safeConfidence(suggestion.confidence)
         if (confidence < 0.1f) {
-            showToast("Could not analyze frame for crop")
+            showToast(text(R.string.ai_crop_analyze_failed_toast))
             return
         }
         val centerX = safeAiFloat(suggestion.centerX, 0.5f, 0f, 1f)
@@ -421,13 +425,13 @@ class AiToolsDelegate(
         // setClipTransform no longer auto-saves (it's called per-tick from drag); AI
         // tool invocations are one-shot, so persist explicitly after the change.
         saveProject()
-        showToast("Smart crop applied (${"%.0f".format(confidence * 100)}% confidence)")
+        showToast(text(R.string.ai_smart_crop_applied_toast, confidence * 100))
     }
 
     private suspend fun runAutoColor(clip: Clip) {
         val correction = withContext(Dispatchers.Default) { aiFeatures.autoColorCorrect(clip.sourceUri) }
         if (safeConfidence(correction.confidence) < 0.1f) {
-            showToast("Could not analyze color")
+            showToast(text(R.string.ai_color_analyze_failed_toast))
             return
         }
         saveUndoState("AI auto color")
@@ -446,7 +450,7 @@ class AiToolsDelegate(
                 add(Effect(type = EffectType.TEMPERATURE, params = mapOf("value" to temperature)))
         }
         if (newEffects.isEmpty()) {
-            showToast("Colors already look good!")
+            showToast(text(R.string.ai_colors_ok_toast))
             return
         }
         stateFlow.update { state ->
@@ -463,7 +467,7 @@ class AiToolsDelegate(
         }
         rebuildPlayerTimeline()
         saveProject()
-        showToast("Applied ${newEffects.size} color corrections")
+        showToast(text(R.string.ai_color_corrections_applied_toast, newEffects.size))
     }
 
     private suspend fun runStabilize(clip: Clip) {
@@ -472,7 +476,7 @@ class AiToolsDelegate(
         val shakeMagnitude = safeAiFloat(result.shakeMagnitude, 0f, 0f, 1f)
         val zoom = safeAiFloat(result.recommendedZoom, 1f, 1f, 5f)
         if (confidence < 0.1f || shakeMagnitude < 0.001f) {
-            showToast("Video is already stable")
+            showToast(text(R.string.ai_video_stable_toast))
             return
         }
         saveUndoState("AI stabilize")
@@ -501,7 +505,7 @@ class AiToolsDelegate(
         }
         rebuildPlayerTimeline()
         saveProject()
-        showToast("Stabilized: ${"%.0f".format(shakeMagnitude * 100)}% shake corrected, ${"%.0f".format((zoom - 1f) * 100)}% zoom applied")
+        showToast(text(R.string.ai_stabilized_summary_toast, shakeMagnitude * 100, (zoom - 1f) * 100))
     }
 
     private suspend fun runDenoise(clip: Clip) {
@@ -510,11 +514,11 @@ class AiToolsDelegate(
         val signalToNoiseDb = safeAiFloat(profile.signalToNoiseDb, 60f, -120f, 120f)
         val recommendedReduction = safeAiFloat(profile.recommendedReduction, 0f, 0f, 1f)
         if (confidence < 0.1f) {
-            showToast("Could not analyze audio noise")
+            showToast(text(R.string.ai_audio_noise_analyze_failed_toast))
             return
         }
         if (signalToNoiseDb > 40f) {
-            showToast("Audio is already clean (SNR: ${"%.0f".format(signalToNoiseDb)}dB)")
+            showToast(text(R.string.ai_audio_clean_toast, signalToNoiseDb))
             return
         }
         saveUndoState("AI denoise")
@@ -535,7 +539,7 @@ class AiToolsDelegate(
         }
         rebuildPlayerTimeline()
         saveProject()
-        showToast("Denoised: SNR ${"%.0f".format(signalToNoiseDb)}dB, reduction ${"%.0f".format(recommendedReduction * 100)}%")
+        showToast(text(R.string.ai_denoised_summary_toast, signalToNoiseDb, recommendedReduction * 100))
     }
 
     private suspend fun runRemoveBg(clip: Clip) {
@@ -543,7 +547,7 @@ class AiToolsDelegate(
         if (segEngine.isReady()) {
             val result = withContext(Dispatchers.Default) { segEngine.segmentVideoFrame(clip.sourceUri) }
             if (result == null || safeConfidence(result.confidence) < 0.05f) {
-                showToast("Could not detect subject in frame")
+                showToast(text(R.string.ai_subject_not_detected_toast))
                 return
             }
             saveUndoState("AI remove background")
@@ -554,7 +558,7 @@ class AiToolsDelegate(
                 effectKind = AiUsageLedger.EffectKind.BACKGROUND_REMOVAL_LOCAL,
                 modelName = "MediaPipe Selfie Segmenter"
             )
-            showToast("AI background removal applied (${"%.0f".format(safeConfidence(result.confidence) * 100)}% coverage)")
+            showToast(text(R.string.ai_background_removed_toast, safeConfidence(result.confidence) * 100))
         } else {
             applyChromaKeyFallback(clip, "removal")
         }
@@ -573,9 +577,9 @@ class AiToolsDelegate(
                     effectKind = AiUsageLedger.EffectKind.BACKGROUND_REMOVAL_LOCAL,
                     modelName = "MediaPipe Selfie Segmenter"
                 )
-                showToast("Background removed \u2014 add replacement media on track below")
+                showToast(text(R.string.ai_background_replace_ready_toast))
             } else {
-                showToast("Could not detect subject in frame")
+                showToast(text(R.string.ai_subject_not_detected_toast))
             }
         } else {
             applyChromaKeyFallback(clip, "replace")
@@ -586,7 +590,7 @@ class AiToolsDelegate(
         val analysis = withContext(Dispatchers.Default) { aiFeatures.analyzeBackground(clip.sourceUri) }
         val confidence = safeConfidence(analysis.confidence)
         if (confidence < 0.1f) {
-            showToast("Could not detect background")
+            showToast(text(R.string.ai_background_not_detected_toast))
             return
         }
         saveUndoState("AI background $action")
@@ -605,11 +609,15 @@ class AiToolsDelegate(
             modelName = "NovaCut background analyzer"
         )
         val bgType = when {
-            analysis.isGreenScreen -> "green screen"
-            analysis.isBlueScreen -> "blue screen"
-            else -> "background"
+            analysis.isGreenScreen -> text(R.string.ai_bg_type_green_screen)
+            analysis.isBlueScreen -> text(R.string.ai_bg_type_blue_screen)
+            else -> text(R.string.ai_bg_type_background)
         }
-        showToast("Applied $bgType $action (${"%.0f".format(confidence * 100)}% confidence)")
+        val actionText = when (action) {
+            "replace" -> text(R.string.ai_bg_action_replace)
+            else -> text(R.string.ai_bg_action_removal)
+        }
+        showToast(text(R.string.ai_background_fallback_applied_toast, bgType, actionText, confidence * 100))
     }
 
     private fun updateClipEffect(clip: Clip, newEffect: Effect, replaceTypes: Set<EffectType>) {
@@ -633,13 +641,13 @@ class AiToolsDelegate(
             val region = com.novacut.editor.ai.TrackingRegion()
             val results = withContext(Dispatchers.Default) { aiFeatures.trackMotion(clip.sourceUri, region, clip.trimStartMs, clip.trimEndMs) }
             if (results.isEmpty()) {
-                showToast("Motion tracking failed")
+                showToast(text(R.string.ai_motion_tracking_empty_toast))
                 return
             }
             saveUndoState("AI motion track")
             val posKeyframes = buildTrackingKeyframes(results, clip, invertSign = false, yBaseline = 0.5f)
             addPositionKeyframes(clip, posKeyframes)
-            showToast("Tracked ${results.size} motion points across clip")
+            showToast(text(R.string.ai_motion_tracking_applied_toast, results.size))
         } catch (e: Exception) {
             Log.e("AiToolsDelegate", "Motion tracking failed", e)
             showToast(text(R.string.ai_motion_tracking_failed_toast))
@@ -648,10 +656,10 @@ class AiToolsDelegate(
 
     private suspend fun runStyleTransfer(clip: Clip) {
         try {
-            showToast("Analyzing frame style...")
+            showToast(text(R.string.ai_style_analyzing_toast))
             val style = withContext(Dispatchers.Default) { aiFeatures.analyzeAndApplyStyle(clip.sourceUri) }
             if (safeConfidence(style.confidence) < 0.1f) {
-                showToast("Could not analyze frame style")
+                showToast(text(R.string.ai_frame_style_analyze_failed_toast))
                 return
             }
             saveUndoState("AI style transfer")
@@ -677,7 +685,7 @@ class AiToolsDelegate(
                     add(Effect(type = EffectType.FILM_GRAIN, params = mapOf("intensity" to filmGrain)))
             }
             if (newEffects.isEmpty()) {
-                showToast("No style adjustments needed for '${style.styleName}'")
+                showToast(text(R.string.ai_style_adjustments_not_needed_toast, style.styleName))
                 return
             }
             stateFlow.update { state ->
@@ -698,7 +706,7 @@ class AiToolsDelegate(
                 effectKind = AiUsageLedger.EffectKind.STYLE_TRANSFER_LOCAL,
                 modelName = "NovaCut style analyzer"
             )
-            showToast("Applied '${style.styleName}' style (${newEffects.size} effects)")
+            showToast(text(R.string.ai_style_applied_toast, style.styleName, newEffects.size))
         } catch (e: Exception) {
             Log.e("AiToolsDelegate", "Style transfer failed", e)
             showToast(text(R.string.ai_style_transfer_failed_toast))
@@ -707,16 +715,16 @@ class AiToolsDelegate(
 
     private suspend fun runFaceTrack(clip: Clip) {
         try {
-            showToast("Face tracking: detecting faces...")
+            showToast(text(R.string.ai_face_tracking_detecting_toast))
             val region = com.novacut.editor.ai.TrackingRegion(centerX = 0.5f, centerY = 0.35f, width = 0.3f, height = 0.3f)
             val results = withContext(Dispatchers.Default) { aiFeatures.trackMotion(clip.sourceUri, region, clip.trimStartMs, clip.trimEndMs) }
             if (results.isNotEmpty()) {
                 saveUndoState("AI face track")
                 val posKeyframes = buildTrackingKeyframes(results, clip, invertSign = true, yBaseline = 0.35f)
                 addPositionKeyframes(clip, posKeyframes)
-                showToast("Face tracked: ${results.size} points")
+                showToast(text(R.string.ai_face_tracked_toast, results.size))
             } else {
-                showToast("No face detected")
+                showToast(text(R.string.ai_face_not_detected_toast))
             }
         } catch (e: Exception) {
             Log.e("AiToolsDelegate", "Face tracking failed", e)
@@ -768,9 +776,9 @@ class AiToolsDelegate(
                     null
                 )
                 saveProject() // one-shot AI op; setClipTransform no longer auto-saves.
-                showToast("Smart reframed for vertical (${"%.0f".format(confidence * 100)}%)")
+                showToast(text(R.string.ai_smart_reframe_applied_toast, confidence * 100))
             } else {
-                showToast("Could not determine reframe region")
+                showToast(text(R.string.ai_smart_reframe_region_failed_toast))
             }
         } catch (e: Exception) {
             Log.e("AiToolsDelegate", "Smart reframe failed", e)
@@ -780,10 +788,10 @@ class AiToolsDelegate(
 
     private suspend fun runUpscale(clip: Clip) {
         try {
-            showToast("Analyzing source resolution...")
+            showToast(text(R.string.ai_upscale_analyzing_toast))
             val result = withContext(Dispatchers.Default) { aiFeatures.analyzeForUpscale(clip.sourceUri) }
             if (result.targetResolution == null) {
-                showToast("Already at maximum resolution (${result.sourceWidth}x${result.sourceHeight})")
+                showToast(text(R.string.ai_upscale_max_resolution_toast, result.sourceWidth, result.sourceHeight))
                 return
             }
             saveUndoState("AI upscale")
@@ -798,7 +806,7 @@ class AiToolsDelegate(
                 effectKind = AiUsageLedger.EffectKind.UPSCALING_LOCAL,
                 modelName = "NovaCut upscale assistant"
             )
-            showToast("Upscaled to ${result.targetResolution.label} + sharpening applied")
+            showToast(text(R.string.ai_upscale_applied_toast, result.targetResolution.label))
         } catch (e: Exception) {
             Log.e("AiToolsDelegate", "Upscale failed", e)
             showToast(text(R.string.ai_upscale_failed_toast))
@@ -913,7 +921,7 @@ class AiToolsDelegate(
             )
             return
         }
-        showToast("Object removal: tap and paint over the object to remove (UI pending)")
+        showToast(text(R.string.ai_object_removal_unavailable_toast))
     }
 
     private suspend fun applyVideoUpscale(clip: Clip) {
@@ -932,18 +940,18 @@ class AiToolsDelegate(
             title = "AI background generation is model-gated",
             body = "Background generation needs the compositing model workflow before NovaCut can synthesize a replacement safely. Use Remove BG or Replace BG when the segmentation model is ready.",
             modelName = "Background composer",
-            estimatedSize = "Model pack pending"
+            estimatedSize = text(R.string.ai_model_size_not_available)
         )
     }
 
     private suspend fun applyStabilization(clip: Clip) {
         if (!stabilizationEngine.isOpenCvAvailable()) {
-            showToast("Advanced stabilization requires OpenCV \u2014 using basic stabilization")
+            showToast(text(R.string.ai_stabilize_fallback_toast))
             val result = withContext(Dispatchers.Default) { aiFeatures.stabilizeVideo(clip.sourceUri) }
             val confidence = safeConfidence(result.confidence)
             val shakeMagnitude = safeAiFloat(result.shakeMagnitude, 0f, 0f, 1f)
             if (confidence < 0.1f || shakeMagnitude < 0.001f) {
-                showToast("Video is already stable")
+                showToast(text(R.string.ai_video_stable_toast))
             } else {
                 saveUndoState("AI stabilize (basic)")
                 // Apply 2% crop-based stabilization via scale
@@ -962,7 +970,7 @@ class AiToolsDelegate(
                         })
                     })
                 }
-                showToast("Basic stabilization applied (${"%.0f".format(shakeMagnitude * 100)}% shake)")
+                showToast(text(R.string.ai_basic_stabilization_applied_toast, shakeMagnitude * 100))
                 rebuildPlayerTimeline()
                 saveProject()
             }
@@ -972,14 +980,14 @@ class AiToolsDelegate(
             smoothingStrength = 0.5f, cropPercentage = 0.15f,
             algorithm = StabilizationEngine.StabilizationConfig.Algorithm.LK_OPTICAL_FLOW
         )
-        showToast("Analyzing camera motion...")
+        showToast(text(R.string.ai_camera_motion_analyzing_toast))
         val motionData = stabilizationEngine.analyzeMotion(uri = clip.sourceUri, config = config, onProgress = { })
         if (motionData == null) {
-            showToast("Motion analysis failed \u2014 using basic stabilization fallback")
+            showToast(text(R.string.ai_motion_analysis_failed_fallback_toast))
             return
         }
         val outputFiles = createStabilizedVideoOutputFiles(appContext, clip.id)
-        showToast("Applying stabilization (${motionData.frameCount} frames)...")
+        showToast(text(R.string.ai_applying_stabilization_toast, motionData.frameCount))
         try {
             val result = stabilizationEngine.stabilize(
                 uri = clip.sourceUri, motionData = motionData, config = config,
@@ -991,7 +999,7 @@ class AiToolsDelegate(
                     outputFile = outputFiles.outputFile
                 )
                 if (stabilizedFile == null) {
-                    showToast("Stabilization failed: output file was empty")
+                    showToast(text(R.string.ai_stabilization_empty_output_toast))
                     return
                 }
                 val stabilizedUri = Uri.fromFile(stabilizedFile)
@@ -1005,10 +1013,10 @@ class AiToolsDelegate(
                 }
                 rebuildPlayerTimeline()
                 saveProject()
-                showToast("Stabilized with ${"%.0f".format(result.cropApplied * 100)}% crop")
+                showToast(text(R.string.ai_stabilized_crop_toast, result.cropApplied * 100))
             } else {
                 cleanupStabilizedVideoFiles(outputFiles.partialFile, outputFiles.outputFile)
-                showToast("Stabilization not yet available \u2014 OpenCV integration pending")
+                showToast(text(R.string.ai_stabilization_unavailable_toast))
             }
         } catch (e: Exception) {
             // Clean up any partial output before re-throwing (CancellationException is
