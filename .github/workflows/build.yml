@@ -60,6 +60,13 @@ jobs:
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.sarif
 
+      - name: Upload Compose metrics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compose-metrics
+          path: app/build/compose_metrics/
+
       - name: Build Instrumentation APK
         run: ./gradlew assembleDebugAndroidTest
 
