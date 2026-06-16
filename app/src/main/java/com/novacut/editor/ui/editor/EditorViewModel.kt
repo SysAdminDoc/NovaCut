@@ -84,6 +84,7 @@ import kotlinx.coroutines.withContext
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.novacut.editor.engine.EditingSuggestionEngine
 import com.novacut.editor.engine.EffectPreviewRenderer
 import com.novacut.editor.engine.MediaHashWorker
 import com.novacut.editor.engine.ProxyGenerationWorker
@@ -450,6 +451,7 @@ class EditorViewModel @Inject constructor(
     private val stabilizationEngine: StabilizationEngine,
     private val styleTransferEngine: StyleTransferEngine,
     private val smartReframeEngine: SmartReframeEngine,
+    private val editingSuggestionEngine: EditingSuggestionEngine,
     private val timelineExchangeEngine: TimelineExchangeEngine,
     private val timelineExchangeValidator: com.novacut.editor.engine.TimelineExchangeValidator,
     private val cutAssistantEngine: com.novacut.editor.engine.CutAssistantEngine,
@@ -2491,36 +2493,16 @@ class EditorViewModel @Inject constructor(
         }
         val s = _state.value
         val clip = s.tracks.flatMap { it.clips }.firstOrNull { it.id == clipId } ?: return
-        val clipHasVisual = clipHasVisual(clip)
-        val clipHasAudio = clipHasAudio(clip)
-        if (clipHasAudio && !s.waveforms.containsKey(clip.id)) {
+        if (clipHasAudio(clip) && !s.waveforms.containsKey(clip.id)) {
             enqueueWaveformLoad(clip.id, clip.sourceUri)
         }
-        val suggestion: AiSuggestion? = when {
-            // Color-correction suggestion removed per user request — firing an
-            // unsolicited "this clip could use color correction" banner every
-            // time a long visual clip was selected was noise, not signal.
-            // Users can still trigger auto-color from the AI tools panel.
-            s.tracks.filter { it.type == TrackType.VIDEO }.flatMap { it.clips }.size > 3 &&
-                s.tracks.flatMap { it.clips }.none { it.headTransition != null || it.tailTransition != null } ->
-                AiSuggestion(
-                    id = "add_transitions_${clip.id}",
-                    message = "Add transitions between your clips",
-                    actionId = "transition"
-                )
-            else -> {
-                val waveform = s.waveforms[clip.id]
-                if (waveform != null && waveform.size > 10) {
-                    val peak = waveform.maxOf { kotlin.math.abs(it) }
-                    val avg = waveform.map { kotlin.math.abs(it) }.average().toFloat()
-                    val variance = waveform.map { val d = kotlin.math.abs(it) - avg; d * d }.average().toFloat()
-                    if (clipHasAudio && peak > 0.01f && variance < 0.005f) AiSuggestion(
-                        id = "denoise_${clip.id}",
-                        message = "Low audio variance detected - try Denoise",
-                        actionId = "denoise"
-                    ) else null
-                } else null
-            }
+        val engineSuggestion = editingSuggestionEngine.analyze(
+            tracks = s.tracks,
+            hasTranscript = s.v369.transcript != null,
+            hasBeatMarkers = s.beatMarkers.isNotEmpty()
+        )
+        val suggestion = engineSuggestion?.let {
+            AiSuggestion(id = it.id, message = it.message, actionId = it.actionId)
         }
         _state.update { it.copyAi { ai -> ai.copy(suggestion = suggestion) } }
     }
