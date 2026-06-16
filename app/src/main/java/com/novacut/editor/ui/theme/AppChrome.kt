@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -147,18 +149,22 @@ fun NovaCutPrimaryButton(
             disabledContentColor = colors.disabledText
         ),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-        modifier = modifier.defaultMinSize(minHeight = TouchTarget.minimum)
+        modifier = modifier
+            .semantics { contentDescription = text }
+            .defaultMinSize(minHeight = TouchTarget.minimum)
     ) {
         if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
+                tint = if (enabled) Mocha.Midnight else colors.disabledText,
                 modifier = Modifier.size(18.dp)
             )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(Spacing.sm))
         }
         Text(
             text = text,
+            color = if (enabled) Mocha.Midnight else colors.disabledText,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

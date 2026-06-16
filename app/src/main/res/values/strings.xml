@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.74.106</string>
+    <string name="app_version">v3.74.107</string>
 
     <!-- Common -->
     <string name="close">Close</string>
@@ -814,6 +814,16 @@
     <string name="projects_updated">Updated %1$s</string>
     <string name="projects_templates_count">%1$d built-in templates</string>
     <string name="projects_saved_templates_count">%1$d saved templates</string>
+    <string name="projects_media_health_title">Media health</string>
+    <string name="projects_media_health_ready_value">Ready</string>
+    <plurals name="projects_media_health_projects_value">
+        <item quantity="one">%1$d local project</item>
+        <item quantity="other">%1$d local projects</item>
+    </plurals>
+    <string name="projects_media_health_body">Imports stay local. Missing media is flagged before export.</string>
+    <string name="projects_render_ready_title">Ready to render</string>
+    <string name="projects_render_ready_value">%1$s · %2$s · %3$dfps</string>
+    <string name="projects_render_ready_body">%1$d starter paths with share-ready defaults.</string>
     <string name="projects_new_project">New Project</string>
     <string name="projects_duplicate">Duplicate</string>
     <string name="projects_rename">Rename</string>
@@ -975,6 +985,10 @@
     <string name="editor_text_track">Text Track</string>
     <string name="editor_text_track_cd">Text track</string>
     <string name="editor_export">Export</string>
+    <string name="editor_timeline_status_empty">No media yet</string>
+    <string name="editor_timeline_status_format">%1$d clips · %2$s</string>
+    <string name="editor_timeline_status_cd">Timeline status: %1$s</string>
+    <string name="editor_mode_chip_cd">Editor mode: %1$s</string>
 
     <!-- ToolPanel: Tab labels -->
     <string name="tool_tab_edit">Edit</string>

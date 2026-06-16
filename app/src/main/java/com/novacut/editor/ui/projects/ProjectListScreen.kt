@@ -49,6 +49,7 @@ import com.novacut.editor.engine.IncomingDocumentImportPreview
 import com.novacut.editor.engine.IncomingDocumentImportStatus
 import com.novacut.editor.engine.IncomingDocumentItem
 import com.novacut.editor.engine.IncomingMediaItem
+import com.novacut.editor.model.ExportConfig
 import com.novacut.editor.model.Project
 import com.novacut.editor.model.ProjectFilterMode
 import com.novacut.editor.model.SortMode
@@ -127,6 +128,9 @@ fun ProjectListScreen(
             .testTag(NovaCutTestTags.PROJECTS_SCREEN)
     ) {
         val importTemplate = { templateImportLauncher.launch(arrayOf("*/*")) }
+        val showCollectionControls = projectTotalCount > 1 ||
+            searchQuery.isNotBlank() ||
+            filterMode != ProjectFilterMode.ALL
 
         Column(modifier = Modifier.fillMaxSize()) {
             ProjectHomeHero(
@@ -141,12 +145,20 @@ fun ProjectListScreen(
                 onImportTemplate = importTemplate,
                 onSettings = onSettings,
                 showProjectActions = projects.isNotEmpty(),
-                showSearch = hasAnyProjects,
-                showSortControls = projects.isNotEmpty(),
+                showSearch = showCollectionControls,
+                showSortControls = showCollectionControls && projects.isNotEmpty(),
                 actionsEnabled = actionsEnabled
             )
 
-            if (hasAnyProjects) {
+            ProjectHomeReadinessRow(
+                projectCount = projectTotalCount,
+                savedTemplateCount = userTemplates.size,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            )
+
+            if (showCollectionControls) {
                 ProjectFilterChipsRow(
                     filterMode = filterMode,
                     onFilterModeChanged = viewModel::setFilterMode,
@@ -681,6 +693,143 @@ private fun HeroMetricPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null
 ) {
     NovaCutMetricPill(text = label, accent = accent, icon = icon)
+}
+
+@Composable
+private fun ProjectHomeReadinessRow(
+    projectCount: Int,
+    savedTemplateCount: Int,
+    modifier: Modifier = Modifier
+) {
+    val exportDefaults = remember { ExportConfig() }
+    val mediaHealthValue = if (projectCount == 0) {
+        stringResource(R.string.projects_media_health_ready_value)
+    } else {
+        pluralStringResource(
+            R.plurals.projects_media_health_projects_value,
+            projectCount,
+            projectCount
+        )
+    }
+    BoxWithConstraints(modifier = modifier) {
+        val stackCards = maxWidth < 520.dp
+        val arrangement = Arrangement.spacedBy(Spacing.sm)
+        if (stackCards) {
+            Column(verticalArrangement = arrangement) {
+                ProjectReadinessCard(
+                    title = stringResource(R.string.projects_media_health_title),
+                    value = mediaHealthValue,
+                    body = stringResource(R.string.projects_media_health_body),
+                    icon = Icons.Default.Verified,
+                    accent = Mocha.Green,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                ProjectReadinessCard(
+                    title = stringResource(R.string.projects_render_ready_title),
+                    value = stringResource(
+                        R.string.projects_render_ready_value,
+                        exportDefaults.codec.label,
+                        exportDefaults.resolution.label,
+                        exportDefaults.frameRate
+                    ),
+                    body = stringResource(R.string.projects_render_ready_body, projectTemplates.size + savedTemplateCount),
+                    icon = Icons.Default.Speed,
+                    accent = Mocha.Mauve,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(horizontalArrangement = arrangement) {
+                ProjectReadinessCard(
+                    title = stringResource(R.string.projects_media_health_title),
+                    value = mediaHealthValue,
+                    body = stringResource(R.string.projects_media_health_body),
+                    icon = Icons.Default.Verified,
+                    accent = Mocha.Green,
+                    modifier = Modifier.weight(1f)
+                )
+                ProjectReadinessCard(
+                    title = stringResource(R.string.projects_render_ready_title),
+                    value = stringResource(
+                        R.string.projects_render_ready_value,
+                        exportDefaults.codec.label,
+                        exportDefaults.resolution.label,
+                        exportDefaults.frameRate
+                    ),
+                    body = stringResource(R.string.projects_render_ready_body, projectTemplates.size + savedTemplateCount),
+                    icon = Icons.Default.Speed,
+                    accent = Mocha.Mauve,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectReadinessCard(
+    title: String,
+    value: String,
+    body: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.semantics {
+            contentDescription = "$title. $value. $body"
+        },
+        color = Mocha.Panel.copy(alpha = 0.92f),
+        shape = RoundedCornerShape(Radius.lg),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.88f))
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = accent.copy(alpha = 0.13f),
+                shape = RoundedCornerShape(Radius.md),
+                border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.28f))
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(22.dp)
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = Mocha.Text,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = value,
+                    color = accent,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = body,
+                    color = Mocha.Subtext0,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
 }
 
 @Composable
