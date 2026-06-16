@@ -2542,10 +2542,6 @@
     <string name="vm_tracked_clip_missing_toast">Tracked source clip is missing</string>
     <string name="vm_tracked_mosaic_exists_toast">Tracked mosaic already applied</string>
     <string name="vm_tracked_mosaic_applied_toast">Tracked mosaic applied: %1$s</string>
-    <string name="vm_need_voice_music_ducking_toast">Need both voice and music tracks for ducking</string>
-    <string name="vm_need_video_audio_ducking_toast">Need a video clip with audio for ducking</string>
-    <string name="vm_ducking_applied_toast">Ducking applied: %1$d regions</string>
-    <string name="vm_aspect_ratio_toast">Aspect ratio: %1$s</string>
     <string name="vm_snapshot_saved_toast">Snapshot saved: %1$s</string>
     <string name="vm_restored_toast">Restored: %1$s</string>
 </resources>
