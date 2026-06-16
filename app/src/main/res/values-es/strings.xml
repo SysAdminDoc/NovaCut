@@ -2048,9 +2048,9 @@
     <string name="v369_hdr_switch_codec">Cambie a HEVC/AV1/VP9 en Exportar para habilitar</string>
     <string name="v369_hdr_enabled">Habilitado; La exportación mantiene los metadatos HDR.</string>
     <string name="v369_hdr_off">Apagado; exportar mapas de tonos a SDR.</string>
-    <string name="v369_sdh_title">SDH + Audiodescripción</string>
-    <string name="v369_sdh_subtitle">Prepare subtítulos y descripción para exportaciones accesibles.</string>
-    <string name="v369_sdh_hint">Utilice primero una transcripción; La generación de audiodescripciones en el momento de la exportación se maneja por separado.</string>
+    <string name="v369_sdh_title">Etiquetas SDH</string>
+    <string name="v369_sdh_subtitle">Etiquetas de eventos no verbales para subtítulos (música, aplausos, risas). La audiodescripción requiere una pista de narración separada.</string>
+    <string name="v369_sdh_hint">Las etiquetas SDH se agregan desde la transcripción. La audiodescripción completa (narración sincronizada) aún no está disponible.</string>
     <string name="v369_dex_title">DeX/diseño de escritorio</string>
     <string name="v369_dex_subtitle">Adapte el editor para DeX, Chromebook, pantallas grandes y flujos de trabajo de puntero.</string>
     <string name="v369_dex_active">Diseño de escritorio activo</string>
