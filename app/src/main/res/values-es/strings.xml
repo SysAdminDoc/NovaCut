@@ -2268,10 +2268,6 @@
     <string name="vm_tracked_clip_missing_toast">El clip rastreado de origen no se encuentra</string>
     <string name="vm_tracked_mosaic_exists_toast">El mosaico rastreado ya está aplicado</string>
     <string name="vm_tracked_mosaic_applied_toast">Mosaico rastreado aplicado: %1$s</string>
-    <string name="vm_need_voice_music_ducking_toast">Se necesitan pistas de voz y música para el ducking</string>
-    <string name="vm_need_video_audio_ducking_toast">Se necesita un clip de video con audio para el ducking</string>
-    <string name="vm_ducking_applied_toast">Ducking aplicado: %1$d regiones</string>
-    <string name="vm_aspect_ratio_toast">Relación de aspecto: %1$s</string>
     <string name="vm_snapshot_saved_toast">Instantánea guardada: %1$s</string>
     <string name="vm_restored_toast">Restaurado: %1$s</string>
 </resources>
