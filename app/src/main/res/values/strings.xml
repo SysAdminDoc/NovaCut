@@ -2318,9 +2318,9 @@
     <string name="v369_hdr_switch_codec">Switch to HEVC/AV1/VP9 in Export to enable</string>
     <string name="v369_hdr_enabled">Enabled; export keeps HDR metadata.</string>
     <string name="v369_hdr_off">Off; export tone-maps to SDR.</string>
-    <string name="v369_sdh_title">SDH + Audio Description</string>
-    <string name="v369_sdh_subtitle">Prepare captions and description intent for accessible exports.</string>
-    <string name="v369_sdh_hint">Use a transcript first; export-time audio-description generation is handled separately.</string>
+    <string name="v369_sdh_title">SDH Event Tags</string>
+    <string name="v369_sdh_subtitle">Bracketed non-speech tags for captions (music, applause, laughter). Audio description requires a separate narration track.</string>
+    <string name="v369_sdh_hint">SDH tags are added from the transcript. Full audio description (synchronized narration) is not yet available.</string>
     <string name="v369_dex_title">DeX / Desktop Layout</string>
     <string name="v369_dex_subtitle">Adapt the editor for DeX, Chromebook, large screens, and pointer workflows.</string>
     <string name="v369_dex_active">Desktop layout active</string>
