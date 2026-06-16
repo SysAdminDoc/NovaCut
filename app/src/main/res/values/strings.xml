@@ -2534,4 +2534,18 @@
     <string name="vm_chapter_added_toast">Chapter added at %1$s</string>
     <string name="vm_frame_saved_toast">Frame saved: %1$s</string>
     <string name="vm_frame_capture_failed_toast">Frame capture failed</string>
+    <string name="vm_need_multicam_clips_toast">Need at least 2 video clips with audio for multi-cam sync</string>
+    <string name="vm_syncing_clips_toast">Syncing clips by audio…</string>
+    <string name="vm_synced_clips_toast">Synced %1$d clips by audio</string>
+    <string name="vm_sync_failed_toast">Could not find audio sync points</string>
+    <string name="vm_no_tracked_data_toast">No tracked object data available</string>
+    <string name="vm_tracked_clip_missing_toast">Tracked source clip is missing</string>
+    <string name="vm_tracked_mosaic_exists_toast">Tracked mosaic already applied</string>
+    <string name="vm_tracked_mosaic_applied_toast">Tracked mosaic applied: %1$s</string>
+    <string name="vm_need_voice_music_ducking_toast">Need both voice and music tracks for ducking</string>
+    <string name="vm_need_video_audio_ducking_toast">Need a video clip with audio for ducking</string>
+    <string name="vm_ducking_applied_toast">Ducking applied: %1$d regions</string>
+    <string name="vm_aspect_ratio_toast">Aspect ratio: %1$s</string>
+    <string name="vm_snapshot_saved_toast">Snapshot saved: %1$s</string>
+    <string name="vm_restored_toast">Restored: %1$s</string>
 </resources>
