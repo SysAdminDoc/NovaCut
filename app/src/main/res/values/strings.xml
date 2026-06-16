@@ -2405,4 +2405,51 @@
     <string name="inspector_last_saved">Last saved</string>
     <string name="inspector_backup_files">Backup files</string>
     <string name="inspector_db_version">Schema version</string>
+
+    <!-- ClipEditingDelegate toast messages -->
+    <string name="clip_read_media_failed_toast">Could not read replacement media</string>
+    <string name="clip_media_unused_toast">Media is no longer used</string>
+    <string name="clip_track_locked_toast">Track is locked</string>
+    <string name="clip_relinked_toast">Relinked %1$d timeline clip(s)</string>
+    <string name="clip_duplicated_toast">Clip duplicated</string>
+    <string name="clip_no_next_merge_toast">No next clip to merge</string>
+    <string name="clip_merge_source_mismatch_toast">Clips must come from the same source and touch end-to-end</string>
+    <string name="clip_linked_audio_not_ready_toast">Linked audio is not ready to merge</string>
+    <string name="clip_linked_audio_out_of_sync_toast">Linked audio is out of sync</string>
+    <string name="clip_merged_toast">Clips merged</string>
+    <string name="clip_too_short_to_split_toast">Clip too short to split here</string>
+    <string name="clip_move_failed_toast">Could not move clip</string>
+    <string name="clip_already_on_track_toast">Clip is already on that track</string>
+    <string name="clip_moved_toast">Clip moved to track</string>
+
+    <!-- EffectsDelegate toast messages -->
+    <string name="effects_already_applied_toast">%1$s already applied</string>
+    <string name="effects_none_to_copy_toast">No effects to copy</string>
+    <string name="effects_copied_toast">Copied %1$d effects</string>
+    <string name="effects_none_copied_toast">No effects copied</string>
+    <string name="effects_already_present_toast">Effects already present on clip</string>
+    <string name="effects_pasted_toast">Pasted %1$d effects</string>
+
+    <!-- OverlayDelegate toast messages -->
+    <string name="overlay_invalid_duration_toast">Invalid text overlay duration</string>
+    <string name="overlay_sticker_added_toast">Sticker added</string>
+    <string name="overlay_marker_added_toast">Marker added</string>
+
+    <!-- ColorGradingDelegate toast messages -->
+    <string name="color_lut_applied_toast">LUT applied: %1$s</string>
+
+    <!-- ExportDelegate toast messages -->
+    <string name="export_stream_copy_complete_toast">Stream-copy export complete: %1$s</string>
+    <string name="export_already_in_progress_toast">Export already in progress</string>
+    <string name="export_no_clips_toast">No clips to export</string>
+    <string name="export_contact_sheet_toast">Contact sheet exported: %1$s</string>
+    <string name="export_gif_complete_toast">GIF exported: %1$s</string>
+    <string name="export_complete_toast">Export complete: %1$s</string>
+    <string name="export_no_media_share_toast">No exported media to share</string>
+    <string name="export_file_unavailable_toast">Export file no longer available</string>
+    <string name="export_no_media_toast">No exported media</string>
+    <string name="export_file_not_found_toast">Export file not found</string>
+    <string name="export_add_items_first_toast">Add export items first</string>
+    <string name="export_batch_progress_toast">Exporting %1$d/%2$d: %3$s</string>
+    <string name="export_rendering_preview_toast">Rendering preview at 480p...</string>
 </resources>
