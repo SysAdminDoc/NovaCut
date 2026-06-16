@@ -79,6 +79,97 @@ private fun findClipInTracks(tracks: List<Track>, clipId: String): Clip? {
     return null
 }
 
+@Composable
+private fun TimelineHeaderSummary(
+    playheadMs: Long,
+    totalDurationMs: Long,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.timeline_title),
+            color = Mocha.Text,
+            style = if (compact) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.titleLarge
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "${formatTimelineTime(playheadMs)} / ${formatTimelineTime(totalDurationMs)}",
+            color = Mocha.Subtext0,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun TimelineToolbarControls(
+    compact: Boolean,
+    zoomLevel: Float,
+    fitZoomLevel: Float,
+    selectedClipId: String?,
+    onZoomChanged: (Float) -> Unit,
+    onScrollChanged: (Long) -> Unit,
+    onSplitAtPlayhead: () -> Unit,
+    onDeleteSelectedClip: () -> Unit,
+    onAddMarker: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TimelineToolbarButton(
+            icon = Icons.Default.Remove,
+            contentDescription = stringResource(R.string.cd_zoom_out),
+            compact = compact,
+            onClick = { onZoomChanged((zoomLevel * 0.75f).coerceAtLeast(MIN_TIMELINE_ZOOM)) }
+        )
+        TimelineToolbarButton(
+            icon = Icons.Default.FitScreen,
+            contentDescription = stringResource(R.string.cd_fit_timeline),
+            compact = compact,
+            onClick = {
+                onZoomChanged(fitZoomLevel)
+                onScrollChanged(0L)
+            }
+        )
+        TimelineToolbarButton(
+            icon = Icons.Default.Add,
+            contentDescription = stringResource(R.string.cd_zoom_in),
+            compact = compact,
+            onClick = { onZoomChanged((zoomLevel * 1.33f).coerceAtMost(MAX_TIMELINE_ZOOM)) }
+        )
+        TimelineToolbarButton(
+            icon = Icons.Default.ContentCut,
+            contentDescription = stringResource(R.string.cd_split_at_playhead),
+            compact = compact,
+            highlight = true,
+            onClick = onSplitAtPlayhead
+        )
+        TimelineToolbarButton(
+            icon = Icons.Default.DeleteSweep,
+            contentDescription = stringResource(R.string.cd_delete_selected),
+            compact = compact,
+            enabled = selectedClipId != null,
+            onClick = onDeleteSelectedClip
+        )
+        TimelineToolbarButton(
+            icon = Icons.Default.BookmarkAdd,
+            contentDescription = stringResource(R.string.cd_add_marker),
+            compact = compact,
+            onClick = onAddMarker
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun Timeline(
@@ -329,72 +420,56 @@ fun Timeline(
                     )
                 )
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = chromePadding, top = chromePadding, end = chromePadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.timeline_title),
-                        color = Mocha.Text,
-                        style = if (isCompactTimeline) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.titleLarge
-                        }
+            if (isCompactTimeline) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = chromePadding, top = chromePadding, end = chromePadding)
+                ) {
+                    TimelineHeaderSummary(
+                        playheadMs = playheadMs,
+                        totalDurationMs = totalDurationMs,
+                        compact = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Text(
-                        text = "${formatTimelineTime(playheadMs)} / ${formatTimelineTime(totalDurationMs)}",
-                        color = Mocha.Subtext0,
-                        style = MaterialTheme.typography.bodySmall
+                    TimelineToolbarControls(
+                        compact = true,
+                        zoomLevel = zoomLevel,
+                        fitZoomLevel = fitZoomLevel,
+                        selectedClipId = selectedClipId,
+                        onZoomChanged = onZoomChanged,
+                        onScrollChanged = onScrollChanged,
+                        onSplitAtPlayhead = onSplitAtPlayhead,
+                        onDeleteSelectedClip = onDeleteSelectedClip,
+                        onAddMarker = onAddMarker,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
                     )
                 }
+            } else {
                 Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = chromePadding, top = chromePadding, end = chromePadding),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TimelineToolbarButton(
-                        icon = Icons.Default.Remove,
-                        contentDescription = stringResource(R.string.cd_zoom_out),
-                        compact = isCompactTimeline,
-                        onClick = { onZoomChanged((zoomLevel * 0.75f).coerceAtLeast(MIN_TIMELINE_ZOOM)) }
+                    TimelineHeaderSummary(
+                        playheadMs = playheadMs,
+                        totalDurationMs = totalDurationMs,
+                        compact = false,
+                        modifier = Modifier.weight(1f)
                     )
-                    TimelineToolbarButton(
-                        icon = Icons.Default.FitScreen,
-                        contentDescription = stringResource(R.string.cd_fit_timeline),
-                        compact = isCompactTimeline,
-                        onClick = {
-                            onZoomChanged(fitZoomLevel)
-                            onScrollChanged(0L)
-                        }
-                    )
-                    TimelineToolbarButton(
-                        icon = Icons.Default.Add,
-                        contentDescription = stringResource(R.string.cd_zoom_in),
-                        compact = isCompactTimeline,
-                        onClick = { onZoomChanged((zoomLevel * 1.33f).coerceAtMost(MAX_TIMELINE_ZOOM)) }
-                    )
-                    TimelineToolbarButton(
-                        icon = Icons.Default.ContentCut,
-                        contentDescription = stringResource(R.string.cd_split_at_playhead),
-                        compact = isCompactTimeline,
-                        highlight = true,
-                        onClick = onSplitAtPlayhead
-                    )
-                    TimelineToolbarButton(
-                        icon = Icons.Default.DeleteSweep,
-                        contentDescription = stringResource(R.string.cd_delete_selected),
-                        compact = isCompactTimeline,
-                        enabled = selectedClipId != null,
-                        onClick = onDeleteSelectedClip
-                    )
-                    TimelineToolbarButton(
-                        icon = Icons.Default.BookmarkAdd,
-                        contentDescription = stringResource(R.string.cd_add_marker),
-                        compact = isCompactTimeline,
-                        onClick = onAddMarker
+                    TimelineToolbarControls(
+                        compact = false,
+                        zoomLevel = zoomLevel,
+                        fitZoomLevel = fitZoomLevel,
+                        selectedClipId = selectedClipId,
+                        onZoomChanged = onZoomChanged,
+                        onScrollChanged = onScrollChanged,
+                        onSplitAtPlayhead = onSplitAtPlayhead,
+                        onDeleteSelectedClip = onDeleteSelectedClip,
+                        onAddMarker = onAddMarker
                     )
                 }
             }

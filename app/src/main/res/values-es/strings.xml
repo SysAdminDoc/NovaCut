@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NovaCut</string>
-    <string name="app_version">v3.74.106</string>
+    <string name="app_version">v3.74.107</string>
     <string name="close">Cerrar</string>
     <string name="cancel">Cancelar</string>
     <string name="done">Listo</string>
@@ -770,6 +770,16 @@
     <string name="projects_updated">Actualizado %1$s</string>
     <string name="projects_templates_count">%1$d plantillas integradas</string>
     <string name="projects_saved_templates_count">%1$d plantillas guardadas</string>
+    <string name="projects_media_health_title">Estado de medios</string>
+    <string name="projects_media_health_ready_value">Listo</string>
+    <plurals name="projects_media_health_projects_value">
+        <item quantity="one">%1$d proyecto local</item>
+        <item quantity="other">%1$d proyectos locales</item>
+    </plurals>
+    <string name="projects_media_health_body">Las importaciones permanecen locales. Los medios faltantes se señalan antes de exportar.</string>
+    <string name="projects_render_ready_title">Listo para renderizar</string>
+    <string name="projects_render_ready_value">%1$s · %2$s · %3$dfps</string>
+    <string name="projects_render_ready_body">%1$d rutas iniciales con valores listos para compartir.</string>
     <string name="projects_new_project">Nuevo proyecto</string>
     <string name="projects_duplicate">Duplicar</string>
     <string name="projects_rename">Cambiar nombre</string>
@@ -927,6 +937,10 @@
     <string name="editor_text_track">Pista de texto</string>
     <string name="editor_text_track_cd">Pista de texto</string>
     <string name="editor_export">Exportar</string>
+    <string name="editor_timeline_status_empty">Aún no hay medios</string>
+    <string name="editor_timeline_status_format">%1$d clips · %2$s</string>
+    <string name="editor_timeline_status_cd">Estado de la línea de tiempo: %1$s</string>
+    <string name="editor_mode_chip_cd">Modo del editor: %1$s</string>
     <string name="tool_tab_edit">Editar</string>
     <string name="tool_tab_audio">Audio</string>
     <string name="tool_tab_text">Texto</string>

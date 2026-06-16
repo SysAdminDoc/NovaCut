@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ import com.novacut.editor.ui.theme.NovaCutPrimaryButton
 import com.novacut.editor.ui.theme.NovaCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
+import com.novacut.editor.ui.theme.TouchTarget
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -642,6 +644,8 @@ fun EditorScreen(
                 canUndo = state.undoStack.isNotEmpty(),
                 canRedo = state.redoStack.isNotEmpty(),
                 selectedClipId = state.selectedClipId,
+                timelineDurationMs = state.totalDurationMs,
+                clipCount = state.tracks.sumOf { track -> track.clips.size },
                 onDelete = viewModel::deleteSelectedClip,
                 confirmBeforeDelete = viewModel.confirmBeforeDelete,
                 onDuplicateClip = viewModel::duplicateSelectedClip,
@@ -732,14 +736,33 @@ fun EditorScreen(
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(Modifier.height(Spacing.lg))
-                                NovaCutPrimaryButton(
-                                    text = stringResource(R.string.editor_add_media),
-                                    icon = Icons.Default.Add,
-                                    onClick = viewModel::showMediaPicker,
+                                val emptyAddMediaLabel = stringResource(R.string.editor_add_media)
+                                Row(
                                     modifier = Modifier
                                         .widthIn(min = 180.dp)
-                                        .testTag(NovaCutTestTags.EDITOR_EMPTY_ADD_MEDIA)
-                                )
+                                        .height(TouchTarget.minimum)
+                                        .clip(RoundedCornerShape(Radius.md))
+                                        .background(Mocha.Rosewater)
+                                        .clickable(onClick = viewModel::showMediaPicker)
+                                        .testTag(NovaCutTestTags.EDITOR_EMPTY_ADD_MEDIA),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = Mocha.Midnight,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(Spacing.sm))
+                                    Text(
+                                        text = emptyAddMediaLabel,
+                                        color = Mocha.Midnight,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
@@ -1155,6 +1178,64 @@ fun EditorScreen(
 }
 
 @Composable
+private fun EditorTopBarChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    contentDescription: String,
+    onClick: (() -> Unit)? = null
+) {
+    val chipModifier = Modifier.semantics {
+        this.contentDescription = contentDescription
+    }
+    val chipContent: @Composable RowScope.() -> Unit = {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(12.dp)
+        )
+        Text(
+            text = label,
+            color = accent,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            modifier = chipModifier,
+            color = accent.copy(alpha = 0.13f),
+            shape = RoundedCornerShape(10.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.24f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = chipContent
+            )
+        }
+    } else {
+        Surface(
+            modifier = chipModifier,
+            color = accent.copy(alpha = 0.10f),
+            shape = RoundedCornerShape(10.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.20f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = chipContent
+            )
+        }
+    }
+}
+
+@Composable
 private fun EditConfidenceRail(
     status: EditConfidenceStatus,
     onOpenHistory: () -> Unit,
@@ -1294,6 +1375,8 @@ private fun EditorTopBar(
     canUndo: Boolean,
     canRedo: Boolean,
     selectedClipId: String?,
+    timelineDurationMs: Long,
+    clipCount: Int,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     confirmBeforeDelete: Boolean = true,
@@ -1505,7 +1588,7 @@ private fun EditorTopBar(
         color = Mocha.Panel,
         modifier = modifier
             .fillMaxWidth()
-            .height(if (isCompactBar) 58.dp else 62.dp)
+            .height(if (isCompactBar) 60.dp else 64.dp)
     ) {
         Box(
             modifier = Modifier
@@ -1548,53 +1631,51 @@ private fun EditorTopBar(
 
                 Spacer(modifier = Modifier.width(if (isCompactBar) 8.dp else 10.dp))
 
+                val modeAccent = if (editorMode == EditorMode.PRO) Mocha.Rosewater else Mocha.Sapphire
+                val modeLabel = if (editorMode == EditorMode.PRO) {
+                    stringResource(R.string.settings_mode_pro)
+                } else {
+                    stringResource(R.string.settings_mode_easy)
+                }
+                val timelineStatusLabel = if (clipCount > 0 && timelineDurationMs > 0L) {
+                    stringResource(
+                        R.string.editor_timeline_status_format,
+                        clipCount,
+                        formatTimelineDurationLabel(timelineDurationMs)
+                    )
+                } else {
+                    stringResource(R.string.editor_timeline_status_empty)
+                }
+                val timelineStatusAccent = if (clipCount > 0 && timelineDurationMs > 0L) Mocha.Green else Mocha.Subtext0
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = projectName,
                         color = Mocha.Text,
-                        style = MaterialTheme.typography.titleMedium.copy(lineHeight = 20.sp),
+                        style = MaterialTheme.typography.titleMedium.copy(lineHeight = 18.sp),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.offset(y = 7.dp)
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Surface(
-                        onClick = onToggleEditorMode,
-                        color = if (editorMode == EditorMode.PRO) Mocha.Mauve.copy(alpha = 0.14f) else Mocha.Sapphire.copy(alpha = 0.14f),
-                        shape = RoundedCornerShape(10.dp),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (editorMode == EditorMode.PRO) {
-                                Mocha.Mauve.copy(alpha = 0.2f)
-                            } else {
-                                Mocha.Sapphire.copy(alpha = 0.2f)
-                            }
-                        )
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(
-                                horizontal = if (isCompactBar) 7.dp else 8.dp,
-                                vertical = if (isCompactBar) 3.dp else 4.dp
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = null,
-                                tint = if (editorMode == EditorMode.PRO) Mocha.Rosewater else Mocha.Sapphire,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = if (editorMode == EditorMode.PRO) {
-                                    stringResource(R.string.settings_mode_pro)
-                                } else {
-                                    stringResource(R.string.settings_mode_easy)
-                                },
-                                color = if (editorMode == EditorMode.PRO) Mocha.Rosewater else Mocha.Sapphire,
-                                style = MaterialTheme.typography.labelSmall
+                        EditorTopBarChip(
+                            label = modeLabel,
+                            icon = Icons.Default.Tune,
+                            accent = modeAccent,
+                            onClick = onToggleEditorMode,
+                            contentDescription = stringResource(R.string.editor_mode_chip_cd, modeLabel)
+                        )
+                        if (!isCompactBar) {
+                            EditorTopBarChip(
+                                label = timelineStatusLabel,
+                                icon = if (clipCount > 0) Icons.Default.Movie else Icons.Default.Add,
+                                accent = timelineStatusAccent,
+                                contentDescription = stringResource(R.string.editor_timeline_status_cd, timelineStatusLabel)
                             )
                         }
                     }
@@ -1703,6 +1784,18 @@ private fun EditorTopBar(
                                 }
                             )
                         } else {
+                            if (isCompactBar) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.tool_search)) },
+                                    onClick = {
+                                        showOverflow = false
+                                        onSearch()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.tool_search))
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.editor_add_media)) },
                                 onClick = {
@@ -1800,19 +1893,21 @@ private fun EditorTopBar(
                     }
                 }
 
-                IconButton(
-                    onClick = onSearch,
-                    modifier = Modifier.size(if (isCompactBar) 32.dp else 36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = stringResource(R.string.tool_search),
-                        modifier = Modifier.size(if (isCompactBar) 17.dp else 19.dp),
-                        tint = Mocha.Subtext1
-                    )
-                }
+                if (!isCompactBar) {
+                    IconButton(
+                        onClick = onSearch,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.tool_search),
+                            modifier = Modifier.size(19.dp),
+                            tint = Mocha.Subtext1
+                        )
+                    }
 
-                Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
 
                 Button(
                     onClick = onExport,
