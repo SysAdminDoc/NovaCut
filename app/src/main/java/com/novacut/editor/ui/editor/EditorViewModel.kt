@@ -84,6 +84,7 @@ import kotlinx.coroutines.withContext
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.novacut.editor.engine.EffectPreviewRenderer
 import com.novacut.editor.engine.MediaHashWorker
 import com.novacut.editor.engine.ProxyGenerationWorker
 import java.io.File
@@ -2725,6 +2726,24 @@ class EditorViewModel @Inject constructor(
     }
 
     fun stopTtsPreview() { ttsEngine.stopPreview() }
+
+    // --- Effect Previews ---
+    private val _effectPreviews = MutableStateFlow<Map<com.novacut.editor.model.EffectType, android.graphics.Bitmap>>(emptyMap())
+    val effectPreviews: StateFlow<Map<com.novacut.editor.model.EffectType, android.graphics.Bitmap>> = _effectPreviews.asStateFlow()
+
+    fun generateEffectPreviews() {
+        val clip = getSelectedClip() ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            val sourceFrame = videoEngine.extractThumbnail(clip.sourceUri, clip.trimStartMs * 1000L, 80, 45)
+                ?: return@launch
+            val previews = mutableMapOf<com.novacut.editor.model.EffectType, android.graphics.Bitmap>()
+            for (effectType in EffectPreviewRenderer.PREVIEWABLE_EFFECTS) {
+                val preview = EffectPreviewRenderer.renderPreview(sourceFrame, effectType)
+                if (preview != null) previews[effectType] = preview
+            }
+            _effectPreviews.value = previews
+        }
+    }
 
     // --- Effect Library ---
     fun showEffectLibrary() = showPanel(PanelId.EFFECT_LIBRARY)
