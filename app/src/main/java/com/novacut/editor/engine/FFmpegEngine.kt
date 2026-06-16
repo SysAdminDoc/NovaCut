@@ -550,33 +550,38 @@ class FFmpegEngine @Inject constructor(
         return null
     }
 
-    internal fun escapeFilterPath(path: String): String {
-        return path
-            .replace("\\", "\\\\")
-            .replace(":", "\\:")
-            .replace("'", "\\'")
-    }
-
-    internal fun escapeConcatPath(path: String): String = path.replace("'", "'\\''")
-
-    internal fun msToSeconds(ms: Long): String = String.format(Locale.US, "%.3f", ms / 1000.0)
-
-    internal fun buildAtempoChain(speed: Float): String {
-        val parts = mutableListOf<String>()
-        var remaining = speed.toDouble().coerceIn(0.25, 16.0)
-        while (remaining > 2.0) {
-            parts.add("atempo=2.0")
-            remaining /= 2.0
-        }
-        while (remaining < 0.5) {
-            parts.add("atempo=0.5")
-            remaining /= 0.5
-        }
-        parts.add("atempo=${String.format(Locale.US, "%.4f", remaining)}")
-        return parts.joinToString(",")
-    }
+    internal fun escapeFilterPath(path: String): String = Companion.escapeFilterPath(path)
+    internal fun escapeConcatPath(path: String): String = Companion.escapeConcatPath(path)
+    internal fun msToSeconds(ms: Long): String = Companion.msToSeconds(ms)
+    internal fun buildAtempoChain(speed: Float): String = Companion.buildAtempoChain(speed)
 
     companion object {
         private const val TAG = "FFmpegEngine"
+
+        fun escapeFilterPath(path: String): String {
+            return path
+                .replace("\\", "\\\\")
+                .replace(":", "\\:")
+                .replace("'", "\\'")
+        }
+
+        fun escapeConcatPath(path: String): String = path.replace("'", "'\\''")
+
+        fun msToSeconds(ms: Long): String = String.format(Locale.US, "%.3f", ms / 1000.0)
+
+        fun buildAtempoChain(speed: Float): String {
+            val parts = mutableListOf<String>()
+            var remaining = speed.toDouble().coerceIn(0.25, 16.0)
+            while (remaining > 2.0) {
+                parts.add("atempo=2.0")
+                remaining /= 2.0
+            }
+            while (remaining < 0.5) {
+                parts.add("atempo=0.5")
+                remaining /= 0.5
+            }
+            parts.add("atempo=${String.format(Locale.US, "%.4f", remaining)}")
+            return parts.joinToString(",")
+        }
     }
 }
