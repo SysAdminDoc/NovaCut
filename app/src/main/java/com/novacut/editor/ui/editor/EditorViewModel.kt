@@ -1291,7 +1291,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val result = fontRegistry.importFont(uri)
             if (result != null) {
-                showToast("Imported \"${result.displayName}\"")
+                showToast(text(R.string.vm_imported_media_toast, result.displayName))
             } else {
                 showToast(text(R.string.vm_invalid_font_toast))
             }
@@ -1943,7 +1943,7 @@ class EditorViewModel @Inject constructor(
             stateJson = json
         )
         _state.update { it.copy(projectSnapshots = it.projectSnapshots + snapshot) }
-        showToast("Snapshot saved: ${snapshot.label}")
+        showToast(text(R.string.vm_snapshot_saved_toast, snapshot.label))
     }
 
     fun restoreSnapshot(snapshotId: String) {
@@ -2000,7 +2000,7 @@ class EditorViewModel @Inject constructor(
             showToast(text(R.string.vm_no_clips_for_proxy_toast))
             return
         }
-        showToast("Generating proxies for ${clips.size} clips...")
+        showToast(text(R.string.vm_generating_proxies_toast, clips.size))
         viewModelScope.launch {
             var generated = 0
             for (clip in clips) {
@@ -2013,7 +2013,7 @@ class EditorViewModel @Inject constructor(
                 }
             }
             rebuildPlayerTimeline()
-            showToast("Proxy editing enabled ($generated proxies generated)")
+            showToast(text(R.string.vm_proxy_enabled_toast, generated))
         }
     }
 
@@ -2110,7 +2110,7 @@ class EditorViewModel @Inject constructor(
                 }
                 if (savedName != null) {
                     _lastBackupTime.value = System.currentTimeMillis()
-                    showToast("Backup saved: $savedName")
+                    showToast(text(R.string.vm_backup_saved_toast, savedName))
                 } else {
                     showToast(text(R.string.vm_backup_export_failed_toast))
                 }
@@ -2282,7 +2282,7 @@ class EditorViewModel @Inject constructor(
         ) }
         _playheadMs.value = _state.value.playheadMs
         rebuildTimeline()
-        showToast("Restored: ${target.description}")
+        showToast(text(R.string.vm_restored_toast, target.description))
     }
 
     // --- Command Palette ---
@@ -2372,7 +2372,7 @@ class EditorViewModel @Inject constructor(
             )
         }
         saveProject()
-        showToast("Caption style applied: ${template.type.displayName}")
+        showToast(text(R.string.vm_caption_style_applied_toast, template.type.displayName))
     }
 
     // --- Beat Sync ---
@@ -2425,7 +2425,7 @@ class EditorViewModel @Inject constructor(
         }
         rebuildTimeline()
         saveProject()
-        showToast("Split $splitCount clips at beat markers")
+        showToast(text(R.string.vm_beat_split_toast, splitCount))
         hideBeatSync()
     }
     fun tapBeatMarker() {
@@ -2650,7 +2650,7 @@ class EditorViewModel @Inject constructor(
                     }
                     rebuildTimeline()
                     saveProject()
-                    showToast("Auto-edit created ${result.segments.size} segments")
+                    showToast(text(R.string.vm_auto_edit_created_toast, result.segments.size))
                 } else {
                     _state.update { it.copyAi { ai -> ai.copy(isAutoEditing = false) } }
                     showToast(text(R.string.vm_auto_edit_failed_toast))
@@ -2725,9 +2725,9 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch {
             val file = effectShareEngine.exportEffects(name, clip.effects, clip.colorGrade, clip.audioEffects)
             if (file != null) {
-                showToast("Effects exported: ${file.name}")
+                showToast(text(R.string.vm_effects_exported_toast, file.name))
             } else {
-                showToast("Export failed")
+                showToast(text(R.string.vm_effects_export_failed_toast))
             }
         }
     }
@@ -2745,10 +2745,10 @@ class EditorViewModel @Inject constructor(
                     )
                 }
                 saveProject()
-                showToast("Imported: ${imported.name}")
+                showToast(text(R.string.vm_effects_imported_toast, imported.name))
                 updatePreview()
             } else {
-                showToast("Import failed — invalid .ncfx file")
+                showToast(text(R.string.vm_effects_import_invalid_toast))
             }
         }
     }
@@ -2891,7 +2891,7 @@ class EditorViewModel @Inject constructor(
                         )
                     }
                     saveProject()
-                    showToast("Applied ${mode.displayName} noise reduction")
+                    showToast(text(R.string.vm_noise_reduction_applied_toast, mode.displayName))
                 } else {
                     _state.update { it.copyAi { ai -> ai.copy(isAnalyzingNoise = false) } }
                     showToast(text(R.string.vm_audio_clean_toast))
@@ -3282,7 +3282,7 @@ class EditorViewModel @Inject constructor(
         val state = _state.value
         val trackedObject = state.trackedObjects.firstOrNull { it.id == trackedObjectId }
         if (trackedObject == null || !trackedObject.isEnabled || trackedObject.keyframes.isEmpty()) {
-            showToast("No tracked object data available")
+            showToast(text(R.string.vm_no_tracked_data_toast))
             return
         }
 
@@ -3291,7 +3291,7 @@ class EditorViewModel @Inject constructor(
             .flatMap { it.clips.asSequence() }
             .firstOrNull { it.id == trackedObject.sourceClipId }
         if (sourceClip == null) {
-            showToast("Tracked source clip is missing")
+            showToast(text(R.string.vm_tracked_clip_missing_toast))
             return
         }
 
@@ -3299,7 +3299,7 @@ class EditorViewModel @Inject constructor(
             it.type == EffectType.TRACKED_MOSAIC && it.targetTrackedObjectId == trackedObject.id
         }
         if (alreadyApplied) {
-            showToast("Tracked mosaic already applied")
+            showToast(text(R.string.vm_tracked_mosaic_exists_toast))
             return
         }
 
@@ -3320,7 +3320,7 @@ class EditorViewModel @Inject constructor(
         }
         updatePreview()
         saveProject()
-        showToast("Tracked mosaic applied: ${trackedObject.label}")
+        showToast(text(R.string.vm_tracked_mosaic_applied_toast, trackedObject.label))
     }
 
     // --- Storyboard ---
@@ -3386,11 +3386,11 @@ class EditorViewModel @Inject constructor(
             .flatMap { it.clips }
             .filter(::clipSupportsAudioSync)
         if (syncEligibleClips.size < 2) {
-            showToast("Need at least 2 video clips with audio for multi-cam sync")
+            showToast(text(R.string.vm_need_multicam_clips_toast))
             return
         }
         viewModelScope.launch {
-            showToast("Syncing clips by audio...")
+            showToast(text(R.string.vm_syncing_clips_toast))
             try {
                 val uris = syncEligibleClips.map { it.sourceUri }
                 val referenceUri = uris.first()
@@ -3419,7 +3419,7 @@ class EditorViewModel @Inject constructor(
                     saveProject()
                     showToast("Synced ${offsets.size} clips by audio")
                 } else {
-                    showToast("Could not find audio sync points")
+                    showToast(text(R.string.vm_sync_failed_toast))
                 }
             } catch (e: Exception) {
                 Log.e("EditorViewModel", "Multi-cam sync failed", e)
@@ -3776,7 +3776,7 @@ class EditorViewModel @Inject constructor(
         }
         saveProject()
         hideTextTemplates()
-        showToast("Template applied: ${template.name}")
+        showToast(text(R.string.vm_template_applied_toast, template.name))
     }
 
     // --- Project Archive ---
@@ -4307,7 +4307,7 @@ class EditorViewModel @Inject constructor(
         val voiceTracks = s.tracks.filter { it.type == TrackType.VIDEO && !it.isMuted }
 
         if (musicTracks.isEmpty() || voiceTracks.isEmpty()) {
-            showToast("Need both voice and music tracks for ducking")
+            showToast(text(R.string.vm_need_voice_music_ducking_toast))
             return
         }
 
@@ -4319,7 +4319,7 @@ class EditorViewModel @Inject constructor(
                     .firstOrNull(::clipHasAudio)
 
                 if (voiceClip == null) {
-                    showToast("Need a video clip with audio for ducking")
+                    showToast(text(R.string.vm_need_video_audio_ducking_toast))
                     return@launch
                 }
 
