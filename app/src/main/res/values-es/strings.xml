@@ -2131,4 +2131,51 @@
     <string name="inspector_last_saved">Último guardado</string>
     <string name="inspector_backup_files">Archivos de respaldo</string>
     <string name="inspector_db_version">Versión del esquema</string>
+
+    <!-- ClipEditingDelegate toast messages -->
+    <string name="clip_read_media_failed_toast">No se pudo leer el medio de reemplazo</string>
+    <string name="clip_media_unused_toast">El medio ya no se usa</string>
+    <string name="clip_track_locked_toast">La pista está bloqueada</string>
+    <string name="clip_relinked_toast">Se revincularon %1$d clip(s) de la línea de tiempo</string>
+    <string name="clip_duplicated_toast">Clip duplicado</string>
+    <string name="clip_no_next_merge_toast">No hay un siguiente clip para fusionar</string>
+    <string name="clip_merge_source_mismatch_toast">Los clips deben provenir de la misma fuente y estar contiguos de extremo a extremo</string>
+    <string name="clip_linked_audio_not_ready_toast">El audio vinculado no está listo para fusionar</string>
+    <string name="clip_linked_audio_out_of_sync_toast">El audio vinculado está desincronizado</string>
+    <string name="clip_merged_toast">Clips fusionados</string>
+    <string name="clip_too_short_to_split_toast">El clip es demasiado corto para dividir aquí</string>
+    <string name="clip_move_failed_toast">No se pudo mover el clip</string>
+    <string name="clip_already_on_track_toast">El clip ya está en esa pista</string>
+    <string name="clip_moved_toast">Clip movido a la pista</string>
+
+    <!-- EffectsDelegate toast messages -->
+    <string name="effects_already_applied_toast">%1$s ya aplicado</string>
+    <string name="effects_none_to_copy_toast">No hay efectos para copiar</string>
+    <string name="effects_copied_toast">Se copiaron %1$d efectos</string>
+    <string name="effects_none_copied_toast">No se copiaron efectos</string>
+    <string name="effects_already_present_toast">Los efectos ya están presentes en el clip</string>
+    <string name="effects_pasted_toast">Se pegaron %1$d efectos</string>
+
+    <!-- OverlayDelegate toast messages -->
+    <string name="overlay_invalid_duration_toast">Duración de superposición de texto no válida</string>
+    <string name="overlay_sticker_added_toast">Pegatina agregada</string>
+    <string name="overlay_marker_added_toast">Marcador agregado</string>
+
+    <!-- ColorGradingDelegate toast messages -->
+    <string name="color_lut_applied_toast">LUT aplicado: %1$s</string>
+
+    <!-- ExportDelegate toast messages -->
+    <string name="export_stream_copy_complete_toast">Exportación por copia directa completa: %1$s</string>
+    <string name="export_already_in_progress_toast">La exportación ya está en curso</string>
+    <string name="export_no_clips_toast">No hay clips para exportar</string>
+    <string name="export_contact_sheet_toast">Hoja de contacto exportada: %1$s</string>
+    <string name="export_gif_complete_toast">GIF exportado: %1$s</string>
+    <string name="export_complete_toast">Exportación completa: %1$s</string>
+    <string name="export_no_media_share_toast">No hay medios exportados para compartir</string>
+    <string name="export_file_unavailable_toast">El archivo de exportación ya no está disponible</string>
+    <string name="export_no_media_toast">No hay medios exportados</string>
+    <string name="export_file_not_found_toast">Archivo de exportación no encontrado</string>
+    <string name="export_add_items_first_toast">Agregue elementos de exportación primero</string>
+    <string name="export_batch_progress_toast">Exportando %1$d/%2$d: %3$s</string>
+    <string name="export_rendering_preview_toast">Renderizando vista previa a 480p...</string>
 </resources>
