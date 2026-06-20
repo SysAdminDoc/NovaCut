@@ -803,5 +803,21 @@ private fun BoxScope.SplitPreviewOverlay(
                 )
             }
         }
+
+        Slider(
+            value = wipePosition,
+            onValueChange = { wipePosition = it.coerceIn(0.05f, 0.95f) },
+            valueRange = 0.05f..0.95f,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp, vertical = 0.dp)
+                .height(24.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = Mocha.Text,
+                activeTrackColor = Mocha.Teal.copy(alpha = 0.5f),
+                inactiveTrackColor = Mocha.Rosewater.copy(alpha = 0.5f)
+            )
+        )
     }
 }
