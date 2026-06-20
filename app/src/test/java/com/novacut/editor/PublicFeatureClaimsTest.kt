@@ -111,6 +111,70 @@ class PublicFeatureClaimsTest {
         }
     }
 
+    @Test
+    fun stubbedEnginesAreNotAdvertisedAsAvailable() {
+        val readme = locate("README.md").readText()
+        val fastlane = locate("fastlane/metadata/android/en-US/full_description.txt").readText()
+
+        val stubbedEngines = mapOf(
+            "TemplateMarketplaceEngine" to listOf("template marketplace", "community marketplace", "browse templates online"),
+            "StockAssetEngine" to listOf("stock library", "stock footage", "Pexels integration", "Pixabay integration"),
+            "CameraCaptureEngine" to listOf("in-app camera", "CameraX recorder", "built-in recorder"),
+            "CaptionTranslationEngine" to listOf("caption translation ready", "translate captions automatically", "real-time translation"),
+        )
+
+        for ((engineName, forbiddenClaims) in stubbedEngines) {
+            val engineFile = locate("app/src/main/java/com/novacut/editor/engine/$engineName.kt")
+            val engineSource = engineFile.readText()
+            val isStub = engineSource.contains("stub", ignoreCase = true)
+                    || engineSource.contains("not yet implemented", ignoreCase = true)
+                    || engineSource.contains("not wired", ignoreCase = true)
+
+            if (isStub) {
+                for (claim in forbiddenClaims) {
+                    assertFalse(
+                        "README must not claim '$claim' while $engineName is a stub",
+                        readme.contains(claim, ignoreCase = true)
+                    )
+                    assertFalse(
+                        "Fastlane must not claim '$claim' while $engineName is a stub",
+                        fastlane.contains(claim, ignoreCase = true)
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun captionTranslationEngineReportsNotReady() {
+        val engineSource = locate(
+            "app/src/main/java/com/novacut/editor/engine/CaptionTranslationEngine.kt"
+        ).readText()
+
+        if (engineSource.contains("stub", ignoreCase = true)) {
+            assertTrue(
+                "CaptionTranslationEngine.isModelReady() must return false while stubbed",
+                engineSource.contains("fun isModelReady(): Boolean = false")
+            )
+        }
+    }
+
+    @Test
+    fun stockAssetEngineReportsNotConfigured() {
+        val engineSource = locate(
+            "app/src/main/java/com/novacut/editor/engine/StockAssetEngine.kt"
+        ).readText()
+
+        if (engineSource.contains("stub", ignoreCase = true)
+            || engineSource.contains("not configured", ignoreCase = true)
+        ) {
+            assertTrue(
+                "StockAssetEngine.isProviderConfigured() must return false while stubbed",
+                engineSource.contains("fun isProviderConfigured(provider: Provider): Boolean = false")
+            )
+        }
+    }
+
     private fun locate(relativePath: String): File {
         val candidates = listOf(
             File(relativePath),

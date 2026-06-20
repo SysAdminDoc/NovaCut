@@ -16,14 +16,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -46,6 +52,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
 import com.novacut.editor.model.SpeedCurve
@@ -72,6 +81,7 @@ fun SpeedCurveEditor(
     onSpeedDragEnded: () -> Unit = {}
 ) {
     var curveMode by remember { mutableStateOf(speedCurve != null) }
+    var selectedCurvePointIndex by remember { mutableIntStateOf(-1) }
     val activeCurve = speedCurve ?: SpeedCurve.constant(constantSpeed)
     val averageCurveSpeed = activeCurve.averageSpeed(clipDurationMs).coerceIn(0.1f, 100f)
     val peakCurveSpeed = activeCurve.points.maxOfOrNull { it.speed }?.coerceIn(0.1f, 100f) ?: constantSpeed
@@ -256,11 +266,26 @@ fun SpeedCurveEditor(
                 SpeedCurveCanvas(
                     curve = activeCurve,
                     onCurveChanged = { onSpeedCurveChanged(it) },
+                    selectedIndex = selectedCurvePointIndex,
+                    onPointSelected = { selectedCurvePointIndex = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .background(Mocha.Surface0)
+                )
+                SpeedPointNumericEditor(
+                    curve = activeCurve,
+                    selectedIndex = selectedCurvePointIndex,
+                    onCurveChanged = { onSpeedCurveChanged(it) },
+                    onDeletePoint = {
+                        if (selectedCurvePointIndex > 0 && selectedCurvePointIndex < activeCurve.points.lastIndex) {
+                            val updated = activeCurve.points.toMutableList()
+                            updated.removeAt(selectedCurvePointIndex)
+                            selectedCurvePointIndex = -1
+                            onSpeedCurveChanged(SpeedCurve(updated))
+                        }
+                    }
                 )
             }
         } else {
@@ -434,9 +459,90 @@ private fun SpeedSummaryText(curveMode: Boolean) {
 }
 
 @Composable
+private fun SpeedPointNumericEditor(
+    curve: SpeedCurve,
+    selectedIndex: Int,
+    onCurveChanged: (SpeedCurve) -> Unit,
+    onDeletePoint: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (selectedIndex !in curve.points.indices) return
+    val point = curve.points[selectedIndex]
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Pt ${selectedIndex + 1}",
+            style = MaterialTheme.typography.labelMedium,
+            color = Mocha.Peach
+        )
+        OutlinedTextField(
+            value = formatEditorDecimal(point.position.toDouble() * 100.0, 1),
+            onValueChange = { text ->
+                val parsed = parseEditorDecimal(text) ?: return@OutlinedTextField
+                val newPosition = (parsed / 100.0).toFloat().coerceIn(0f, 1f)
+                val clamped = clampSpeedPointPosition(curve.points, selectedIndex, newPosition)
+                val updated = curve.points.toMutableList()
+                updated[selectedIndex] = updated[selectedIndex].copy(position = clamped)
+                onCurveChanged(SpeedCurve(updated))
+            },
+            label = { Text("Pos %") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = "Speed point position percent" },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Mocha.Text,
+                unfocusedTextColor = Mocha.Subtext0,
+                focusedBorderColor = Mocha.Peach,
+                unfocusedBorderColor = Mocha.Surface1
+            )
+        )
+        OutlinedTextField(
+            value = formatEditorDecimal(point.speed.toDouble(), 2),
+            onValueChange = { text ->
+                val parsed = parseEditorDecimal(text) ?: return@OutlinedTextField
+                val newSpeed = parsed.toFloat().coerceIn(0.1f, 8f)
+                val updated = curve.points.toMutableList()
+                updated[selectedIndex] = updated[selectedIndex].copy(speed = newSpeed)
+                onCurveChanged(SpeedCurve(updated))
+            },
+            label = { Text("Speed") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = "Speed point multiplier value" },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Mocha.Text,
+                unfocusedTextColor = Mocha.Subtext0,
+                focusedBorderColor = Mocha.Peach,
+                unfocusedBorderColor = Mocha.Surface1
+            )
+        )
+        if (selectedIndex > 0 && selectedIndex < curve.points.lastIndex) {
+            IconButton(
+                onClick = onDeletePoint,
+                modifier = Modifier.semantics { contentDescription = "Delete speed point" }
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, tint = Mocha.Red)
+            }
+        }
+    }
+}
+
+@Composable
 private fun SpeedCurveCanvas(
     curve: SpeedCurve,
     onCurveChanged: (SpeedCurve) -> Unit,
+    selectedIndex: Int = -1,
+    onPointSelected: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var dragPointIndex by remember { mutableIntStateOf(-1) }
@@ -444,11 +550,30 @@ private fun SpeedCurveCanvas(
     val minSpeed = 0.1f
     val currentCurve by rememberUpdatedState(curve)
     val currentOnCurveChanged by rememberUpdatedState(onCurveChanged)
+    val currentOnPointSelected by rememberUpdatedState(onPointSelected)
 
     androidx.compose.foundation.Canvas(
         modifier = modifier
+            .semantics { contentDescription = "Speed curve canvas. Double-tap to add point, tap to select, drag to move." }
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onTap = { offset ->
+                        val hitRadius = 30f
+                        var bestIdx = -1
+                        var bestDist = hitRadius * hitRadius
+                        for (i in currentCurve.points.indices) {
+                            val px = currentCurve.points[i].position * size.width
+                            val py = (1f - (currentCurve.points[i].speed - minSpeed) / (maxSpeed - minSpeed)) * size.height
+                            val dx = offset.x - px
+                            val dy = offset.y - py
+                            val dist = dx * dx + dy * dy
+                            if (dist < bestDist) {
+                                bestDist = dist
+                                bestIdx = i
+                            }
+                        }
+                        currentOnPointSelected(bestIdx)
+                    },
                     onDoubleTap = { offset ->
                         val position = (offset.x / size.width).coerceIn(0.02f, 0.98f)
                         val speed = (minSpeed + (1f - offset.y / size.height) * (maxSpeed - minSpeed))
@@ -517,9 +642,12 @@ private fun SpeedCurveCanvas(
         }
         drawPath(path, Mocha.Peach, style = Stroke(2.5f))
 
-        curve.points.forEach { point ->
+        curve.points.forEachIndexed { i, point ->
             val px = point.position * w
             val py = (1f - (point.speed - minSpeed) / speedRange) * h
+            if (i == selectedIndex) {
+                drawCircle(Mocha.Yellow, 14f, Offset(px, py))
+            }
             drawCircle(Mocha.Peach, 8f, Offset(px, py))
             drawCircle(Color.White, 5f, Offset(px, py))
         }

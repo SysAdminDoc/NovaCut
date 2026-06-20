@@ -70,6 +70,112 @@ private const val MAX_TIMELINE_ZOOM = 10f
 
 // Allocation-free clip lookup for drag handlers — they fire per pointer event
 // (~60-120Hz), where the previous flatMap built a throwaway list each event.
+@Composable
+private fun TrimNumericInputRow(
+    clipId: String,
+    trimStartMs: Long,
+    trimEndMs: Long,
+    sourceDurationMs: Long,
+    onTrimChanged: (String, Long?, Long?) -> Unit,
+    onTrimDragStarted: () -> Unit,
+    onTrimDragEnded: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var startText by remember(clipId, trimStartMs) {
+        mutableStateOf(formatTrimTime(trimStartMs))
+    }
+    var endText by remember(clipId, trimEndMs) {
+        mutableStateOf(formatTrimTime(trimEndMs))
+    }
+
+    Row(
+        modifier = modifier.padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "In:",
+            style = MaterialTheme.typography.labelSmall,
+            color = Mocha.Peach
+        )
+        OutlinedTextField(
+            value = startText,
+            onValueChange = { text ->
+                startText = text
+                val parsed = parseTrimTime(text) ?: return@OutlinedTextField
+                val clamped = parsed.coerceIn(0L, (trimEndMs - 100L).coerceAtLeast(0L))
+                onTrimDragStarted()
+                onTrimChanged(clipId, clamped, null)
+                onTrimDragEnded()
+            },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall.copy(color = Mocha.Text),
+            modifier = Modifier
+                .weight(1f)
+                .height(42.dp)
+                .semantics { contentDescription = "Trim start time in seconds" },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Mocha.Peach,
+                unfocusedBorderColor = Mocha.Surface1
+            )
+        )
+        Text(
+            text = "Out:",
+            style = MaterialTheme.typography.labelSmall,
+            color = Mocha.Peach
+        )
+        OutlinedTextField(
+            value = endText,
+            onValueChange = { text ->
+                endText = text
+                val parsed = parseTrimTime(text) ?: return@OutlinedTextField
+                val clamped = parsed.coerceIn((trimStartMs + 100L), sourceDurationMs)
+                onTrimDragStarted()
+                onTrimChanged(clipId, null, clamped)
+                onTrimDragEnded()
+            },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall.copy(color = Mocha.Text),
+            modifier = Modifier
+                .weight(1f)
+                .height(42.dp)
+                .semantics { contentDescription = "Trim end time in seconds" },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Mocha.Peach,
+                unfocusedBorderColor = Mocha.Surface1
+            )
+        )
+        Text(
+            text = formatTrimTime(sourceDurationMs),
+            style = MaterialTheme.typography.labelSmall,
+            color = Mocha.Subtext0
+        )
+    }
+}
+
+private fun formatTrimTime(ms: Long): String {
+    val totalSec = ms / 1000.0
+    val min = (totalSec / 60).toInt()
+    val sec = totalSec % 60
+    return if (min > 0) String.format(java.util.Locale.US, "%d:%05.2f", min, sec)
+    else String.format(java.util.Locale.US, "%.2f", sec)
+}
+
+private fun parseTrimTime(text: String): Long? {
+    val cleaned = text.replace(',', '.')
+    if (cleaned.contains(':')) {
+        val parts = cleaned.split(':')
+        if (parts.size != 2) return null
+        val min = parts[0].toLongOrNull() ?: return null
+        val sec = parts[1].toDoubleOrNull() ?: return null
+        if (sec < 0 || sec.isNaN() || sec.isInfinite()) return null
+        return ((min * 60 + sec) * 1000).toLong()
+    }
+    val sec = cleaned.toDoubleOrNull() ?: return null
+    if (sec < 0 || sec.isNaN() || sec.isInfinite()) return null
+    return (sec * 1000).toLong()
+}
+
 private fun findClipInTracks(tracks: List<Track>, clipId: String): Clip? {
     for (track in tracks) {
         for (candidate in track.clips) {
@@ -532,6 +638,7 @@ fun Timeline(
             }
 
             if (isTrimMode && selectedClipId != null) {
+                val selectedClip = tracks.flatMap { it.clips }.find { it.id == selectedClipId }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -546,6 +653,20 @@ fun Timeline(
                         stringResource(R.string.timeline_trim_mode_hint),
                         color = Mocha.Peach,
                         style = MaterialTheme.typography.labelMedium
+                    )
+                }
+                if (selectedClip != null) {
+                    TrimNumericInputRow(
+                        clipId = selectedClip.id,
+                        trimStartMs = selectedClip.trimStartMs,
+                        trimEndMs = selectedClip.trimEndMs,
+                        sourceDurationMs = selectedClip.sourceDurationMs,
+                        onTrimChanged = onTrimChanged,
+                        onTrimDragStarted = onTrimDragStarted,
+                        onTrimDragEnded = onTrimDragEnded,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = chromePadding)
                     )
                 }
             }
