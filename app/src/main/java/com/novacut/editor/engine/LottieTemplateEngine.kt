@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.net.Uri
 import android.opengl.GLES30
 import android.opengl.GLUtils
+import android.provider.Settings
 import android.util.Log
 import com.airbnb.lottie.LottieComposition
 import com.airbnb.lottie.LottieCompositionFactory
@@ -114,7 +115,8 @@ class LottieTemplateEngine @Inject constructor(
         frameTimeMs: Long,
         width: Int,
         height: Int,
-        textReplacements: Map<String, String> = emptyMap()
+        textReplacements: Map<String, String> = emptyMap(),
+        forceReducedMotion: Boolean = false
     ): Bitmap {
         val drawable = LottieDrawable()
         drawable.composition = composition
@@ -128,11 +130,19 @@ class LottieTemplateEngine @Inject constructor(
             drawable.setTextDelegate(textDelegate)
         }
 
-        // Set progress (0..1). Guard against duration=0 on malformed/empty compositions:
-        // 0 / 0 = NaN, and NaN.coerceIn(0f, 1f) = NaN (NaN comparisons always return false),
-        // which would pass NaN to drawable.progress and render at an undefined frame position.
-        val safeDuration = composition.duration.takeIf { it > 0f } ?: 1f
-        val progress = (frameTimeMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+        // EU Accessibility Act / WCAG 2.3.3: when reduced motion is active,
+        // render the final frame (progress = 1.0) as a static title card
+        // instead of animating through the composition.
+        val reducedMotion = forceReducedMotion || isReducedMotionEnabled()
+        val progress = if (reducedMotion) {
+            1f
+        } else {
+            // Set progress (0..1). Guard against duration=0 on malformed/empty compositions:
+            // 0 / 0 = NaN, and NaN.coerceIn(0f, 1f) = NaN (NaN comparisons always return false),
+            // which would pass NaN to drawable.progress and render at an undefined frame position.
+            val safeDuration = composition.duration.takeIf { it > 0f } ?: 1f
+            (frameTimeMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+        }
         drawable.progress = progress
 
         // Render to bitmap
@@ -254,6 +264,26 @@ class LottieTemplateEngine @Inject constructor(
         }
         bitmap.recycle()
         return texId
+    }
+
+    /**
+     * Whether the system's reduced-motion accessibility setting is enabled.
+     * When true, Lottie animations should render as static final frames
+     * instead of animating — required for EU Accessibility Act / WCAG 2.3.3 compliance.
+     *
+     * Checks `Settings.Global.ANIMATOR_DURATION_SCALE`: a value of 0f means
+     * the user (or accessibility service) has disabled animations system-wide.
+     */
+    fun isReducedMotionEnabled(): Boolean {
+        return try {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            ) == 0f
+        } catch (_: Exception) {
+            false
+        }
     }
 
     companion object {
