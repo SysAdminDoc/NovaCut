@@ -1525,13 +1525,20 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    @Volatile private var cachedClipToTrackMap: Map<String, String> = emptyMap()
+    @Volatile private var cachedClipToTrackTracksIdentity: List<Track>? = null
+
+    private fun clipToTrackMap(tracks: List<Track>): Map<String, String> {
+        if (tracks === cachedClipToTrackTracksIdentity) return cachedClipToTrackMap
+        val map = mutableMapOf<String, String>()
+        tracks.forEach { track -> track.clips.forEach { clip -> map[clip.id] = track.id } }
+        cachedClipToTrackMap = map
+        cachedClipToTrackTracksIdentity = tracks
+        return map
+    }
+
     private fun normalizeSelectionState(state: EditorState, tracks: List<Track> = state.tracks): EditorState {
-        val clipToTrackId = mutableMapOf<String, String>()
-        tracks.forEach { track ->
-            track.clips.forEach { clip ->
-                clipToTrackId[clip.id] = track.id
-            }
-        }
+        val clipToTrackId = clipToTrackMap(tracks)
 
         val validSelectedIds = state.selectedClipIds.filter { clipToTrackId.containsKey(it) }.toSet()
         val validSelectedClipId = state.selectedClipId?.takeIf { clipToTrackId.containsKey(it) }
