@@ -2,8 +2,6 @@
 
 A professional Android video editor built with Kotlin and Jetpack Compose. Open alternative to CapCut, PowerDirector, and DaVinci Resolve -- with AI-assisted tools, GPU-accelerated effects, and desktop NLE interoperability.
 
-
-![clearcut-logo](https://github.com/user-attachments/assets/5187e84f-e9e7-4dc6-b7f5-0c990049f31f)<svg width="1800" height="560" viewBox="0 0 1800 560" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="panel" x1="84" y1="66" x2="1718" y2="512" gradientUnits="userSpaceOnUse">
       <stop stop-color="#0A0C12"/>
