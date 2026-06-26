@@ -129,9 +129,13 @@ class ProcessExitRecorderTest {
         recorder.recordStartupExitReasons(nowEpochMs = 9_000L)
         val json = JSONObject(recorder.buildDiagnosticJson())
         val records = json.getJSONArray("records")
+        val reasonsByTimestamp = (0 until records.length()).associate { index ->
+            val record = records.getJSONObject(index)
+            record.getLong("timestampEpochMs") to record.getString("reason")
+        }
 
-        assertEquals("MEMORY_LIMITER", records.getJSONObject(0).getString("reason"))
-        assertEquals("OTHER", records.getJSONObject(1).getString("reason"))
+        assertEquals("MEMORY_LIMITER", reasonsByTimestamp[7_000L])
+        assertEquals("OTHER", reasonsByTimestamp[8_000L])
     }
 
     @Test

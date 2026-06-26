@@ -27,7 +27,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.model.TrackType
+import com.novacut.editor.ui.theme.LocalClearCutColors
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.TouchTarget
 import java.util.Locale
 import kotlin.math.abs
@@ -42,24 +44,25 @@ internal fun TimelineToolbarButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val colors = LocalClearCutColors.current
     val backgroundColor = when {
-        !enabled -> Mocha.PanelHighest.copy(alpha = 0.35f)
+        !enabled -> colors.panelHighest.copy(alpha = 0.35f)
         highlight -> Mocha.Peach.copy(alpha = 0.22f)
-        else -> Mocha.PanelHighest
+        else -> colors.panelHighest
     }
     val borderColor = when {
-        !enabled -> Mocha.CardStroke.copy(alpha = 0.35f)
+        !enabled -> colors.cardStroke.copy(alpha = 0.35f)
         highlight -> Mocha.Peach.copy(alpha = 0.7f)
-        else -> Mocha.CardStroke
+        else -> if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke
     }
     val iconTint = when {
-        !enabled -> Mocha.Text.copy(alpha = 0.4f)
+        !enabled -> colors.text.copy(alpha = 0.4f)
         highlight -> Mocha.Peach
-        else -> Mocha.Text
+        else -> colors.text
     }
     Surface(
         color = backgroundColor,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radius.md),
         border = BorderStroke(1.dp, borderColor)
     ) {
         IconButton(
@@ -83,10 +86,11 @@ internal fun TimelineInfoChip(
     accent: Color,
     compact: Boolean = false
 ) {
+    val colors = LocalClearCutColors.current
     Surface(
         color = accent.copy(alpha = 0.13f),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
+        shape = RoundedCornerShape(Radius.sm),
+        border = BorderStroke(1.dp, accent.copy(alpha = if (colors.highContrast) 0.46f else 0.2f))
     ) {
         Text(
             text = text,
@@ -106,13 +110,14 @@ internal fun TimelineTextActionChip(
     compact: Boolean = false,
     onClick: () -> Unit
 ) {
+    val colors = LocalClearCutColors.current
     Surface(
         modifier = Modifier
             .defaultMinSize(minHeight = TouchTarget.minimum)
             .clickable(role = Role.Button, onClick = onClick),
-        color = Mocha.PanelHighest,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, Mocha.CardStroke)
+        color = colors.panelHighest,
+        shape = RoundedCornerShape(Radius.sm),
+        border = BorderStroke(1.dp, if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke)
     ) {
         Box(
             modifier = Modifier.padding(
@@ -123,7 +128,7 @@ internal fun TimelineTextActionChip(
         ) {
             Text(
                 text = text,
-                color = Mocha.Text,
+                color = colors.text,
                 style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -141,12 +146,13 @@ internal fun TimelineMiniIconButton(
     compact: Boolean = false,
     onClick: () -> Unit
 ) {
+    val colors = LocalClearCutColors.current
     Surface(
-        color = if (active) accent.copy(alpha = 0.14f) else Mocha.Surface0.copy(alpha = 0.8f),
-        shape = RoundedCornerShape(12.dp),
+        color = if (active) accent.copy(alpha = 0.14f) else colors.panelHighest.copy(alpha = 0.8f),
+        shape = RoundedCornerShape(Radius.sm),
         border = BorderStroke(
             1.dp,
-            if (active) accent.copy(alpha = 0.26f) else Mocha.CardStroke.copy(alpha = 0.5f)
+            if (active) accent.copy(alpha = 0.26f) else colors.cardStroke.copy(alpha = 0.5f)
         )
     ) {
         IconButton(
@@ -156,7 +162,7 @@ internal fun TimelineMiniIconButton(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (active) accent else Mocha.Subtext0,
+                tint = if (active) accent else colors.subtext,
                 modifier = Modifier.size(if (compact) 12.dp else 14.dp)
             )
         }
@@ -171,7 +177,7 @@ internal fun TimelineClipBadge(
 ) {
     Surface(
         color = accent.copy(alpha = 0.18f),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.sm),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.24f))
     ) {
         Text(

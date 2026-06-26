@@ -60,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -1797,32 +1798,25 @@ private fun WatermarkSection(
     watermark: Watermark?,
     onWatermarkChanged: (Watermark?) -> Unit
 ) {
+    val context = LocalContext.current
     val pickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri: android.net.Uri? ->
         if (uri != null) {
-            // Persist the read permission so the export process can still
-            // decode the bitmap after app restarts / activity recreation.
-            // Silently fall through on failure — some provider URIs don't
-            // grant persistable permission (Photo Picker) but still work
-            // for the lifetime of the ExportConfig in memory, which is our
-            // primary use case.
-            val ctx = uri
             try {
-                androidx.compose.ui.platform.LocalContext
-                // The LocalContext composition-local can't be read from a
-                // non-composable lambda; grab the context via the launcher's
-                // registry instead when we need it. For now, just pass the
-                // URI through — permission persistence happens at the
-                // launcher's callsite in MediaPicker already, and this
-                // picker path is read once per export.
-            } catch (_: Throwable) {}
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {
+                // Some providers do not grant persistable access; the current
+                // in-memory URI still works for the active export session.
+            }
             onWatermarkChanged(
                 (watermark ?: Watermark(sourceUri = uri)).copy(sourceUri = uri)
             )
         }
     }
-    val context = androidx.compose.ui.platform.LocalContext.current
 
     ExportToggleRow(
         icon = Icons.Default.Image,
@@ -1908,10 +1902,6 @@ private fun WatermarkSection(
                     color = Mocha.Blue
                 )
             }
-            // Suppress unused warning for ctx — retained because future
-            // expansion (e.g. inline preview of the chosen bitmap) will
-            // need the composition-local.
-            @Suppress("UNUSED_EXPRESSION") context
         }
     }
 }
@@ -2005,6 +1995,7 @@ private fun ExportToggleRow(
                 checked = checked,
                 enabled = enabled,
                 onCheckedChange = null,
+                modifier = Modifier.clearAndSetSemantics { },
                 colors = SwitchDefaults.colors(
                     checkedTrackColor = accent,
                     checkedThumbColor = Mocha.Crust,

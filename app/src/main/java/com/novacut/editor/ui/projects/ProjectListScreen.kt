@@ -67,6 +67,7 @@ import com.novacut.editor.ui.theme.ClearCutPrimaryButton
 import com.novacut.editor.ui.theme.ClearCutScreenBackground
 import com.novacut.editor.ui.theme.ClearCutSectionHeader
 import com.novacut.editor.ui.theme.ClearCutSecondaryButton
+import com.novacut.editor.ui.theme.LocalClearCutColors
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
 import com.novacut.editor.ui.theme.TouchTarget
@@ -569,13 +570,17 @@ private fun ProjectHomeHero(
         Text(
             text = stringResource(R.string.projects_headline),
             color = Mocha.Text,
-            style = MaterialTheme.typography.displayMedium
+            style = MaterialTheme.typography.displayMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
 
         Text(
             text = stringResource(R.string.projects_subtitle),
             color = Mocha.Subtext0,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
         )
 
         LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -775,13 +780,17 @@ private fun ProjectReadinessCard(
     accent: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalClearCutColors.current
     Surface(
         modifier = modifier.semantics {
             contentDescription = "$title. $value. $body"
         },
-        color = Mocha.Panel.copy(alpha = 0.92f),
+        color = colors.panel.copy(alpha = 0.92f),
         shape = RoundedCornerShape(Radius.lg),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.88f))
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke.copy(alpha = 0.88f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(Spacing.md),
@@ -808,7 +817,7 @@ private fun ProjectReadinessCard(
             ) {
                 Text(
                     text = title,
-                    color = Mocha.Text,
+                    color = colors.text,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -822,7 +831,7 @@ private fun ProjectReadinessCard(
                 )
                 Text(
                     text = body,
-                    color = Mocha.Subtext0,
+                    color = colors.subtext,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -837,9 +846,10 @@ private fun ProjectOperationCard(
     operation: ProjectListOperationState,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalClearCutColors.current
     Surface(
         modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        color = Mocha.PanelHighest,
+        color = colors.panelHighest,
         shape = RoundedCornerShape(Radius.lg),
         border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Mauve.copy(alpha = 0.26f))
     ) {
@@ -868,12 +878,12 @@ private fun ProjectOperationCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = operation.title,
-                        color = Mocha.Text,
+                        color = colors.text,
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
                         text = operation.description,
-                        color = Mocha.Subtext0,
+                        color = colors.subtext,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -1204,7 +1214,7 @@ private fun ProjectCard(
             border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f)),
             shape = RoundedCornerShape(Radius.lg)
         ) {
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .background(
                         Brush.horizontalGradient(
@@ -1216,23 +1226,26 @@ private fun ProjectCard(
                     )
                     .padding(14.dp)
             ) {
+                val compactCard = maxWidth < 390.dp
+                val thumbnailSize = if (compactCard) 76.dp else 92.dp
+                val thumbnailGap = if (compactCard) Spacing.sm else 14.dp
                 Row(
                     modifier = Modifier
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ProjectThumbnail(project = project)
+                    ProjectThumbnail(project = project, size = thumbnailSize)
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(thumbnailGap))
 
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(if (compactCard) 6.dp else 8.dp)
                     ) {
                         Text(
                             project.name,
                             color = Mocha.Text,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = if (compactCard) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1335,13 +1348,15 @@ private fun ProjectCard(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = Mocha.Overlay1,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (!compactCard) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = Mocha.Overlay1,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -1499,12 +1514,15 @@ private fun ProjectCard(
 }
 
 @Composable
-private fun ProjectThumbnail(project: Project) {
+private fun ProjectThumbnail(
+    project: Project,
+    size: androidx.compose.ui.unit.Dp = 92.dp
+) {
     val context = LocalContext.current
 
     Box(
         modifier = Modifier
-            .size(92.dp)
+            .size(size)
             .clip(RoundedCornerShape(Radius.lg))
             .background(
                 Brush.verticalGradient(
@@ -1532,7 +1550,7 @@ private fun ProjectThumbnail(project: Project) {
                 tint = Mocha.Rosewater,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(28.dp)
+                    .size(if (size < 90.dp) 24.dp else 28.dp)
             )
         }
 
@@ -1547,7 +1565,10 @@ private fun ProjectThumbnail(project: Project) {
                 text = project.aspectRatio.label,
                 color = Mocha.Text,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                modifier = Modifier.padding(
+                    horizontal = if (size < 90.dp) 6.dp else 8.dp,
+                    vertical = 4.dp
+                )
             )
         }
     }
@@ -1567,6 +1588,8 @@ private fun ProjectMetadataChip(
             text = text,
             color = accent,
             style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
         )
     }

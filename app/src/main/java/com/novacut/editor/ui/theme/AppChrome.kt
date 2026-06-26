@@ -1,7 +1,12 @@
 package com.novacut.editor.ui.theme
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -27,11 +32,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -138,18 +146,39 @@ fun ClearCutPrimaryButton(
     enabled: Boolean = true
 ) {
     val colors = LocalClearCutColors.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> Mocha.Surface1.copy(alpha = 0.5f)
+            pressed -> Mocha.Flamingo
+            else -> Mocha.Rosewater
+        },
+        animationSpec = tween(durationMillis = Motion.DurationFast, easing = Motion.StandardEasing),
+        label = "primaryButtonContainer"
+    )
+    val buttonScale by animateFloatAsState(
+        targetValue = if (enabled && pressed) 0.985f else 1f,
+        animationSpec = tween(durationMillis = Motion.DurationFast, easing = Motion.StandardEasing),
+        label = "primaryButtonScale"
+    )
     Button(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(Radius.md),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Mocha.Rosewater,
+            containerColor = containerColor,
             contentColor = Mocha.Midnight,
-            disabledContainerColor = Mocha.Surface1.copy(alpha = 0.5f),
+            disabledContainerColor = containerColor,
             disabledContentColor = colors.disabledText
         ),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
         modifier = modifier
+            .graphicsLayer {
+                scaleX = buttonScale
+                scaleY = buttonScale
+            }
             .semantics { contentDescription = text }
             .defaultMinSize(minHeight = TouchTarget.minimum)
     ) {
@@ -182,19 +211,50 @@ fun ClearCutSecondaryButton(
     enabled: Boolean = true
 ) {
     val colors = LocalClearCutColors.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> Mocha.Surface1.copy(alpha = 0.28f)
+            pressed -> colors.panelHighest.copy(alpha = if (colors.highContrast) 0.96f else 0.66f)
+            else -> colors.panelHighest.copy(alpha = if (colors.highContrast) 0.88f else 0.42f)
+        },
+        animationSpec = tween(durationMillis = Motion.DurationFast, easing = Motion.StandardEasing),
+        label = "secondaryButtonContainer"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> colors.cardStroke.copy(alpha = 0.55f)
+            pressed -> contentColor.copy(alpha = if (colors.highContrast) 0.86f else 0.42f)
+            else -> colors.cardStrokeStrong
+        },
+        animationSpec = tween(durationMillis = Motion.DurationFast, easing = Motion.StandardEasing),
+        label = "secondaryButtonBorder"
+    )
+    val buttonScale by animateFloatAsState(
+        targetValue = if (enabled && pressed) 0.985f else 1f,
+        animationSpec = Motion.fast(),
+        label = "secondaryButtonScale"
+    )
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(Radius.md),
-        border = BorderStroke(1.dp, colors.cardStrokeStrong),
+        border = BorderStroke(1.dp, borderColor),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = colors.panelHighest.copy(alpha = if (colors.highContrast) 0.88f else 0.42f),
+            containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = Mocha.Surface1.copy(alpha = 0.28f),
+            disabledContainerColor = containerColor,
             disabledContentColor = colors.disabledText
         ),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-        modifier = modifier.defaultMinSize(minHeight = TouchTarget.minimum)
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = buttonScale
+                scaleY = buttonScale
+            }
+            .defaultMinSize(minHeight = TouchTarget.minimum)
     ) {
         if (icon != null) {
             Icon(

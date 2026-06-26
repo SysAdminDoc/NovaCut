@@ -457,6 +457,7 @@ fun SettingsScreen(
                     label = stringResource(R.string.settings_clear_proxy_cache),
                     description = formatStorageBytes(projectStorage.proxyCacheBytes),
                     actionLabel = if (projectStorage.isClearingProxies) "…" else stringResource(R.string.settings_clear_proxy_cache),
+                    actionIcon = Icons.Default.DeleteSweep,
                     onClick = viewModel::clearProxyCache
                 )
             }
@@ -680,6 +681,7 @@ fun SettingsScreen(
                             ),
                             description = stringResource(R.string.settings_update_available_description),
                             actionLabel = stringResource(R.string.settings_update_view_action),
+                            actionIcon = Icons.AutoMirrored.Filled.OpenInNew,
                             onClick = { updateCheck.releaseUrl?.let { uriHandler.openUri(it) } }
                         )
                     } else {
@@ -693,6 +695,7 @@ fun SettingsScreen(
                             } else {
                                 stringResource(R.string.settings_update_check_now_action)
                             },
+                            actionIcon = Icons.Default.Refresh,
                             onClick = { if (!updateCheck.isChecking) viewModel.checkForUpdate() }
                         )
                     }
@@ -1121,7 +1124,10 @@ private fun SettingsDiagnosticExportRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
                         ClearCutSecondaryButton(
                             text = stringResource(R.string.settings_diagnostic_share),
                             onClick = { onShare(state.bundle) },
@@ -1625,6 +1631,7 @@ private fun SettingsActionRow(
     label: String,
     description: String,
     actionLabel: String,
+    actionIcon: ImageVector = Icons.Default.ChevronRight,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1644,7 +1651,7 @@ private fun SettingsActionRow(
             overflow = TextOverflow.Ellipsis
         )
         Icon(
-            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+            imageVector = actionIcon,
             contentDescription = null,
             tint = accent,
             modifier = Modifier.size(18.dp)
@@ -1739,7 +1746,7 @@ private fun SettingsTile(
             if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke.copy(alpha = 0.9f)
         )
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(modifier)
@@ -1752,36 +1759,83 @@ private fun SettingsTile(
                         Modifier
                     }
                 )
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 14.dp, vertical = 14.dp)
         ) {
-            SettingsTileIcon(icon = icon, accent = accent)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    label,
-                    color = colors.text,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                description?.let {
-                    Text(
-                        it,
-                        color = colors.subtext,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+            val compact = maxWidth < 420.dp
+            if (compact) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsTileIcon(icon = icon, accent = accent)
+                        SettingsTileText(
+                            label = label,
+                            description = description,
+                            modifier = Modifier.weight(1f),
+                            colors = colors
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = trailing
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SettingsTileIcon(icon = icon, accent = accent)
+                    SettingsTileText(
+                        label = label,
+                        description = description,
+                        modifier = Modifier.weight(1f),
+                        colors = colors
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = trailing
                     )
                 }
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                content = trailing
+        }
+    }
+}
+
+@Composable
+private fun SettingsTileText(
+    label: String,
+    description: String?,
+    modifier: Modifier,
+    colors: com.novacut.editor.ui.theme.ClearCutSemanticColors
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            label,
+            color = colors.text,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        description?.let {
+            Text(
+                it,
+                color = colors.subtext,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

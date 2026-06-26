@@ -1,5 +1,6 @@
 package com.novacut.editor.ui.editor
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
@@ -69,6 +72,7 @@ fun PremiumEditorPanel(
                 colors.panel,
                 RoundedCornerShape(topStart = Radius.xxl, topEnd = Radius.xxl)
             )
+            .semantics { paneTitle = title }
             .then(scrollModifier)
             .padding(horizontal = Spacing.lg, vertical = 14.dp)
     ) {
@@ -158,7 +162,9 @@ fun PremiumPanelCard(
     val colors = LocalClearCutColors.current
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         color = colors.panelHighest,
         shape = RoundedCornerShape(Radius.lg),
         border = BorderStroke(
