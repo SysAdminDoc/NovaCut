@@ -48,9 +48,9 @@ class TrackedFilesAuditTest {
     }
 
     /**
-     * Sanity check: the public build/release contract files must remain tracked.
-     * Planning and research markdown are intentionally local-only; the README is
-     * the only tracked markdown file in this repo.
+     * Sanity check: the public local-build/release contract files must remain
+     * tracked. Planning and research markdown are intentionally local-only; the
+     * README is the only tracked markdown file in this repo.
      */
     @Test
     fun requiredPublicFilesRemainTracked() {
@@ -83,6 +83,26 @@ class TrackedFilesAuditTest {
             "README.md is the only tracked markdown file; private planning docs " +
                 "must stay local-only. Tracked private markdown: $trackedPrivateMarkdown",
             trackedPrivateMarkdown.isEmpty()
+        )
+    }
+
+    @Test
+    fun githubAutomationFilesStayUntracked() {
+        val repoRoot = locateRepoRoot() ?: return
+        val tracked = gitLsFiles(repoRoot) ?: run {
+            assumeTrue("git command unavailable; skipping GitHub automation audit", false)
+            return
+        }
+
+        val offenders = tracked.filter { path ->
+            FORBIDDEN_AUTOMATION_PREFIXES.any { path.startsWith(it) } ||
+                path in FORBIDDEN_AUTOMATION_FILES
+        }
+
+        assertTrue(
+            "ClearCut builds, tests, and releases locally. GitHub workflow, " +
+                "Dependabot, and Renovate files must not be tracked. Offenders: $offenders",
+            offenders.isEmpty()
         )
     }
 
@@ -142,11 +162,18 @@ class TrackedFilesAuditTest {
             "research/",
         )
 
+        private val FORBIDDEN_AUTOMATION_PREFIXES = listOf(
+            ".github/workflows/",
+        )
+
+        private val FORBIDDEN_AUTOMATION_FILES = setOf(
+            ".github/dependabot.yml",
+            "renovate.json",
+        )
+
         private val REQUIRED_TRACKED = listOf(
             "README.md",
             "LICENSE",
-            ".github/workflows/build.yml",
-            ".github/dependabot.yml",
             "app/build.gradle.kts",
             "app/src/main/AndroidManifest.xml",
             "gradle/libs.versions.toml",
