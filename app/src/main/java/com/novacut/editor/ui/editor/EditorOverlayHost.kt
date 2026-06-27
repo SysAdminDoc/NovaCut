@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -54,6 +53,7 @@ import com.novacut.editor.model.Caption
 import com.novacut.editor.model.Clip
 import com.novacut.editor.model.ClipLabel
 import com.novacut.editor.model.KeyframeProperty
+import com.novacut.editor.ui.theme.ClearCutChromeIconButton
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.Spacing
@@ -201,14 +201,13 @@ fun BoxScope.EditorOverlayHost(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    IconButton(onClick = onClipLabelPickerDismiss, modifier = Modifier.size(44.dp)) {
-                        Icon(
-                            Icons.Default.Close,
-                            stringResource(R.string.cd_close_color_grading),
-                            tint = Mocha.Subtext0,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    ClearCutChromeIconButton(
+                        icon = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.cd_close_color_grading),
+                        onClick = onClipLabelPickerDismiss,
+                        size = 44.dp,
+                        iconSize = 20.dp
+                    )
                 }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -296,13 +295,12 @@ fun BoxScope.EditorOverlayHost(
                 }
             },
             dismissAction = {
-                IconButton(onClick = { viewModel.dismissBulkUndoPrompt() }) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.bulk_undo_dismiss_cd),
-                        tint = Mocha.Subtext0
-                    )
-                }
+                ClearCutChromeIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.bulk_undo_dismiss_cd),
+                    onClick = { viewModel.dismissBulkUndoPrompt() },
+                    size = 40.dp
+                )
             },
             shape = RoundedCornerShape(Radius.xl)
         ) {

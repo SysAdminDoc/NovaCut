@@ -934,20 +934,39 @@ private fun ProjectEmptyState(
     val hasActiveSearch = searchQuery.isNotBlank()
     val hasActiveFilter = filterMode != ProjectFilterMode.ALL
     val isConstrainedEmpty = hasAnyProjects && (hasActiveSearch || hasActiveFilter)
+    val colors = LocalClearCutColors.current
+    val accent = if (isConstrainedEmpty) Mocha.Sapphire else Mocha.Mauve
+    val iconTint = if (isConstrainedEmpty) Mocha.Sapphire else Mocha.Rosewater
+    val title = projectEmptyStateTitle(
+        isConstrainedEmpty = isConstrainedEmpty,
+        hasActiveSearch = hasActiveSearch,
+        hasActiveFilter = hasActiveFilter,
+        filterLabel = filterMode.localizedLabel()
+    )
+    val body = projectEmptyStateBody(
+        isConstrainedEmpty = isConstrainedEmpty,
+        hasActiveSearch = hasActiveSearch,
+        hasActiveFilter = hasActiveFilter
+    )
 
     Surface(
-        color = Mocha.Panel,
+        color = colors.panel,
         shape = RoundedCornerShape(Radius.xl),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f)),
-        modifier = Modifier.fillMaxWidth()
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke.copy(alpha = 0.9f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "$title. $body" }
     ) {
         Box(
             modifier = Modifier
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Mocha.PanelHighest.copy(alpha = 0.92f),
-                            Mocha.Panel
+                            colors.panelHighest.copy(alpha = 0.92f),
+                            colors.panel
                         )
                     )
                 )
@@ -958,25 +977,17 @@ private fun ProjectEmptyState(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Surface(
-                    color = if (isConstrainedEmpty) {
-                        Mocha.Sapphire.copy(alpha = 0.14f)
-                    } else {
-                        Mocha.Mauve.copy(alpha = 0.14f)
-                    },
+                    color = accent.copy(alpha = if (colors.highContrast) 0.22f else 0.14f),
                     shape = RoundedCornerShape(Radius.lg),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (isConstrainedEmpty) {
-                            Mocha.Sapphire.copy(alpha = 0.24f)
-                        } else {
-                            Mocha.Mauve.copy(alpha = 0.22f)
-                        }
+                        accent.copy(alpha = if (colors.highContrast) 0.72f else 0.24f)
                     )
                 ) {
                     Icon(
                         imageVector = if (isConstrainedEmpty) Icons.Default.Search else Icons.Default.VideoLibrary,
                         contentDescription = null,
-                        tint = if (isConstrainedEmpty) Mocha.Sapphire else Mocha.Rosewater,
+                        tint = iconTint,
                         modifier = Modifier
                             .padding(Spacing.lg)
                             .size(30.dp)
@@ -984,23 +995,14 @@ private fun ProjectEmptyState(
                 }
 
                 Text(
-                    text = projectEmptyStateTitle(
-                        isConstrainedEmpty = isConstrainedEmpty,
-                        hasActiveSearch = hasActiveSearch,
-                        hasActiveFilter = hasActiveFilter,
-                        filterLabel = filterMode.localizedLabel()
-                    ),
-                    color = Mocha.Text,
+                    text = title,
+                    color = colors.text,
                     style = MaterialTheme.typography.headlineMedium
                 )
 
                 Text(
-                    text = projectEmptyStateBody(
-                        isConstrainedEmpty = isConstrainedEmpty,
-                        hasActiveSearch = hasActiveSearch,
-                        hasActiveFilter = hasActiveFilter
-                    ),
-                    color = Mocha.Subtext0,
+                    text = body,
+                    color = colors.subtext,
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center
                 )

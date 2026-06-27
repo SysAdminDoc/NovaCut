@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +50,7 @@ import com.novacut.editor.ui.editor.PremiumPanelCard
 import com.novacut.editor.ui.editor.PremiumPanelPill
 import com.novacut.editor.ui.editor.PremiumSnackbarHost
 import com.novacut.editor.ui.editor.ToastSeverity
+import com.novacut.editor.ui.theme.LocalClearCutColors
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.ClearCutSecondaryButton
 import com.novacut.editor.ui.theme.Radius
@@ -715,16 +717,27 @@ private fun MediaSourceActionCard(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
+    val colors = LocalClearCutColors.current
+    val semanticDescription = "$label. $description"
     Card(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 76.dp),
+            .defaultMinSize(minHeight = 76.dp)
+            .semantics { contentDescription = semanticDescription },
         colors = CardDefaults.cardColors(
-            containerColor = Mocha.PanelHighest
+            containerColor = if (enabled) colors.panelHighest else colors.panelRaised.copy(alpha = 0.56f),
+            disabledContainerColor = colors.panelRaised.copy(alpha = 0.56f)
         ),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.18f)),
+        border = BorderStroke(
+            1.dp,
+            if (enabled) {
+                color.copy(alpha = if (colors.highContrast) 0.72f else 0.24f)
+            } else {
+                colors.cardStroke.copy(alpha = 0.56f)
+            }
+        ),
         shape = RoundedCornerShape(Radius.xl)
     ) {
         Box(
@@ -732,7 +745,10 @@ private fun MediaSourceActionCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(color.copy(alpha = 0.2f), Color.Transparent)
+                        listOf(
+                            color.copy(alpha = if (enabled) 0.18f else 0.07f),
+                            Color.Transparent
+                        )
                     )
                 )
                 .padding(horizontal = 14.dp, vertical = 12.dp)
@@ -746,13 +762,13 @@ private fun MediaSourceActionCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(Radius.md))
-                        .background(color.copy(alpha = 0.16f)),
+                        .background(color.copy(alpha = if (enabled) 0.16f else 0.07f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         icon,
                         contentDescription = null,
-                        tint = color,
+                        tint = if (enabled) color else colors.disabledText,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -763,14 +779,14 @@ private fun MediaSourceActionCard(
                 ) {
                     Text(
                         label,
-                        color = if (enabled) Mocha.Text else Mocha.Subtext0,
+                        color = if (enabled) colors.text else colors.disabledText,
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = description,
-                        color = if (enabled) Mocha.Subtext0 else Mocha.Overlay1,
+                        color = if (enabled) colors.subtext else colors.disabledText.copy(alpha = 0.74f),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -780,7 +796,7 @@ private fun MediaSourceActionCard(
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = if (enabled) Mocha.Subtext0 else Mocha.Overlay1,
+                    tint = if (enabled) colors.subtext else colors.disabledText.copy(alpha = 0.74f),
                     modifier = Modifier.size(18.dp)
                 )
             }

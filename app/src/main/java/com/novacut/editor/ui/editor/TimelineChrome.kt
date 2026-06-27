@@ -13,8 +13,6 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.model.TrackType
+import com.novacut.editor.ui.theme.ClearCutChromeIconButton
 import com.novacut.editor.ui.theme.LocalClearCutColors
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.Radius
@@ -60,24 +59,18 @@ internal fun TimelineToolbarButton(
         highlight -> Mocha.Peach
         else -> colors.text
     }
-    Surface(
-        color = backgroundColor,
+    ClearCutChromeIconButton(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        tint = iconTint,
+        containerColor = backgroundColor,
+        borderColor = borderColor,
         shape = RoundedCornerShape(Radius.md),
-        border = BorderStroke(1.dp, borderColor)
-    ) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.size(TouchTarget.minimum)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = iconTint,
-                modifier = Modifier.size(if (compact) 16.dp else 18.dp)
-            )
-        }
-    }
+        size = TouchTarget.minimum,
+        iconSize = if (compact) 16.dp else 18.dp,
+        enabled = enabled
+    )
 }
 
 @Composable
@@ -147,26 +140,17 @@ internal fun TimelineMiniIconButton(
     onClick: () -> Unit
 ) {
     val colors = LocalClearCutColors.current
-    Surface(
-        color = if (active) accent.copy(alpha = 0.14f) else colors.panelHighest.copy(alpha = 0.8f),
+    ClearCutChromeIconButton(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        tint = if (active) accent else colors.subtext,
+        containerColor = if (active) accent.copy(alpha = 0.14f) else colors.panelHighest.copy(alpha = 0.8f),
+        borderColor = if (active) accent.copy(alpha = 0.26f) else colors.cardStroke.copy(alpha = 0.5f),
         shape = RoundedCornerShape(Radius.sm),
-        border = BorderStroke(
-            1.dp,
-            if (active) accent.copy(alpha = 0.26f) else colors.cardStroke.copy(alpha = 0.5f)
-        )
-    ) {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier.size(if (compact) 24.dp else 28.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = if (active) accent else colors.subtext,
-                modifier = Modifier.size(if (compact) 12.dp else 14.dp)
-            )
-        }
-    }
+        size = if (compact) 28.dp else 32.dp,
+        iconSize = if (compact) 12.dp else 14.dp
+    )
 }
 
 @Composable

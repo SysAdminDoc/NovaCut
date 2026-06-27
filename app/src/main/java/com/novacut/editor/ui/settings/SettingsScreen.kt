@@ -999,7 +999,9 @@ private fun SettingsOverviewStat(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.semantics {
+            contentDescription = "$label. $value"
+        },
         color = accent.copy(alpha = 0.1f),
         shape = RoundedCornerShape(Radius.md),
         border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.18f))

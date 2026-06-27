@@ -1935,6 +1935,9 @@
 
     <!-- ExportProgressOverlay -->
     <string name="export_eta_remaining">~%1$s remaining</string>
+    <string name="export_encoder_format">Encoder: %1$s</string>
+    <string name="export_stall_warning">Export appears stalled. You can cancel and retry with a lower resolution.</string>
+    <string name="export_error_unknown">The export could not finish. Check the recent export diagnostics, then try again.</string>
     <string name="cd_export_cancel">Cancel export</string>
 
     <!-- ChromaKeyPanel -->

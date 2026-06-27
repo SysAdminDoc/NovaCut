@@ -376,6 +376,7 @@ fun ClearCutChromeIconButton(
     borderColor: Color = Mocha.CardStroke,
     shape: Shape = RoundedCornerShape(Radius.md),
     size: Dp = TouchTarget.minimum,
+    iconSize: Dp = 18.dp,
     enabled: Boolean = true
 ) {
     val colors = LocalClearCutColors.current
@@ -433,7 +434,7 @@ fun ClearCutChromeIconButton(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = animatedTint,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(iconSize)
             )
         }
     }

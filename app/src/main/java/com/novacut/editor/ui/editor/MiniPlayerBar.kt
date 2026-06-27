@@ -14,7 +14,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.novacut.editor.R
+import com.novacut.editor.ui.theme.ClearCutChromeIconButton
+import com.novacut.editor.ui.theme.LocalClearCutColors
 import com.novacut.editor.ui.theme.Mocha
+import com.novacut.editor.ui.theme.Radius
 import com.novacut.editor.ui.theme.TouchTarget
 
 @Composable
@@ -26,6 +29,7 @@ fun MiniPlayerBar(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalClearCutColors.current
     val progress = if (totalDurationMs > 0L) {
         (playheadMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -34,17 +38,20 @@ fun MiniPlayerBar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Mocha.Panel,
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke.copy(alpha = 0.9f))
+        color = colors.panel,
+        shape = RoundedCornerShape(topStart = Radius.lg, topEnd = Radius.lg),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (colors.highContrast) colors.cardStrokeStrong else colors.cardStroke.copy(alpha = 0.9f)
+        )
     ) {
         Row(
             modifier = Modifier
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            Mocha.PanelHighest.copy(alpha = 0.94f),
-                            Mocha.Panel.copy(alpha = 0.98f)
+                            colors.panelHighest.copy(alpha = 0.94f),
+                            colors.panel.copy(alpha = 0.98f)
                         )
                     )
                 )
@@ -52,29 +59,21 @@ fun MiniPlayerBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Surface(
-                color = Mocha.Rosewater.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(14.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.Rosewater.copy(alpha = 0.22f))
-            ) {
-                IconButton(
-                    onClick = onTogglePlayback,
-                    modifier = Modifier.size(TouchTarget.minimum)
-                ) {
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = stringResource(
-                            if (isPlaying) R.string.preview_pause else R.string.preview_play
-                        ),
-                        tint = Mocha.Rosewater,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+            ClearCutChromeIconButton(
+                icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = stringResource(
+                    if (isPlaying) R.string.preview_pause else R.string.preview_play
+                ),
+                onClick = onTogglePlayback,
+                tint = Mocha.Rosewater,
+                containerColor = Mocha.Rosewater.copy(alpha = 0.14f),
+                borderColor = Mocha.Rosewater.copy(alpha = 0.22f),
+                shape = RoundedCornerShape(Radius.md)
+            )
 
             Text(
                 text = formatTimecode(playheadMs),
-                color = Mocha.Text,
+                color = colors.text,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.width(46.dp),
                 maxLines = 1,
@@ -102,7 +101,7 @@ fun MiniPlayerBar(
 
             Text(
                 text = formatTimecode(totalDurationMs),
-                color = Mocha.Subtext0,
+                color = colors.subtext,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.width(46.dp),
                 maxLines = 1,

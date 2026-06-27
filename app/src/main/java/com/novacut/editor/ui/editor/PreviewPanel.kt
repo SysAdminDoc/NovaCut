@@ -54,8 +54,8 @@ import com.novacut.editor.engine.VideoEngine
 import com.novacut.editor.model.AspectRatio
 import com.novacut.editor.model.Clip
 import com.novacut.editor.model.ImageOverlay
+import com.novacut.editor.ui.theme.ClearCutChromeIconButton
 import com.novacut.editor.ui.theme.Mocha
-import com.novacut.editor.ui.theme.TouchTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -298,65 +298,35 @@ fun PreviewPanel(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 if (showScopesButton) {
-                                    Surface(
-                                        color = Mocha.Midnight.copy(alpha = 0.72f),
-                                        shape = CircleShape,
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Mocha.CardStroke),
-                                    ) {
-                                        IconButton(
-                                            onClick = onToggleScopes,
-                                            modifier = Modifier.size(TouchTarget.minimum)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Insights,
-                                                stringResource(R.string.preview_scopes),
-                                                tint = Mocha.Subtext0.copy(alpha = 0.9f),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
+                                    ClearCutChromeIconButton(
+                                        icon = Icons.Default.Insights,
+                                        contentDescription = stringResource(R.string.preview_scopes),
+                                        onClick = onToggleScopes,
+                                        tint = Mocha.Subtext0.copy(alpha = 0.9f),
+                                        containerColor = Mocha.Midnight.copy(alpha = 0.72f),
+                                        borderColor = Mocha.CardStroke,
+                                        shape = CircleShape
+                                    )
                                 }
-                                Surface(
-                                    color = if (showCompositionGuides) Mocha.Mauve.copy(alpha = 0.3f) else Mocha.Midnight.copy(alpha = 0.72f),
+                                ClearCutChromeIconButton(
+                                    icon = Icons.Default.GridOn,
+                                    contentDescription = stringResource(R.string.preview_composition_guides),
+                                    onClick = onToggleCompositionGuides,
+                                    tint = if (showCompositionGuides) Mocha.Mauve else Mocha.Subtext0.copy(alpha = 0.9f),
+                                    containerColor = if (showCompositionGuides) Mocha.Mauve.copy(alpha = 0.3f) else Mocha.Midnight.copy(alpha = 0.72f),
+                                    borderColor = if (showCompositionGuides) Mocha.Mauve.copy(alpha = 0.6f) else Mocha.CardStroke,
                                     shape = CircleShape,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (showCompositionGuides) Mocha.Mauve.copy(alpha = 0.6f) else Mocha.CardStroke
-                                    ),
-                                ) {
-                                    IconButton(
-                                        onClick = onToggleCompositionGuides,
-                                        modifier = Modifier.size(TouchTarget.minimum)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.GridOn,
-                                            contentDescription = stringResource(R.string.preview_composition_guides),
-                                            tint = if (showCompositionGuides) Mocha.Mauve else Mocha.Subtext0.copy(alpha = 0.9f),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
+                                )
                                 if (hasActiveEffects) {
-                                    Surface(
-                                        color = if (isSplitPreviewEnabled) Mocha.Teal.copy(alpha = 0.3f) else Mocha.Midnight.copy(alpha = 0.72f),
+                                    ClearCutChromeIconButton(
+                                        icon = Icons.Default.Compare,
+                                        contentDescription = stringResource(R.string.preview_compare),
+                                        onClick = onToggleSplitPreview,
+                                        tint = if (isSplitPreviewEnabled) Mocha.Teal else Mocha.Subtext0.copy(alpha = 0.9f),
+                                        containerColor = if (isSplitPreviewEnabled) Mocha.Teal.copy(alpha = 0.3f) else Mocha.Midnight.copy(alpha = 0.72f),
+                                        borderColor = if (isSplitPreviewEnabled) Mocha.Teal.copy(alpha = 0.6f) else Mocha.CardStroke,
                                         shape = CircleShape,
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            1.dp,
-                                            if (isSplitPreviewEnabled) Mocha.Teal.copy(alpha = 0.6f) else Mocha.CardStroke
-                                        ),
-                                    ) {
-                                        IconButton(
-                                            onClick = onToggleSplitPreview,
-                                            modifier = Modifier.size(TouchTarget.minimum)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Compare,
-                                                contentDescription = stringResource(R.string.preview_compare),
-                                                tint = if (isSplitPreviewEnabled) Mocha.Teal else Mocha.Subtext0.copy(alpha = 0.9f),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -438,26 +408,20 @@ fun PreviewPanel(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                Surface(
-                    color = Mocha.Rosewater,
-                    shape = CircleShape
-                ) {
-                    IconButton(
-                        onClick = onTogglePlayback,
-                        modifier = Modifier.size(TouchTarget.minimum)
-                    ) {
-                        Icon(
-                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) {
-                                stringResource(R.string.preview_pause)
-                            } else {
-                                stringResource(R.string.preview_play)
-                            },
-                            tint = Mocha.Midnight,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
+                ClearCutChromeIconButton(
+                    icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) {
+                        stringResource(R.string.preview_pause)
+                    } else {
+                        stringResource(R.string.preview_play)
+                    },
+                    onClick = onTogglePlayback,
+                    tint = Mocha.Midnight,
+                    containerColor = Mocha.Rosewater,
+                    borderColor = Mocha.Rosewater.copy(alpha = 0.72f),
+                    shape = CircleShape,
+                    iconSize = 22.dp
+                )
             }
         }
     }

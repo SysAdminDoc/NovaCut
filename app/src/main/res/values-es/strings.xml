@@ -1753,6 +1753,9 @@
     <string name="cd_media_goto">Ir al clip</string>
     <string name="cd_media_missing">desaparecido</string>
     <string name="export_eta_remaining">~%1$s restante</string>
+    <string name="export_encoder_format">Codificador: %1$s</string>
+    <string name="export_stall_warning">La exportación parece detenida. Puede cancelarla e intentarlo de nuevo con una resolución más baja.</string>
+    <string name="export_error_unknown">La exportación no pudo finalizar. Revise los diagnósticos recientes e inténtelo de nuevo.</string>
     <string name="cd_export_cancel">Cancelar exportación</string>
     <string name="chroma_red">rojo</string>
     <string name="chroma_green">Verde</string>

@@ -26,18 +26,14 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -101,6 +97,7 @@ import com.novacut.editor.ui.ClearCutTestTags
 import com.novacut.editor.ui.theme.LocalClearCutColors
 import com.novacut.editor.ui.theme.Mocha
 import com.novacut.editor.ui.theme.Motion
+import com.novacut.editor.ui.theme.ClearCutChromeIconButton
 import com.novacut.editor.ui.theme.ClearCutDialogIcon
 import com.novacut.editor.ui.theme.ClearCutPrimaryButton
 import com.novacut.editor.ui.theme.ClearCutSecondaryButton
@@ -360,25 +357,13 @@ fun ExportSheet(
             }
 
             if (exportState != ExportState.EXPORTING) {
-                Surface(
-                    color = Mocha.PanelHighest,
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, Mocha.CardStroke)
-                ) {
-                    IconButton(
-                        onClick = onClose,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag(ClearCutTestTags.EXPORT_CLOSE)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            stringResource(R.string.close),
-                            tint = Mocha.Subtext0,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                ClearCutChromeIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.close),
+                    onClick = onClose,
+                    modifier = Modifier.testTag(ClearCutTestTags.EXPORT_CLOSE),
+                    size = 40.dp
+                )
             }
         }
 
@@ -397,8 +382,8 @@ fun ExportSheet(
                 null
             }
 
-            val encoderLine = encoderName?.let { "Encoder: $it" }
-            val stallLine = if (stallWarning) "Export appears stalled" else null
+            val encoderLine = encoderName?.let { stringResource(R.string.export_encoder_format, it) }
+            val stallLine = if (stallWarning) stringResource(R.string.export_stall_warning) else null
             val bodyParts = listOfNotNull(
                 stringResource(R.string.export_elapsed, elapsedLabel),
                 encoderLine,
@@ -463,7 +448,7 @@ fun ExportSheet(
                 icon = Icons.Default.Error,
                 tint = Mocha.Red,
                 title = stringResource(R.string.export_failed),
-                body = errorMessage?.takeIf { it.isNotBlank() } ?: stringResource(R.string.error),
+                body = errorMessage?.takeIf { it.isNotBlank() } ?: stringResource(R.string.export_error_unknown),
                 secondaryBody = latestFailureDiagnostic,
                 primaryLabel = stringResource(R.string.retry),
                 onPrimary = onStartExport,
@@ -2140,59 +2125,45 @@ private fun ExportStateCard(
                 Spacer(modifier = Modifier.height(18.dp))
                 when (primaryStyle) {
                     PrimaryStyle.Destructive -> {
-                        // Cancel during export: outlined Peach. Reads as available-but-not-celebratory.
-                        OutlinedButton(
+                        ClearCutSecondaryButton(
+                            text = primaryLabel,
                             onClick = onPrimary,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            border = BorderStroke(1.dp, tint.copy(alpha = 0.6f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = tint),
-                            shape = RoundedCornerShape(Radius.lg)
-                        ) {
-                            Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        }
+                            contentColor = tint
+                        )
                     }
                     PrimaryStyle.Quiet -> {
-                        OutlinedButton(
+                        ClearCutSecondaryButton(
+                            text = primaryLabel,
                             onClick = onPrimary,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            border = BorderStroke(1.dp, colors.cardStrokeStrong),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.text),
-                            shape = RoundedCornerShape(Radius.lg)
-                        ) {
-                            Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        }
+                            contentColor = colors.text
+                        )
                     }
                     PrimaryStyle.Filled -> {
-                        Button(
+                        ClearCutPrimaryButton(
+                            text = primaryLabel,
                             onClick = onPrimary,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (tint == Mocha.Red) Mocha.Red else Mocha.Rosewater,
-                                contentColor = if (tint == Mocha.Red) Mocha.Crust else Mocha.Midnight
-                            ),
-                            shape = RoundedCornerShape(Radius.lg)
-                        ) {
-                            Text(primaryLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                        }
+                            icon = if (tint == Mocha.Red) Icons.Default.Error else null
+                        )
                     }
                 }
 
                 if (secondaryLabel != null && onSecondary != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
+                    ClearCutSecondaryButton(
+                        text = secondaryLabel,
                         onClick = onSecondary,
                         modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, colors.cardStrokeStrong),
-                        shape = RoundedCornerShape(Radius.lg)
-                    ) {
-                        Text(secondaryLabel, color = colors.text, style = MaterialTheme.typography.labelLarge)
-                    }
+                        contentColor = colors.text
+                    )
                 }
 
                 if (tertiaryLabel != null && onTertiary != null) {
