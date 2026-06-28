@@ -42,3 +42,11 @@ research/
 # Markdown files local-only (except README)
 *.md
 !README.md
+
+# AI config
+CODEX_CHANGELOG.md
+AGENTS.md
+.codex/
+.ai/
+PROJECT_CONTEXT.md
+CONTINUATION_PROMPT.md
